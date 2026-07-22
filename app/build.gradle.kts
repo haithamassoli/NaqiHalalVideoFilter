@@ -40,6 +40,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true // BuildConfig.DEBUG gates the debug autorun + forced-interval E2E hooks
     }
     packaging {
         jniLibs {
@@ -65,8 +66,10 @@ dependencies {
     implementation(libs.media3.transformer)
     implementation(libs.media3.effect)
     implementation(libs.media3.common)
+    implementation(libs.mlkit.face.detection)
 
     testImplementation(libs.junit)
+    testImplementation(libs.json) // real org.json impl so Edl JSON round-trip tests run on the JVM
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -10,16 +10,22 @@ import com.haithamassoli.naqi.model.FilterOps
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
-/** Thin WorkManager facade for the (M0 no-op) filtering job. */
+/** Thin WorkManager facade for the filtering job. */
 object JobController {
 
-    fun start(context: Context, ops: FilterOps, inputUri: String?): UUID {
+    /** @param forceIntervalsMs debug-only "startMs-endMs,startMs-endMs" forced censor spans (E2E hook). */
+    fun start(context: Context, ops: FilterOps, inputUri: String?, forceIntervalsMs: String? = null): UUID {
         val request = OneTimeWorkRequestBuilder<FilterWorker>()
             .setInputData(
                 workDataOf(
                     FilterWorker.KEY_REMOVE_MUSIC to ops.removeMusic,
                     FilterWorker.KEY_CENSOR_WOMEN to ops.censorWomen,
                     FilterWorker.KEY_INPUT_URI to inputUri,
+                    FilterWorker.KEY_STRICTNESS to ops.strictness,
+                    FilterWorker.KEY_BLUR_AMOUNT to ops.blurAmount,
+                    FilterWorker.KEY_GRAYSCALE to ops.grayscale,
+                    FilterWorker.KEY_BLUR_UNKNOWN to ops.blurUnknownFaces,
+                    FilterWorker.KEY_FORCE_INTERVALS to forceIntervalsMs,
                 ),
             )
             .build()

@@ -6,6 +6,6 @@
     <string name="job_channel_desc">Progress for on-device filtering jobs</string>
     <string name="job_notif_title">Filtering video</string>
     <string name="action_cancel">Cancel</string>
-    <string name="stage_analyzing">Analyzing video…</string>
-    <string name="stage_rendering">Rendering filtered copy…</string>
+    <string name="stage_analyzing">Pass 1 — analyzing</string>
+    <string name="stage_rendering">Pass 2 — rendering</string>
 </resources>

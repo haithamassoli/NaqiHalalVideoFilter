@@ -12,6 +12,8 @@
 /captures
 # Bundled ONNX models (large binaries) — fetch/regenerate with scripts/fetch-models.sh
 /app/src/main/assets/models/
+# Local QA video clips (synthesized from public-domain portraits; manifest in docs/m0-spikes.md)
+/qa-assets/
 .externalNativeBuild
 .cxx
 local.properties

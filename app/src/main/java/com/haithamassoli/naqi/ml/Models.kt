@@ -134,6 +134,9 @@ object ModelSmoke {
         }
     }
 
+    /** Resolve a bundled model to a real file path (copy-once) for [Infer]; null when not bundled. */
+    internal fun modelFile(context: Context, model: NaqiModel): File? = extracted(context, model)
+
     private fun sessionOptions() = OrtSession.SessionOptions().apply {
         setIntraOpNumThreads(1)
         addConfigEntry("session.intra_op.allow_spinning", "0")

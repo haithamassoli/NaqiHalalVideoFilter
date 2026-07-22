@@ -19,21 +19,23 @@ Status (2026-07-22): code foundations built + verified on a Galaxy S23 (API 36).
 ## M1 — Censor pipeline end-to-end (PRD build order 1)
 **Exit:** pick video → censor-only job → saved copy; face + gate acceptance criteria green; audio passthrough verified.
 
+Status (2026-07-22): pipeline built and E2E-verified on the S23 (12 s 1080p30 QA clip ≈ 18 s warm): female-face blur lands correctly (landscape + rotated-90 input), forced-interval full-frame blur+grayscale verified frame-by-frame, audio passthrough **bit-identical** (ADTS md5), no-audio clip completes, cancel mid-job leaves Movies/ untouched + temp cleaned (WM `CANCELLED` confirmed). QA finding: NudeNet 320n `FACE_MALE` is effectively dead on real portraits (Einstein/Obama/Trump crops → `FACE_FEMALE` 0.7–0.86, `FACE_MALE` ≤ 0.07; reproduced with upstream nudenet package, so preprocessing is correct) ⇒ the vote censors ~all faces — safe direction, PRD-accepted limitation; evaluate 640m in M3 tuning. Rotation is decoder-dependent in media3 1.10 (S23: rot-90 arrives pre-rotated, rot-270 stored + forwarded matrix) — `CensorEffect` detects per stream via frame-vs-probe dims. Debug E2E hooks: `MainActivity` autorun extras + `force_intervals_ms`; local clips in gitignored `qa-assets/`.
+
 Pass 1 — analysis
-- [ ] Decode-only frame sampler with timestamps; downscaled feeds at 5 fps (gate) and 10 fps (faces)
-- [ ] NSFW gate: strictness→threshold interpolation table in one config object; delta rule `nsfw ≥ 0 AND nsfw > sfw`
-- [ ] Hysteresis `[t−0.5s, t+1.5s]` + interval merge; unit tests on synthetic probability sequences
-- [ ] ML Kit face detection (bundled flavor, fast mode, tracking ON) @ 10 fps; box interpolation to full fps; 25% padding
-- [ ] Gender per track: ≤5 frontal crops → NudeNet majority vote (score ≥ 0.35); `blurUnknownFaces` handling; unknown ⇒ skip
-- [ ] EDL builder + serialization: censor intervals + per-frame face regions; precedence (full-frame ⇒ skip faces)
+- [x] Decode-only frame sampler with timestamps; downscaled feeds at 5 fps (gate) and 10 fps (faces) — `analysis/FrameSampler`: one sequential MediaCodec YUV pass at 10 fps, gate consumes every 2nd sample; upright bitmaps (rotation baked)
+- [x] NSFW gate: strictness→threshold interpolation table in one config object; delta rule `nsfw ≥ 0 AND nsfw > sfw` — `analysis/NsfwGate`; 0 firings on SFW QA clips at s=50 on device
+- [x] Hysteresis `[t−0.5s, t+1.5s]` + interval merge; unit tests on synthetic probability sequences — `NsfwGateTest` 14 tests
+- [x] ML Kit face detection (bundled flavor, fast mode, tracking ON) @ 10 fps; box interpolation to full fps; 25% padding — `analysis/FaceTracker`; interpolation via EDL keyframes at render time; note: tracker may keep one id across a hard cut (two-face QA clip intermittently yields 1 spanning track)
+- [x] Gender per track: ≤5 frontal crops → NudeNet majority vote (score ≥ 0.35); `blurUnknownFaces` handling; unknown ⇒ skip — `analysis/GenderVoter`; see FACE_MALE caveat above
+- [x] EDL builder + serialization: censor intervals + per-frame face regions; precedence (full-frame ⇒ skip faces) — `edl/Edl`, org.json round-trip, `EdlTest` 8 tests
 
 Pass 2 — render/encode
-- [ ] GL effects: separable Gaussian blur (downscale→blur→upscale for large sigma), grayscale, combinable; sigma mapped from blur-amount × resolution
-- [ ] EDL-driven render integration per M0 decision (Transformer `GlShaderProgram` or MediaCodec+GLES)
-- [ ] Encode: H.264 with bitrate cap table; HDR→SDR tonemap; rotation preserved
-- [ ] Audio passthrough fast path for censor-only jobs (no audio re-encode)
-- [ ] WorkManager job wiring: staged progress (pass 1 / pass 2), cancel cleans temp, no partial file in `Movies/`
-- [ ] Milestone check: face criteria (full-track censor incl. profile frames within frontal-started tracks; state changes only at EDL boundaries) + strictness 100/0 criteria on QA sets
+- [x] GL effects: separable Gaussian blur (downscale→blur→upscale for large sigma), grayscale, combinable; sigma mapped from blur-amount × resolution — `render/CensorEffect`, downscale ∈ {1,2,4,8} keeping σ_low ≤ 4, sigma keyed on short side
+- [x] EDL-driven render integration per M0 decision (Transformer `GlShaderProgram` or MediaCodec+GLES) — Transformer `CensorGlEffect`; upright↔stored rect mapping decided per stream in `configure()` (`NRect.toStoredSpace`, `NRectRotationTest`)
+- [x] Encode: H.264 with bitrate cap table; HDR→SDR tonemap; rotation preserved — caps by pixel tier, effective = min(source, cap) verified; `HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL` configured but device-unverified (no HDR asset); rotation verified on rot-90 clip
+- [x] Audio passthrough fast path for censor-only jobs (no audio re-encode) — transmux, extracted AAC bit-identical to source
+- [x] WorkManager job wiring: staged progress (pass 1 / pass 2), cancel cleans temp, no partial file in `Movies/` — MediaStore IS_PENDING publish; cancel re-checked after the un-cancellable copy window; pre-Q branch has manifest+runtime `WRITE_EXTERNAL_STORAGE` (device-untested, no API ≤28 hardware)
+- [ ] Milestone check: face criteria (full-track censor incl. profile frames within frontal-started tracks; state changes only at EDL boundaries) + strictness 100/0 criteria on QA sets — BLOCKED (beach/gym/cartoon/profile-face QA sets still missing; face criteria spot-verified on the synthetic portrait clips only)
 
 ## M2 — Audio pipeline (PRD build order 2)
 **Exit:** music-removal-only job ≤15 min on target device; video passthrough bit-identical; A/V drift <50 ms.

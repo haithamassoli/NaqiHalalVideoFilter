@@ -8,6 +8,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
     <!-- Runtime permission on API 33+; still requested at runtime before starting a job. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Pre-Q only: saving the filtered copy into public Movies/Naqi needs legacy write access (also
+         requested at runtime). API 29+ uses scoped MediaStore and needs no permission, so cap at 28. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
         android:allowBackup="true"

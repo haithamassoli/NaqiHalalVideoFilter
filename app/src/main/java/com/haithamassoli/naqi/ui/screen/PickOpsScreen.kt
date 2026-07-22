@@ -77,6 +77,9 @@ fun PickOpsScreen(modifier: Modifier = Modifier) {
     val info = workInfos.firstOrNull()
     val running = info?.state == WorkInfo.State.RUNNING || info?.state == WorkInfo.State.ENQUEUED
     val succeeded = info?.state == WorkInfo.State.SUCCEEDED
+    val failed = info?.state == WorkInfo.State.FAILED
+    val outputName = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_NAME)
+    val outputMessage = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_MESSAGE)
     val progress = info?.progress?.getInt(FilterWorker.KEY_PROGRESS, 0) ?: 0
     val stageText = info?.progress?.getString(FilterWorker.KEY_STAGE).orEmpty()
 
@@ -97,11 +100,22 @@ fun PickOpsScreen(modifier: Modifier = Modifier) {
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         startJob() // start whether granted or not; without it the job runs but its notification is hidden
     }
+    // Pre-Q, saving into public Movies/Naqi needs WRITE_EXTERNAL_STORAGE; a Worker can't request it, so ask here.
+    val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        startJob() // if denied, publish() fails fast with a surfaced message rather than saving nowhere
+    }
 
     fun onContinue() {
+        // Disjoint by API level: storage is pre-Q only, notifications are API 33+, so at most one is asked.
+        val needsStorage = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
         val needsNotif = Build.VERSION.SDK_INT >= 33 &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        if (needsNotif) notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS) else startJob()
+        when {
+            needsStorage -> storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            needsNotif -> notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            else -> startJob()
+        }
     }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background, modifier = modifier) { pad ->
@@ -153,7 +167,10 @@ fun PickOpsScreen(modifier: Modifier = Modifier) {
             }
 
             Spacer(Modifier.height(NaqiTokens.space4))
-            ReassuranceLine(succeeded && !running)
+            ReassuranceLine(
+                savedName = if (succeeded) outputName else null,
+                errorMessage = if (failed) outputMessage else null,
+            )
 
             Spacer(Modifier.height(NaqiTokens.space6))
             DiagnosticsFooter(smoke)
@@ -356,19 +373,29 @@ private fun JobProgressCard(stage: String, progress: Int, onCancel: () -> Unit) 
 }
 
 @Composable
-private fun ReassuranceLine(succeeded: Boolean) {
+private fun ReassuranceLine(savedName: String?, errorMessage: String?) {
     val cs = MaterialTheme.colorScheme
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NaqiTokens.space1)) {
             Icon(NaqiIcons.Check, null, tint = cs.primary, modifier = Modifier.size(15.dp))
             Text("Original file is never changed.", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         }
-        if (succeeded) {
+        if (savedName != null) {
             Spacer(Modifier.height(NaqiTokens.space1))
             Text(
-                "Demo job finished — no file written yet (M0 skeleton).",
+                "Saved to Movies/Naqi/$savedName",
                 style = MaterialTheme.typography.bodySmall,
                 color = cs.primary,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (errorMessage != null) {
+            Spacer(Modifier.height(NaqiTokens.space1))
+            Text(
+                errorMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.error,
+                textAlign = TextAlign.Center,
             )
         }
     }
