@@ -25,6 +25,12 @@
       "skillPath": "performance/r8-analyzer/SKILL.md",
       "computedHash": "b6235067308a3db62adafe508340c66a167877f4d4d14198eaa4a1b87bcdf581"
     },
+    "styles": {
+      "source": "android/skills",
+      "sourceType": "github",
+      "skillPath": "jetpack-compose/theming/styles/SKILL.md",
+      "computedHash": "8392fa00f0b760f4ce4618d16bc5b5a9b8df9da75ae4ea45d8357ccff8a393c1"
+    },
     "testing-setup": {
       "source": "android/skills",
       "sourceType": "github",
