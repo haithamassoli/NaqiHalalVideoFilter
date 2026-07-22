@@ -13,12 +13,18 @@ android {
 
     defaultConfig {
         applicationId = "com.haithamassoli.naqi"
-        minSdk = 28
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // arm64-v8a only: ONNX Runtime ships a universal AAR (~108 MB of .so across 4 ABIs);
+        // restrict to the one ABI we support.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     buildTypes {
@@ -35,6 +41,12 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        jniLibs {
+            // Keep native .so uncompressed + page-aligned (required for ONNX Runtime's 16 KB-page libs).
+            useLegacyPackaging = false
+        }
+    }
 }
 
 dependencies {
@@ -45,7 +57,15 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
+
+    // M0 foundations
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.onnxruntime.android)
+    implementation(libs.media3.transformer)
+    implementation(libs.media3.effect)
+    implementation(libs.media3.common)
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Naqi — Halal Video Filter</string>
+
+    <!-- Job foreground-service notification -->
+    <string name="job_channel_name">Video filtering</string>
+    <string name="job_channel_desc">Progress for on-device filtering jobs</string>
+    <string name="job_notif_title">Filtering video</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="stage_analyzing">Analyzing video…</string>
+    <string name="stage_rendering">Rendering filtered copy…</string>
 </resources>

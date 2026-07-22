@@ -10,6 +10,8 @@
 .DS_Store
 /build
 /captures
+# Bundled ONNX models (large binaries) — fetch/regenerate with scripts/fetch-models.sh
+/app/src/main/assets/models/
 .externalNativeBuild
 .cxx
 local.properties

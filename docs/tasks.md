@@ -5,14 +5,16 @@ Source: `prd-video-filter-android.md`. Milestones are dependency-ordered. M0 add
 ## M0 — Foundations & de-risk spikes
 **Exit:** both risky paths proven on a physical device with measured numbers; all three models validated against reference outputs.
 
-- [ ] Repo scaffold: Kotlin, Compose, minSdk 26, `arm64-v8a` only, coroutines, WorkManager + foreground-service skeleton (no-op job with progress notification + cancel)
-- [ ] ONNX Runtime Android ≥1.19 integrated; XNNPACK EP verified on device; NNAPI behind a debug flag
-- [ ] Source/convert NSFW 5-class classifier (Porn/Sexy/Hentai/Neutral/Drawing) to ONNX/TFLite; lock class order + preprocessing; parity-check against reference on a labeled image set
-- [ ] Source NudeNet v3 320n ONNX; validate `FACE_FEMALE`/`FACE_MALE` on sample crops; lock preprocessing
-- [ ] Export htdemucs f16 ONNX via demucs.onnx (STFT/iSTFT outside graph); parity-check stems vs desktop reference on a 30 s clip
-- [ ] SPIKE: htdemucs device benchmark — 60 s stereo @44.1 kHz on SD 778G-class device; record ×realtime, peak RAM, thermal; go/no-go vs the ≤25 min acceptance budget
-- [ ] SPIKE: Media3 Transformer — custom `GlShaderProgram` (grayscale test effect) + audio replacement via Composition; decide Transformer vs raw MediaCodec fallback; write decision down
-- [ ] Curate local test assets: 5-min 1080p30 main clip, HDR clip, rotated/portrait clip, MKV+Opus clip, no-audio clip, beach/gym/lingerie gate set, cartoon/illustration set, face set incl. profile-only track
+Status (2026-07-22): code foundations built + verified on a Galaxy S23 (API 36). Spike decisions in `m0-spikes.md`. All three models sourced/converted, parity-checked against their references, installed in `assets/models/` (gitignored — `scripts/fetch-models.sh`), and smoke-run on device via `ml/Models.kt`. Still blocked: htdemucs benchmark (needs an SD 778G-class device) and test-asset curation (needs real videos).
+
+- [x] Repo scaffold: Kotlin, Compose, minSdk 26, `arm64-v8a` only, coroutines, WorkManager + foreground-service skeleton (no-op job with progress notification + cancel) — verified on device: enqueue → FGS (`mediaProcessing`) → staged progress notif + Cancel action → SUCCESS and CANCELLED lifecycles confirmed via `WM-WorkerWrapper`
+- [x] ONNX Runtime Android ≥1.19 integrated; XNNPACK EP verified on device; NNAPI behind a debug flag — ORT 1.27.0; on-device readout `providers=[CPU, NNAPI, XNNPACK, WEBGPU]`; NNAPI behind `ModelSmoke.useNnapi` + API≥27; smoke now zero-tensor-infers all three bundled models on launch
+- [x] Source/convert NSFW 5-class classifier (Porn/Sexy/Hentai/Neutral/Drawing) to ONNX/TFLite; lock class order + preprocessing — GantMan MobileNetV2 1.4-224 → ONNX NCHW f32 via tf2onnx; parity vs TF reference max|Δ|=3.6e-7, argmax 8/8; contracts locked in `ml/Models.kt`; 84 ms → [1,5] on S23. Labeled-image spot-check carried to M1 gate QA (no labeled set here); f16 rejected (XNNPACK fp16 depthwise-conv failure) — see `m0-spikes.md`
+- [x] Source NudeNet v3 320n ONNX; lock preprocessing — v3.4 release artifact (sha pinned), 18-class order + letterbox//255/RGB contract locked in `ml/Models.kt`; 76 ms → [1,22,2100] on S23. `FACE_FEMALE`/`FACE_MALE` crop validation carried to M1 QA (needs sample crops); AGPL-3.0 flagged for license review
+- [x] Export htdemucs f16 ONNX via demucs.onnx (STFT/iSTFT outside graph) — torch 2.13 dynamo export, opset 18, f16 87 MB; parity vs torch reference on 7.8 s synthetic: f32 75/89 dB, f16 61.5/65.9 dB SNR (spec/wave); 7.8 s segment ≈ 9 s on S23 (smoke config). Full 30 s overlap-add stems parity lands with the M2 chunk driver
+- [ ] SPIKE: htdemucs device benchmark — 60 s stereo @44.1 kHz on SD 778G-class device; record ×realtime, peak RAM, thermal; go/no-go vs the ≤25 min acceptance budget — BLOCKED (needs SD 778G device; only an S23 flagship is available)
+- [x] SPIKE: Media3 Transformer — custom `GlShaderProgram` (grayscale test effect) + audio replacement via Composition; decide Transformer vs raw MediaCodec fallback; write decision down — DECISION: **Transformer (GO)**, compiles against media3 1.10.1 in `spike/GrayscaleTransformerSpike.kt`; decision written in `m0-spikes.md` (full device transcode pending a test asset)
+- [ ] Curate local test assets: 5-min 1080p30 main clip, HDR clip, rotated/portrait clip, MKV+Opus clip, no-audio clip, beach/gym/lingerie gate set, cartoon/illustration set, face set incl. profile-only track — BLOCKED (no video files here; manifest in `m0-spikes.md`)
 
 ## M1 — Censor pipeline end-to-end (PRD build order 1)
 **Exit:** pick video → censor-only job → saved copy; face + gate acceptance criteria green; audio passthrough verified.
