@@ -1,9 +1,11 @@
 package com.haithamassoli.naqi.ui.screen
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -34,7 +36,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.Eyebrow
 import com.haithamassoli.naqi.ui.NaqiCard
@@ -94,34 +98,38 @@ fun OptionsScreen(
                 .padding(horizontal = NaqiTokens.gutter)
                 .padding(top = NaqiTokens.space4, bottom = NaqiTokens.space7),
         ) {
-            TextButton(onClick = onBack) { Text("← Back") }
+            TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) }
             Spacer(Modifier.height(NaqiTokens.space2))
-            Text("Options", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                stringResource(R.string.opt_title),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             Spacer(Modifier.height(NaqiTokens.space5))
 
             if (ops.censorWomen) {
-                Eyebrow("CENSOR WOMEN")
+                Eyebrow(stringResource(R.string.opt_section_censor_women))
                 Spacer(Modifier.height(NaqiTokens.space3))
                 NaqiCard {
                     SliderRow(
-                        title = "Strictness",
-                        desc = "How eagerly whole scenes are censored. Face blurring is never affected.",
+                        title = stringResource(R.string.opt_strictness_title),
+                        desc = stringResource(R.string.opt_strictness_desc),
                         value = ops.strictness,
                     ) { onOpsChange(ops.copy(strictness = it)) }
                 }
                 Spacer(Modifier.height(NaqiTokens.space3))
                 NaqiCard {
                     SliderRow(
-                        title = "Blur amount",
-                        desc = "How heavy the blur is on faces and censored scenes.",
+                        title = stringResource(R.string.opt_blur_amount_title),
+                        desc = stringResource(R.string.opt_blur_amount_desc),
                         value = ops.blurAmount,
                     ) { onOpsChange(ops.copy(blurAmount = it)) }
                 }
                 Spacer(Modifier.height(NaqiTokens.space3))
                 NaqiCard {
                     ToggleRow(
-                        title = "Grayscale",
-                        desc = "Also drains the color out of censored areas.",
+                        title = stringResource(R.string.opt_grayscale_title),
+                        desc = stringResource(R.string.opt_grayscale_desc),
                         checked = ops.grayscale,
                     ) { onOpsChange(ops.copy(grayscale = it)) }
                 }
@@ -129,7 +137,7 @@ fun OptionsScreen(
             }
 
             if (ops.removeMusic) {
-                Eyebrow("REMOVE MUSIC")
+                Eyebrow(stringResource(R.string.opt_section_remove_music))
                 Spacer(Modifier.height(NaqiTokens.space3))
                 KeepStemsSelector(keepStems = ops.keepStems) { onOpsChange(ops.copy(keepStems = it)) }
                 Spacer(Modifier.height(NaqiTokens.space5))
@@ -145,13 +153,13 @@ fun OptionsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            "Advanced",
+                            stringResource(R.string.opt_advanced_title),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f),
                         )
                         Text(
-                            if (advanced) "Hide" else "Show",
+                            stringResource(if (advanced) R.string.action_hide else R.string.action_show),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -159,11 +167,39 @@ fun OptionsScreen(
                     if (advanced) {
                         Spacer(Modifier.height(NaqiTokens.space3))
                         ToggleRow(
-                            title = "Blur unknown faces",
-                            desc = "Censors faces whose gender never resolves. Off by default: it blurs men too.",
+                            title = stringResource(R.string.opt_blur_unknown_faces_title),
+                            desc = stringResource(R.string.opt_blur_unknown_faces_desc),
                             checked = ops.blurUnknownFaces,
                         ) { onOpsChange(ops.copy(blurUnknownFaces = it)) }
                     }
+                }
+                Spacer(Modifier.height(NaqiTokens.space5))
+            }
+
+            // ponytail: system per-app language picker (API 33+); in-app switcher needs appcompat, add when pre-33 users complain.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                NaqiCard(
+                    Modifier.clickable {
+                        runCatching {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_APP_LOCALE_SETTINGS,
+                                    Uri.fromParts("package", context.packageName, null),
+                                ),
+                            )
+                        }
+                    },
+                ) {
+                    Text(
+                        stringResource(R.string.opt_language),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.opt_language_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Spacer(Modifier.height(NaqiTokens.space5))
             }
@@ -174,7 +210,7 @@ fun OptionsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-            ) { Text("Start", style = MaterialTheme.typography.labelLarge) }
+            ) { Text(stringResource(R.string.action_start), style = MaterialTheme.typography.labelLarge) }
         }
     }
 }
@@ -184,7 +220,7 @@ private fun SliderRow(title: String, desc: String, value: Int, onChange: (Int) -
     val cs = MaterialTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(title, style = MaterialTheme.typography.titleSmall, color = cs.onSurface, modifier = Modifier.weight(1f))
-        Text("$value", style = MaterialTheme.typography.labelMedium, color = cs.primary)
+        Text(stringResource(R.string.opt_slider_value, value), style = MaterialTheme.typography.labelMedium, color = cs.primary)
     }
     Text(desc, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
     Slider(
@@ -212,20 +248,20 @@ private fun ToggleRow(title: String, desc: String, checked: Boolean, onChange: (
 private fun KeepStemsSelector(keepStems: String, onSelect: (String) -> Unit) {
     NaqiCard {
         Text(
-            "KEEP",
+            stringResource(R.string.opt_keep_label),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(NaqiTokens.space2))
         KeepStemsOption(
-            title = "Voices only",
-            desc = "Keeps dialogue and singing; drops music and sound effects.",
+            title = stringResource(R.string.opt_keep_vocals_title),
+            desc = stringResource(R.string.opt_keep_vocals_desc),
             selected = keepStems == "vocals",
         ) { onSelect("vocals") }
         Spacer(Modifier.height(NaqiTokens.space2))
         KeepStemsOption(
-            title = "Voices + sounds",
-            desc = "Also keeps sound effects and ambience; some music may leak.",
+            title = stringResource(R.string.opt_keep_vocals_other_title),
+            desc = stringResource(R.string.opt_keep_vocals_other_desc),
             selected = keepStems == "vocals_other",
         ) { onSelect("vocals_other") }
     }

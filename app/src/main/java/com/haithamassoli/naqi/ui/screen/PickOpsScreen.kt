@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -100,19 +101,19 @@ fun PickOpsScreen(
             PickVideoCard(picked = pickedUri != null, fileName = pickedName) { picker.launch(arrayOf("video/*")) }
             Spacer(Modifier.height(NaqiTokens.space5))
 
-            Eyebrow("CHOOSE WHAT TO FILTER")
+            Eyebrow(stringResource(R.string.pick_eyebrow_choose))
             Spacer(Modifier.height(NaqiTokens.space3))
             OperationCard(
                 icon = NaqiIcons.MusicOff,
-                title = "Remove music",
-                desc = "Strip the soundtrack, keep dialogue.",
+                title = stringResource(R.string.pick_op_music_title),
+                desc = stringResource(R.string.pick_op_music_desc),
                 selected = ops.removeMusic,
             ) { onOpsChange(ops.copy(removeMusic = !ops.removeMusic)) }
             Spacer(Modifier.height(NaqiTokens.space3))
             OperationCard(
                 icon = NaqiIcons.Shield,
-                title = "Censor women",
-                desc = "Blur female faces and flagged scenes.",
+                title = stringResource(R.string.pick_op_women_title),
+                desc = stringResource(R.string.pick_op_women_desc),
                 selected = ops.censorWomen,
             ) { onOpsChange(ops.copy(censorWomen = !ops.censorWomen)) }
 
@@ -125,7 +126,7 @@ fun PickOpsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-            ) { Text("Continue", style = MaterialTheme.typography.labelLarge) }
+            ) { Text(stringResource(R.string.action_continue), style = MaterialTheme.typography.labelLarge) }
 
             Spacer(Modifier.height(NaqiTokens.space4))
             ReassuranceLine()
@@ -149,9 +150,9 @@ private fun TrustSeal() {
             .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space2),
     ) {
         Icon(NaqiIcons.Droplet, contentDescription = null, tint = primary, modifier = Modifier.size(16.dp))
-        Text("On-device", style = MaterialTheme.typography.labelMedium, color = primary)
+        Text(stringResource(R.string.pick_seal_on_device), style = MaterialTheme.typography.labelMedium, color = primary)
         Text("·", style = MaterialTheme.typography.labelMedium, color = primary.copy(alpha = 0.55f))
-        Text("Offline", style = MaterialTheme.typography.labelMedium, color = primary)
+        Text(stringResource(R.string.pick_seal_offline), style = MaterialTheme.typography.labelMedium, color = primary)
     }
 }
 
@@ -168,7 +169,7 @@ private fun Wordmark() {
         )
         Spacer(Modifier.height(NaqiTokens.space3))
         Text(
-            "نقي",
+            stringResource(R.string.pick_wordmark_ar),
             style = MaterialTheme.typography.displayMedium,
             color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
@@ -176,13 +177,13 @@ private fun Wordmark() {
         )
         Spacer(Modifier.height(NaqiTokens.space2))
         Text(
-            "Naqi",
+            stringResource(R.string.pick_wordmark_latin),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(NaqiTokens.space3))
         Text(
-            "Filter video on your device.\nNothing leaves your phone.",
+            stringResource(R.string.pick_tagline),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -212,7 +213,7 @@ private fun PickVideoCard(picked: Boolean, fileName: String?, onClick: () -> Uni
         Spacer(Modifier.height(NaqiTokens.space2))
         Text(
             // A provider may not expose a display name; the video is still picked, so don't look unpicked.
-            fileName ?: if (picked) "Video selected" else "Pick a video",
+            fileName ?: stringResource(if (picked) R.string.pick_video_selected else R.string.pick_video_none),
             style = MaterialTheme.typography.titleMedium,
             color = cs.onSurface,
             maxLines = 1,
@@ -220,7 +221,7 @@ private fun PickVideoCard(picked: Boolean, fileName: String?, onClick: () -> Uni
         )
         Spacer(Modifier.height(NaqiTokens.space1))
         Text(
-            if (picked) "Tap to change" else "MP4 · MKV · WebM",
+            stringResource(if (picked) R.string.pick_video_change else R.string.pick_video_formats),
             style = MaterialTheme.typography.bodySmall,
             color = cs.onSurfaceVariant,
         )
@@ -282,7 +283,11 @@ private fun ReassuranceLine() {
     val cs = MaterialTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NaqiTokens.space1)) {
         Icon(NaqiIcons.Check, null, tint = cs.primary, modifier = Modifier.size(15.dp))
-        Text("Original file is never changed.", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+        Text(
+            stringResource(R.string.pick_reassurance),
+            style = MaterialTheme.typography.bodySmall,
+            color = cs.onSurfaceVariant,
+        )
     }
 }
 
@@ -296,13 +301,13 @@ private fun DiagnosticsFooter(smoke: SmokeReport?) {
             .background(cs.surfaceContainerLow)
             .padding(NaqiTokens.space3),
     ) {
-        Text("DEVICE RUNTIME", style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
+        Text(stringResource(R.string.pick_diag_title), style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
         Spacer(Modifier.height(NaqiTokens.space1))
         if (smoke == null) {
-            Text("Running model smoke…", style = MaterialTheme.typography.bodySmall, color = cs.onSurface)
+            Text(stringResource(R.string.pick_diag_running), style = MaterialTheme.typography.bodySmall, color = cs.onSurface)
         } else {
             Text(
-                "EPs: ${smoke.providers.joinToString(", ").ifEmpty { "—" }}",
+                stringResource(R.string.pick_diag_eps, smoke.providers.joinToString(", ").ifEmpty { "—" }),
                 style = MaterialTheme.typography.bodySmall,
                 color = cs.onSurface,
             )
@@ -313,7 +318,12 @@ private fun DiagnosticsFooter(smoke: SmokeReport?) {
                     else -> "✗" to cs.error
                 }
                 Text(
-                    "$mark ${r.model.assetName.removeSuffix(".onnx")} · ${r.detail}",
+                    stringResource(
+                        R.string.pick_diag_model_line,
+                        mark,
+                        r.model.assetName.removeSuffix(".onnx"),
+                        r.detail,
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = color,
                 )

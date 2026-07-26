@@ -1,7 +1,160 @@
 <resources>
+
+    <!-- ============================================================
+         App
+         ============================================================ -->
     <string name="app_name">Naqi — Halal Video Filter</string>
 
-    <!-- Job foreground-service notification -->
+    <!-- ============================================================
+         Pick / onboarding — step 1, PickOpsScreen
+         ============================================================ -->
+
+    <!-- Trust-seal pill at the very top; the two halves are joined by a "·" drawn in code. Tight space, keep short. -->
+    <string name="pick_seal_on_device">On-device</string>
+    <string name="pick_seal_offline">Offline</string>
+
+    <!-- Brand lockup under the droplet mark. BRAND: identical value in every locale, do not translate. -->
+    <string name="pick_wordmark_ar">نقي</string>
+    <string name="pick_wordmark_latin">Naqi</string>
+
+    <!-- Two-line privacy promise under the wordmark; \n is a real line break in the rendered text. -->
+    <string name="pick_tagline">Filter video on your device.\nNothing leaves your phone.</string>
+
+    <!-- Pick-video card. Title is one line with ellipsis; "Video selected" covers a provider that exposes no name. -->
+    <string name="pick_video_none">Pick a video</string>
+    <string name="pick_video_selected">Video selected</string>
+    <string name="pick_video_change">Tap to change</string>
+    <!-- Accepted containers; the format names are proper nouns and stay Latin in every locale. -->
+    <string name="pick_video_formats">MP4 · MKV · WebM</string>
+
+    <!-- Section label above the two operation cards. Uppercase is literal — Eyebrow() does not uppercase. -->
+    <string name="pick_eyebrow_choose">CHOOSE WHAT TO FILTER</string>
+
+    <!-- Operation cards. -->
+    <string name="pick_op_music_title">Remove music</string>
+    <string name="pick_op_music_desc">Strip the soundtrack, keep dialogue.</string>
+    <string name="pick_op_women_title">Censor women</string>
+    <string name="pick_op_women_desc">Blur female faces and flagged scenes.</string>
+
+    <!-- Primary CTA: advances to the options screen. -->
+    <string name="action_continue">Continue</string>
+
+    <!-- Check-marked reassurance line directly under the Continue button. -->
+    <string name="pick_reassurance">Original file is never changed.</string>
+
+    <!-- Diagnostics footer (ORT provider + per-model smoke results). Uppercase is literal. -->
+    <string name="pick_diag_title">DEVICE RUNTIME</string>
+    <string name="pick_diag_running">Running model smoke…</string>
+    <!-- %1$s = comma-joined ONNX Runtime execution-provider names, or "—" when the list is empty. -->
+    <string name="pick_diag_eps">EPs: %1$s</string>
+    <!-- Layout template, one row per model. %1$s = status glyph (✓ / – / ✗), %2$s = model name, %3$s = diagnostic detail. -->
+    <string name="pick_diag_model_line">%1$s %2$s · %3$s</string>
+
+    <!-- ============================================================
+         Options — step 2, OptionsScreen
+         ============================================================ -->
+
+    <!-- Top-left back affordance; the ← glyph is part of the label. Mirror it to → in RTL locales. -->
+    <string name="action_back">← Back</string>
+    <string name="opt_title">Options</string>
+
+    <!-- Censor-women section. Uppercase is literal — Eyebrow() does not uppercase. -->
+    <string name="opt_section_censor_women">CENSOR WOMEN</string>
+    <string name="opt_strictness_title">Strictness</string>
+    <string name="opt_strictness_desc">How eagerly whole scenes are censored. Face blurring is never affected.</string>
+    <string name="opt_blur_amount_title">Blur amount</string>
+    <string name="opt_blur_amount_desc">How heavy the blur is on faces and censored scenes.</string>
+    <string name="opt_grayscale_title">Grayscale</string>
+    <string name="opt_grayscale_desc">Also drains the color out of censored areas.</string>
+
+    <!-- Remove-music section. Uppercase is literal. -->
+    <string name="opt_section_remove_music">REMOVE MUSIC</string>
+    <!-- Keep-stems card. The wire values "vocals"/"vocals_other" are NOT localizable and are not resources. -->
+    <string name="opt_keep_label">KEEP</string>
+    <string name="opt_keep_vocals_title">Voices only</string>
+    <string name="opt_keep_vocals_desc">Keeps dialogue and singing; drops music and sound effects.</string>
+    <string name="opt_keep_vocals_other_title">Voices + sounds</string>
+    <string name="opt_keep_vocals_other_desc">Also keeps sound effects and ambience; some music may leak.</string>
+
+    <!-- Collapsible Advanced card (censor-only). action_hide/action_show are the two states of one affordance. -->
+    <string name="opt_advanced_title">Advanced</string>
+    <string name="action_hide">Hide</string>
+    <string name="action_show">Show</string>
+    <string name="opt_blur_unknown_faces_title">Blur unknown faces</string>
+    <string name="opt_blur_unknown_faces_desc">Censors faces whose gender never resolves. Off by default: it blurs men too.</string>
+
+    <!-- Primary CTA: enqueues the filtering job. -->
+    <string name="action_start">Start</string>
+
+    <!-- Numeric readout beside a slider title. %1$d = the 0–100 value. -->
+    <string name="opt_slider_value">%1$d</string>
+
+    <!-- ============================================================
+         Jobs / library — step 3, JobsScreen
+         Also reuses action_cancel, action_open and action_share (see Notifications).
+         ============================================================ -->
+
+    <!-- Resets the flow back to step 1; the ← glyph is part of the label. Mirror it to → in RTL locales. -->
+    <string name="jobs_new_job">← Filter another video</string>
+
+    <!-- Empty state inside the job card when nothing is running, succeeded or failed. -->
+    <string name="jobs_none_running">No job running.</string>
+
+    <!-- Library list. Uppercase is literal. "Movies/Naqi" is a real on-disk path — keep it Latin, untranslated. -->
+    <string name="jobs_library">LIBRARY</string>
+    <string name="jobs_library_empty">Filtered videos are saved to Movies/Naqi.</string>
+
+    <!-- Progress card. jobs_stage_starting fills the instant before the worker publishes its first stage_* value. -->
+    <string name="jobs_stage_starting">Starting…</string>
+    <!-- %1$d = 0–100 progress; %% is a literal percent sign. -->
+    <string name="jobs_progress_percent">%1$d%%</string>
+
+    <!-- Success card. %1$s = the saved file name; the Movies/Naqi/ segment is a real path and stays Latin. -->
+    <string name="jobs_saved_label">Saved</string>
+    <string name="jobs_saved_path">Movies/Naqi/%1$s</string>
+
+    <!-- Header of the system share sheet. -->
+    <string name="jobs_share_chooser_title">Share video</string>
+
+    <!-- File-size subtitle on a library row. %1$.1f = gigabytes, %1$.0f = megabytes. -->
+    <string name="jobs_size_gb">%1$.1f GB</string>
+    <string name="jobs_size_mb">%1$.0f MB</string>
+
+    <!-- ============================================================
+         Dialogs and toasts — MainActivity
+         ============================================================ -->
+
+    <!-- Toasts after the delete-original flow resolves. -->
+    <string name="dlg_original_deleted">Original deleted</string>
+    <string name="dlg_original_kept">Original kept</string>
+    <string name="dlg_delete_original_failed">Couldn’t delete the original — remove it from your gallery instead.</string>
+
+    <!-- Confirm-delete dialog. %1$s = the file name of the filtered copy; it may fall back to dlg_delete_original_fallback_name. -->
+    <string name="dlg_delete_original_title">Delete the original?</string>
+    <string name="dlg_delete_original_body">The filtered copy (%1$s) stays in Movies/Naqi. The original video will be removed from this device and can’t be recovered.</string>
+    <string name="dlg_delete_original_fallback_name">this video</string>
+    <!-- Buttons of that dialog. Distinct from action_delete_original, the notification action. -->
+    <string name="action_delete">Delete</string>
+    <string name="action_keep">Keep</string>
+
+    <!-- ============================================================
+         Failure messages — the Preflight taxonomy, resolved in JobsScreen
+         ============================================================ -->
+    <string name="err_drm">This video is copy-protected (DRM), so it can’t be filtered.</string>
+    <string name="err_unreadable">This file couldn’t be opened. It may be damaged or in a format this device doesn’t support.</string>
+    <string name="err_no_video">This file has no video track.</string>
+    <string name="err_no_audio">This video has no audio track, so there’s no music to remove.</string>
+    <!-- The 2 GB figure is a fixed constant, not a format arg. -->
+    <string name="err_low_space">Not enough free space. Filtering needs room for a temporary copy plus about 2 GB.</string>
+    <string name="err_unsupported_codec">This video uses a codec this device can’t decode.</string>
+    <string name="err_out_of_space">The device ran out of space while saving the filtered copy.</string>
+    <!-- Catch-all. Also the JobsScreen fallback when a FAILED job carried no message. -->
+    <string name="err_generic">Filtering failed.</string>
+
+    <!-- ============================================================
+         Notifications — job foreground service and the done notification.
+         The action_* keys here are shared with JobsScreen and must keep these exact names.
+         ============================================================ -->
     <string name="job_channel_name">Video filtering</string>
     <string name="job_channel_desc">Progress for on-device filtering jobs</string>
     <string name="job_notif_title">Filtering video</string>

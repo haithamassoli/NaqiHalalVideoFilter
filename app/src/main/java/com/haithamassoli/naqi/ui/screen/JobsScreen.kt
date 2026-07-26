@@ -37,9 +37,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.work.WorkInfo
+import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.ui.Eyebrow
 import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
@@ -67,7 +69,8 @@ fun JobsScreen(onNewJob: () -> Unit, modifier: Modifier = Modifier) {
     val failed = info?.state == WorkInfo.State.FAILED
     val outputName = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_NAME)
     val outputUri = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_URI)
-    val outputMessage = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_MESSAGE)
+    // A @StringRes id, so a failure re-localizes if the language changes after the job failed; 0 = absent.
+    val outputMessageId = info?.outputData?.getInt(FilterWorker.KEY_OUTPUT_MESSAGE, 0) ?: 0
     val progress = info?.progress?.getInt(FilterWorker.KEY_PROGRESS, 0) ?: 0
     val stageText = info?.progress?.getString(FilterWorker.KEY_STAGE).orEmpty()
 
@@ -93,7 +96,7 @@ fun JobsScreen(onNewJob: () -> Unit, modifier: Modifier = Modifier) {
                 .padding(horizontal = NaqiTokens.gutter)
                 .padding(top = NaqiTokens.space4, bottom = NaqiTokens.space7),
         ) {
-            TextButton(onClick = onNewJob) { Text("← Filter another video") }
+            TextButton(onClick = onNewJob) { Text(stringResource(R.string.jobs_new_job)) }
             Spacer(Modifier.height(NaqiTokens.space2))
 
             when {
@@ -101,14 +104,14 @@ fun JobsScreen(onNewJob: () -> Unit, modifier: Modifier = Modifier) {
                 succeeded -> SavedCard(outputName, savedUri, context)
                 failed -> NaqiCard {
                     Text(
-                        outputMessage ?: "Filtering failed.",
+                        stringResource(if (outputMessageId != 0) outputMessageId else R.string.err_generic),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
                 else -> NaqiCard {
                     Text(
-                        "No job running.",
+                        stringResource(R.string.jobs_none_running),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -116,11 +119,11 @@ fun JobsScreen(onNewJob: () -> Unit, modifier: Modifier = Modifier) {
             }
 
             Spacer(Modifier.height(NaqiTokens.space6))
-            Eyebrow("LIBRARY")
+            Eyebrow(stringResource(R.string.jobs_library))
             Spacer(Modifier.height(NaqiTokens.space3))
             if (library.isEmpty()) {
                 Text(
-                    "Filtered videos are saved to Movies/Naqi.",
+                    stringResource(R.string.jobs_library_empty),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -137,15 +140,20 @@ fun JobsScreen(onNewJob: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 private fun JobProgressCard(stage: String, progress: Int, onCancel: () -> Unit) {
     val cs = MaterialTheme.colorScheme
+    val starting = stringResource(R.string.jobs_stage_starting)
     NaqiCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                stage.ifEmpty { "Starting…" },
+                stage.ifEmpty { starting },
                 style = MaterialTheme.typography.titleSmall,
                 color = cs.onSurface,
                 modifier = Modifier.weight(1f),
             )
-            Text("$progress%", style = MaterialTheme.typography.labelMedium, color = cs.primary)
+            Text(
+                stringResource(R.string.jobs_progress_percent, progress),
+                style = MaterialTheme.typography.labelMedium,
+                color = cs.primary,
+            )
         }
         Spacer(Modifier.height(NaqiTokens.space3))
         LinearProgressIndicator(
@@ -158,7 +166,9 @@ private fun JobProgressCard(stage: String, progress: Int, onCancel: () -> Unit) 
             trackColor = cs.surfaceContainerHighest,
         )
         Spacer(Modifier.height(NaqiTokens.space2))
-        TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.End)) { Text("Cancel") }
+        TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.action_cancel))
+        }
     }
 }
 
@@ -166,10 +176,10 @@ private fun JobProgressCard(stage: String, progress: Int, onCancel: () -> Unit) 
 private fun SavedCard(name: String?, uri: Uri?, context: Context) {
     val cs = MaterialTheme.colorScheme
     NaqiCard {
-        Text("Saved", style = MaterialTheme.typography.labelMedium, color = cs.primary)
+        Text(stringResource(R.string.jobs_saved_label), style = MaterialTheme.typography.labelMedium, color = cs.primary)
         Spacer(Modifier.height(NaqiTokens.space1))
         Text(
-            "Movies/Naqi/${name.orEmpty()}",
+            stringResource(R.string.jobs_saved_path, name.orEmpty()),
             style = MaterialTheme.typography.bodyMedium,
             color = cs.onSurface,
         )

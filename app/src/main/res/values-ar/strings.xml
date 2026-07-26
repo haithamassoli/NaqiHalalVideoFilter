@@ -1,0 +1,170 @@
+<resources>
+
+    <!-- ============================================================
+         App
+         ============================================================ -->
+    <string name="app_name">نقي — فلتر الفيديو الحلال</string>
+
+    <!-- ============================================================
+         Pick / onboarding — step 1, PickOpsScreen
+         ============================================================ -->
+
+    <!-- Trust-seal pill at the very top; the two halves are joined by a "·" drawn in code. Tight space, keep short. -->
+    <string name="pick_seal_on_device">على الجهاز</string>
+    <string name="pick_seal_offline">بلا إنترنت</string>
+
+    <!-- Brand lockup under the droplet mark. BRAND: identical value in every locale, do not translate. -->
+    <string name="pick_wordmark_ar">نقي</string>
+    <string name="pick_wordmark_latin">Naqi</string>
+
+    <!-- Two-line privacy promise under the wordmark; \n is a real line break in the rendered text. -->
+    <string name="pick_tagline">تتم فلترة الفيديو على جهازك.\nلا شيء يغادر هاتفك.</string>
+
+    <!-- Pick-video card. Title is one line with ellipsis; "Video selected" covers a provider that exposes no name. -->
+    <string name="pick_video_none">اختر فيديو</string>
+    <string name="pick_video_selected">تم اختيار الفيديو</string>
+    <string name="pick_video_change">انقر للتغيير</string>
+    <!-- Accepted containers; the format names are proper nouns and stay Latin in every locale. -->
+    <string name="pick_video_formats">MP4 · MKV · WebM</string>
+
+    <!-- Section label above the two operation cards. Arabic has no case; a short phrase replaces the English caps. -->
+    <string name="pick_eyebrow_choose">اختر ما تريد فلترته</string>
+
+    <!-- Operation cards. -->
+    <string name="pick_op_music_title">إزالة الموسيقى</string>
+    <string name="pick_op_music_desc">تُزيل الموسيقى التصويرية وتُبقي الحوار.</string>
+    <string name="pick_op_women_title">حجب النساء</string>
+    <string name="pick_op_women_desc">تُموّه وجوه النساء والمشاهد المُخالفة.</string>
+
+    <!-- Primary CTA: advances to the options screen. -->
+    <string name="action_continue">متابعة</string>
+
+    <!-- Check-marked reassurance line directly under the Continue button. -->
+    <string name="pick_reassurance">لا يُمسّ الملف الأصلي أبدًا.</string>
+
+    <!-- Diagnostics footer (ORT provider + per-model smoke results). The label is translated, the runtime tokens are not. -->
+    <string name="pick_diag_title">بيئة التشغيل على الجهاز</string>
+    <string name="pick_diag_running">جارٍ اختبار النماذج…</string>
+    <!-- %1$s = comma-joined ONNX Runtime execution-provider names, or "—" when the list is empty. -->
+    <string name="pick_diag_eps">موفّرات التنفيذ: %1$s</string>
+    <!-- Layout template, one row per model. %1$s = status glyph (✓ / – / ✗), %2$s = model name, %3$s = diagnostic detail. -->
+    <string name="pick_diag_model_line">%1$s %2$s · %3$s</string>
+
+    <!-- ============================================================
+         Options — step 2, OptionsScreen
+         ============================================================ -->
+
+    <!-- Top-left back affordance; the arrow is part of the label and is mirrored to → for RTL. -->
+    <string name="action_back">→ رجوع</string>
+    <string name="opt_title">الخيارات</string>
+
+    <!-- Censor-women section. Arabic has no case; a short phrase replaces the English caps. -->
+    <string name="opt_section_censor_women">حجب النساء</string>
+    <string name="opt_strictness_title">الصرامة</string>
+    <string name="opt_strictness_desc">مدى سهولة حجب المشهد كاملًا. لا يتأثّر تمويه الوجوه بهذا الإعداد.</string>
+    <string name="opt_blur_amount_title">شدّة التمويه</string>
+    <string name="opt_blur_amount_desc">مدى قوّة التمويه على الوجوه والمشاهد المحجوبة.</string>
+    <string name="opt_grayscale_title">تدرّج الرمادي</string>
+    <string name="opt_grayscale_desc">يسحب الألوان أيضًا من المناطق المحجوبة.</string>
+
+    <!-- Remove-music section. Arabic has no case; a short phrase replaces the English caps. -->
+    <string name="opt_section_remove_music">إزالة الموسيقى</string>
+    <!-- Keep-stems card. The wire values "vocals"/"vocals_other" are NOT localizable and are not resources. -->
+    <string name="opt_keep_label">ما يُحتفظ به</string>
+    <string name="opt_keep_vocals_title">الأصوات البشرية فقط</string>
+    <string name="opt_keep_vocals_desc">يُبقي الحوار والغناء؛ ويحذف الموسيقى والمؤثرات الصوتية.</string>
+    <string name="opt_keep_vocals_other_title">الأصوات البشرية + المؤثرات</string>
+    <string name="opt_keep_vocals_other_desc">يُبقي أيضًا المؤثرات الصوتية وأصوات المحيط؛ وقد يتسرّب شيء من الموسيقى.</string>
+
+    <!-- Collapsible Advanced card (censor-only). action_hide/action_show are the two states of one affordance. -->
+    <string name="opt_advanced_title">خيارات متقدّمة</string>
+    <string name="action_hide">إخفاء</string>
+    <string name="action_show">إظهار</string>
+    <string name="opt_blur_unknown_faces_title">تمويه الوجوه غير المُصنَّفة</string>
+    <string name="opt_blur_unknown_faces_desc">يحجب الوجوه التي يتعذّر تحديد جنسها. مُعطَّل افتراضيًا لأنه يُموّه الرجال أيضًا.</string>
+
+    <!-- Primary CTA: enqueues the filtering job. -->
+    <string name="action_start">بدء</string>
+
+    <!-- Numeric readout beside a slider title. %1$d = the 0–100 value. -->
+    <string name="opt_slider_value">%1$d</string>
+
+    <!-- ============================================================
+         Jobs / library — step 3, JobsScreen
+         Also reuses action_cancel, action_open and action_share (see Notifications).
+         ============================================================ -->
+
+    <!-- Resets the flow back to step 1; the arrow is part of the label and is mirrored to → for RTL. -->
+    <string name="jobs_new_job">→ فلترة فيديو آخر</string>
+
+    <!-- Empty state inside the job card when nothing is running, succeeded or failed. -->
+    <string name="jobs_none_running">لا توجد مهمة قيد التنفيذ.</string>
+
+    <!-- Library list. "Movies/Naqi" is a real on-disk path — keep it Latin, untranslated. -->
+    <string name="jobs_library">المكتبة</string>
+    <string name="jobs_library_empty">تُحفظ مقاطع الفيديو المُفلترة في Movies/Naqi.</string>
+
+    <!-- Progress card. jobs_stage_starting fills the instant before the worker publishes its first stage_* value. -->
+    <string name="jobs_stage_starting">جارٍ البدء…</string>
+    <!-- %1$d = 0–100 progress; ٪ (U+066A) is the Arabic percent sign, so no %% escape is needed here. -->
+    <string name="jobs_progress_percent">%1$d٪</string>
+
+    <!-- Success card. %1$s = the saved file name; the Movies/Naqi/ segment is a real path and stays Latin. -->
+    <string name="jobs_saved_label">تم الحفظ</string>
+    <string name="jobs_saved_path">Movies/Naqi/%1$s</string>
+
+    <!-- Header of the system share sheet. -->
+    <string name="jobs_share_chooser_title">مشاركة الفيديو</string>
+
+    <!-- File-size subtitle on a library row. %1$.1f = gigabytes, %1$.0f = megabytes. -->
+    <string name="jobs_size_gb">%1$.1f غيغابايت</string>
+    <string name="jobs_size_mb">%1$.0f ميغابايت</string>
+
+    <!-- ============================================================
+         Dialogs and toasts — MainActivity
+         ============================================================ -->
+
+    <!-- Toasts after the delete-original flow resolves. -->
+    <string name="dlg_original_deleted">تم حذف الملف الأصلي</string>
+    <string name="dlg_original_kept">تم الإبقاء على الملف الأصلي</string>
+    <string name="dlg_delete_original_failed">تعذّر حذف الملف الأصلي — احذفه من المعرض بدلًا من ذلك.</string>
+
+    <!-- Confirm-delete dialog. %1$s = the file name of the filtered copy; it may fall back to dlg_delete_original_fallback_name. -->
+    <string name="dlg_delete_original_title">حذف الملف الأصلي؟</string>
+    <string name="dlg_delete_original_body">تبقى النسخة المُفلترة (%1$s) في Movies/Naqi. أمّا الفيديو الأصلي فسيُحذف من هذا الجهاز ولا يمكن استرجاعه.</string>
+    <string name="dlg_delete_original_fallback_name">هذا الفيديو</string>
+    <!-- Buttons of that dialog. Distinct from action_delete_original, the notification action. -->
+    <string name="action_delete">حذف</string>
+    <string name="action_keep">إبقاء</string>
+
+    <!-- ============================================================
+         Failure messages — the Preflight taxonomy, resolved in JobsScreen
+         ============================================================ -->
+    <string name="err_drm">هذا الفيديو محمي ضد النسخ (DRM)، لذا لا يمكن فلترته.</string>
+    <string name="err_unreadable">تعذّر فتح هذا الملف. قد يكون تالفًا أو بصيغة لا يدعمها هذا الجهاز.</string>
+    <string name="err_no_video">لا يحتوي هذا الملف على مسار فيديو.</string>
+    <string name="err_no_audio">لا يحتوي هذا الفيديو على مسار صوتي، فلا توجد موسيقى لإزالتها.</string>
+    <!-- The 2 GB figure is a fixed constant, not a format arg. -->
+    <string name="err_low_space">لا توجد مساحة خالية كافية. تحتاج الفلترة إلى مساحة لنسخة مؤقتة إضافةً إلى نحو ٢ غيغابايت.</string>
+    <string name="err_unsupported_codec">يستخدم هذا الفيديو ترميزًا لا يستطيع هذا الجهاز فكّه.</string>
+    <string name="err_out_of_space">نفدت مساحة التخزين في الجهاز أثناء حفظ النسخة المُفلترة.</string>
+    <!-- Catch-all. Also the JobsScreen fallback when a FAILED job carried no message. -->
+    <string name="err_generic">فشلت الفلترة.</string>
+
+    <!-- ============================================================
+         Notifications — job foreground service and the done notification.
+         The action_* keys here are shared with JobsScreen and must keep these exact names.
+         ============================================================ -->
+    <string name="job_channel_name">فلترة الفيديو</string>
+    <string name="job_channel_desc">تقدّم مهام الفلترة على الجهاز</string>
+    <string name="job_notif_title">جارٍ فلترة الفيديو</string>
+    <string name="action_cancel">إلغاء</string>
+    <string name="stage_analyzing">المرحلة ١ — التحليل</string>
+    <string name="stage_rendering">المرحلة ٢ — المعالجة</string>
+    <string name="stage_separating">إزالة الموسيقى</string>
+    <string name="stage_muxing">اللمسات الأخيرة</string>
+    <string name="done_notif_title">تم حفظ النسخة المُفلترة</string>
+    <string name="action_open">فتح</string>
+    <string name="action_share">مشاركة</string>
+    <string name="action_delete_original">حذف الأصلي</string>
+</resources>

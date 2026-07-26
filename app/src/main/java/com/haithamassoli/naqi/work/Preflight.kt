@@ -5,6 +5,8 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.annotation.StringRes
+import com.haithamassoli.naqi.R
 import java.io.FileNotFoundException
 import java.io.IOException
 
