@@ -39,9 +39,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.ml.ModelSmoke
 import com.haithamassoli.naqi.ml.SmokeReport
 import com.haithamassoli.naqi.model.FilterOps
@@ -156,6 +158,15 @@ private fun TrustSeal() {
 @Composable
 private fun Wordmark() {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // The mark is the bowl of ن holding a droplet — it rhymes with the نـ of the wordmark below,
+        // so the two read as one lockup rather than a logo parked above a title.
+        Icon(
+            painterResource(R.drawable.ic_naqi_mark),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(60.dp),
+        )
+        Spacer(Modifier.height(NaqiTokens.space3))
         Text(
             "نقي",
             style = MaterialTheme.typography.displayMedium,
