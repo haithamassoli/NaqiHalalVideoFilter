@@ -20,6 +20,12 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // Base URL for the M3 model downloader's *converted* artifacts (the NSFW gate and htdemucs —
+        // NudeNet carries its own public release URL). Empty by default: no host is published yet, and
+        // ModelDownloader reports "no download source configured" rather than building a bogus request.
+        // Set with -PnaqiModelBaseUrl=https://host/path (https only — cleartext is blocked at API 28+).
+        buildConfigField("String", "NAQI_MODEL_BASE_URL", "\"${project.findProperty("naqiModelBaseUrl") ?: ""}\"")
+
         // arm64-v8a only: ONNX Runtime ships a universal AAR (~108 MB of .so across 4 ABIs);
         // restrict to the one ABI we support.
         ndk {

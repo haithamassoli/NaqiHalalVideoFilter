@@ -25,6 +25,7 @@ object JobController {
                     FilterWorker.KEY_BLUR_AMOUNT to ops.blurAmount,
                     FilterWorker.KEY_GRAYSCALE to ops.grayscale,
                     FilterWorker.KEY_BLUR_UNKNOWN to ops.blurUnknownFaces,
+                    FilterWorker.KEY_KEEP_STEMS to ops.keepStems,
                     FilterWorker.KEY_FORCE_INTERVALS to forceIntervalsMs,
                 ),
             )

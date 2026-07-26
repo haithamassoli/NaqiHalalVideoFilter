@@ -17,3 +17,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Python bytecode from scripts/
+scripts/__pycache__/

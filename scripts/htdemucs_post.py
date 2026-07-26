@@ -1,7 +1,10 @@
 """Post-export: dump IO, convert to f16, parity-check torch reference vs ORT f32/f16.
 
 Run with PYTHONPATH=<demucs.onnx>/demucs-for-onnx, inside the demucs venv.
-Usage: python htdemucs_post.py <out_dir_with_htdemucs.onnx>
+Usage: python htdemucs_post.py <out_dir_with_htdemucs.onnx> [segment_seconds]
+
+[segment_seconds] must match the segment the .onnx was exported at (see htdemucs_export.py);
+it sets the length of the synthetic parity signal. Omit it for the checkpoint's own 7.8 s.
 """
 import os
 import sys
@@ -34,6 +37,8 @@ print("sizes MB: f32=%.1f f16=%.1f" % (os.path.getsize(f32_path) / 1e6, os.path.
 model = get_model("htdemucs")
 core = model.models[0] if hasattr(model, "models") else model
 core.eval()
+if len(sys.argv) > 2:
+    core.segment = float(sys.argv[2])  # must match what htdemucs_export.py baked into the graph
 sr = 44100
 T = int(core.segment * sr)
 print("training_length:", T)

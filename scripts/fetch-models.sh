@@ -13,6 +13,6 @@ if [ ! -s "$DEST/nudenet_320n.onnx" ]; then
 fi
 echo "c15d8273adad2d0a92f014cc69ab2d6c311a06777a55545f2c4eb46f51911f0f  $DEST/nudenet_320n.onnx" | shasum -a 256 -c
 
-for f in nsfw_mnv2_140_f32.onnx htdemucs_f16.onnx; do
+for f in nsfw_mnv2_140_f32.onnx htdemucs_s39_f16.onnx; do
   [ -s "$DEST/$f" ] || echo "MISSING $DEST/$f — regenerate per docs/m0-spikes.md (Models section)"
 done

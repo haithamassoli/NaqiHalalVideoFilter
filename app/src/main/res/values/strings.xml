@@ -8,4 +8,10 @@
     <string name="action_cancel">Cancel</string>
     <string name="stage_analyzing">Pass 1 — analyzing</string>
     <string name="stage_rendering">Pass 2 — rendering</string>
+    <string name="stage_separating">Removing music</string>
+    <string name="stage_muxing">Finishing up</string>
+    <string name="done_notif_title">Filtered copy saved</string>
+    <string name="action_open">Open</string>
+    <string name="action_share">Share</string>
+    <string name="action_delete_original">Delete original</string>
 </resources>

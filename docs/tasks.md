@@ -40,23 +40,34 @@ Pass 2 — render/encode
 ## M2 — Audio pipeline (PRD build order 2)
 **Exit:** music-removal-only job ≤15 min on target device; video passthrough bit-identical; A/V drift <50 ms.
 
-- [ ] Demux + decode to f32 stereo PCM; resample to 44.1 kHz
-- [ ] Chunked overlap-add htdemucs driver per demucs.onnx reference
-- [ ] Streaming stem sum: only `keep_stems` materialized per chunk (never 4 full stems); soft-clip guard
-- [ ] Streaming AAC-LC 48 kHz 192 kbps encode with 1-chunk lookahead; temp disk <2 GB verified on 2 h input
-- [ ] Video passthrough fast path: remux original video samples, zero video re-encode
-- [ ] Combined-ops path: processed audio muxed with pass-2 video output
-- [ ] `keep_stems` option (`vocals` / `vocals+other`) plumbed end-to-end
-- [ ] Preflight: free space ≥ 2× source + 2 GB; no-audio-track error when music removal selected
-- [ ] Milestone check: runtime, bit-identity, A/V sync on 5-min clip
+Status (2026-07-26): built in a prior session, then **reviewed and device-verified** here. All three job shapes run green on the S23. Measured on `qa-assets/`: music-only 5-min 1080p **8.2 min** at the original 7.8 s segment, **~3.4 min** after the M3 re-export (budget ≤15 min); video track **bit-identical** (elementary-stream MD5 *and* packet PTS/size sequence match) on both the 30 s and 5-min clips; **A/V lag a constant 2048 samples = 42.67 ms** measured by cross-correlation at the start, middle and end of the 5-min clip — i.e. no progressive drift, the double 44.1k↔48k resample contributes nothing, and the whole error is uncompensated AAC encoder priming (budget <50 ms, so ~7 ms of margin). Combined path verified (84 s for 30 s in, censor render + replaced audio). Cancel mid-job: **2 s latency (one chunk), no partial file in `Movies/`, temp cache clean**. Ingest verified on 44.1 kHz stereo, 48 kHz stereo and 48 kHz mono sources.
+
+A 61-agent adversarial review of the 1 209 new lines raised 27 findings; 21 were refuted, 6 confirmed. Two were fixed here (preflight, free-space); one more (5.1 downmix) was fixed because it broke the feature's whole premise. The remaining three are recorded under *Known M2 limitations* below rather than silently carried.
+
+- [x] Demux + decode to f32 stereo PCM; resample to 44.1 kHz — `audio/AudioDecoder`; verified on 44.1k stereo / 48k stereo / 48k mono. **>2 ch now folds via ITU-R BS.775** (center at −3 dB): the original code kept ch0/ch1 verbatim, which drops the center channel — where a 5.1 film puts nearly all dialogue — so `vocals` came back empty on exactly the content this feature exists for
+- [x] Chunked overlap-add htdemucs driver per demucs.onnx reference — `audio/DemucsSeparator`; ring-buffer bounds, tail `TensorChunk.padded` handling and the `emitted == totalFrames` invariant all held across every device run
+- [x] Streaming stem sum: only `keep_stems` materialized per chunk (never 4 full stems); soft-clip guard — one iSTFT per chunk on the summed masked spec
+- [x] Streaming AAC-LC 48 kHz 192 kbps encode with 1-chunk lookahead — `audio/AacWriter`; temp disk stays O(1) in track length (peak temp = one `.m4a` + one mux copy). **The "<2 GB on 2 h input" claim is NOT verified** — the mux temp is a full-size copy of the source, so a 2 h movie exceeds 2 GB by construction; the preflight now sizes for that instead of asserting it
+- [x] Video passthrough fast path: remux original video samples, zero video re-encode — `audio/Remux`; **bit-identity proven**, not assumed
+- [x] Combined-ops path: processed audio muxed with pass-2 video output — verified on device
+- [x] `keep_stems` option (`vocals` / `vocals+other`) plumbed end-to-end — one wire value from the Options UI to `DemucsSeparator.keep`; `vocals_other` exercised on device
+- [x] Preflight: free space ≥ 2× source + 2 GB; no-audio-track error when music removal selected — moved into `work/Preflight` and now runs for **every** job shape (see M3 failure taxonomy); combined correctly reserves 3× source
+- [x] Milestone check: runtime, bit-identity, A/V sync on 5-min clip — all three green, numbers above
+
+### Known M2 limitations (confirmed by review, deliberately carried)
+- **Resampler quality.** Ingest and egress both use media3's `SonicAudioProcessor`, which is 2-tap linear interpolation with no anti-imaging filter (it exists for playback speed, not SRC). A 48 kHz source — i.e. essentially every video — takes ~−27 dB in-band distortion at 8 kHz on the way in and again on the way out, and htdemucs is fed the pre-distorted mix. Fix is a polyphase FIR (L=160/M=147) on top of the existing `audio/Dsp` FFT layer.
+- **A/V lag 42.67 ms.** Within the <50 ms budget but with thin margin, and it is a fixed offset, not drift. Removing it means trimming the encoder's priming frames and rebasing PTS in `AacWriter`.
+- **Audio start anchor.** `AacWriter` is anchored at the source's first audio PTS clamped to ≥ 0, and `MediaMuxer` writes no edit list — a source whose audio genuinely starts late (positive first PTS) would have that offset collapsed to 0. Every QA asset has a first PTS of ~0 or slightly negative, so this is untested rather than known-broken.
 
 ## M3 — Product complete (PRD build order 3)
 **Exit:** every PRD acceptance criterion green on target device, including airplane-mode E2E.
 
-- [ ] Compose screens: pick/ops (require ≥1 op), options (strictness, blur amount, grayscale, keep_stems, advanced `blurUnknownFaces`), jobs/library
-- [ ] Model downloader: first-use fetch to app-private storage, hash verification, resume, progress, offline error states
-- [ ] Output handling: `Movies/<AppName>/` via MediaStore; done-notification actions (Open / Share / Delete original)
-- [ ] Failure taxonomy surfaced with per-cause messages: DRM, unsupported codec, no audio track, low space
-- [ ] Thermal yield between chunks; 2 h movie soak test — no OOM, no thermal kill
-- [ ] Tuning pass on QA sets; freeze threshold/cadence/hysteresis constants
-- [ ] Full acceptance sweep: all PRD criteria + airplane mode + cancel-mid-job cleanup
+Status (2026-07-26): feature-complete in code; acceptance is green on everything the available hardware and assets can exercise. The htdemucs **segment re-export is the headline change** — the shipped graph is now 2.6 s instead of the checkpoint's 7.8 s, which took peak RSS from **3.24 GB to 1.30 GB** (PRD budget <1.5 GB, previously missed by 2×) and wall-clock from 4.2× to **1.33× realtime**, for ~2 dB of agreement with the trained configuration. Full measurement table in `m0-spikes.md`.
+
+- [x] Compose screens: pick/ops (require ≥1 op), options (strictness, blur amount, grayscale, keep_stems, advanced `blurUnknownFaces`), jobs/library — `ui/NaqiApp` (three steps, `BackHandler`, no nav dependency) + `ui/screen/{PickOps,Options,Jobs}Screen`; visually verified end-to-end on device. Continue now requires a picked video *and* ≥1 op (it previously enqueued a null Uri). Nav state is `rememberSaveable` and re-attaches to a live job on cold start, so a minutes-long job survives rotation and process death
+- [x] Model downloader: first-use fetch to app-private storage, hash verification, resume, progress, offline error states — `ml/ModelDownloader`; sha256 pinned per model, HTTP `Range` resume from `.part`, hash verified **before** the atomic rename, typed errors (`NO_SOURCE / OFFLINE / HTTP / HASH_MISMATCH / NO_SPACE / IO`). NudeNet points at its public release; the two locally converted artifacts resolve against `BuildConfig.NAQI_MODEL_BASE_URL` (empty ⇒ clean "no source configured", never a crash). **Set `-PnaqiModelBaseUrl=https://…` to enable real downloads.** Bundled assets remain the first resort, so the dev/QA flow is unchanged
+- [x] Output handling: `Movies/<AppName>/` via MediaStore; done-notification actions (Open / Share / Delete original) — `work/JobNotifications.done`. Open/Share are `content://`-only (a pre-Q `file://` would throw `FileUriExposedException` in the receiving app). **Delete original opens an in-app confirmation** rather than deleting on one notification tap, and falls back to the system delete request when SAF's read-only grant can't delete
+- [x] Failure taxonomy surfaced with per-cause messages: DRM, unsupported codec, no audio track, low space — `work/Preflight` (+ `PreflightTest`). This was a real hole: an unreadable source used to escape `doWork` as a raw `IOException`, logging a stack trace and showing the user nothing (reproduced on device, then fixed and re-verified)
+- [x] Thermal yield between chunks — `AudioPipeline.thermalYield`, backing off 0.5 s / 2 s at `MODERATE` / `SEVERE`+ between htdemucs chunks. **2 h soak not run** (see below)
+- [ ] Tuning pass on QA sets; freeze threshold/cadence/hysteresis constants — BLOCKED, unchanged since M1: needs the beach/gym/lingerie, cartoon/illustration and profile-face sets. Tuning against anything else would fit the constants to the wrong data
+- [ ] Full acceptance sweep: all PRD criteria + airplane mode + cancel-mid-job cleanup — **green:** airplane-mode E2E, cancel-mid-job cleanup, peak RAM 1.30 GB < 1.5 GB, music-only runtime, video bit-identity, A/V drift 42.67 ms < 50 ms, no-audio-track error. **Still blocked:** the strictness-100/0 and female-face criteria (QA sets above); the SD 778G timing budget (only an S23 is available — every number here reads optimistically fast); the 2 h movie soak (no 2 h asset)

@@ -1,11 +1,8 @@
 package com.haithamassoli.naqi.ui.screen
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,97 +21,62 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.work.WorkInfo
 import com.haithamassoli.naqi.ml.ModelSmoke
 import com.haithamassoli.naqi.ml.SmokeReport
 import com.haithamassoli.naqi.model.FilterOps
+import com.haithamassoli.naqi.ui.Eyebrow
 import com.haithamassoli.naqi.ui.NaqiIcons
+import com.haithamassoli.naqi.ui.SelectDot
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
-import com.haithamassoli.naqi.work.FilterWorker
-import com.haithamassoli.naqi.work.JobController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * Step 1: choose the video and which operations to run. Tuning for those operations lives on the
+ * options screen, so nothing here writes anything but [FilterOps.removeMusic]/[FilterOps.censorWomen].
+ */
 @Composable
-fun PickOpsScreen(modifier: Modifier = Modifier) {
+fun PickOpsScreen(
+    pickedUri: Uri?,
+    pickedName: String?,
+    ops: FilterOps,
+    onPicked: (Uri, String?) -> Unit,
+    onOpsChange: (FilterOps) -> Unit,
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
-
-    var pickedUri by remember { mutableStateOf<Uri?>(null) }
-    var pickedName by remember { mutableStateOf<String?>(null) }
-    var ops by remember { mutableStateOf(FilterOps()) }
     var smoke by remember { mutableStateOf<SmokeReport?>(null) }
 
     LaunchedEffect(Unit) { smoke = withContext(Dispatchers.Default) { ModelSmoke.run(context) } }
-
-    val workFlow = remember { JobController.observe(context) }
-    val workInfos by workFlow.collectAsState(initial = emptyList())
-    val info = workInfos.firstOrNull()
-    val running = info?.state == WorkInfo.State.RUNNING || info?.state == WorkInfo.State.ENQUEUED
-    val succeeded = info?.state == WorkInfo.State.SUCCEEDED
-    val failed = info?.state == WorkInfo.State.FAILED
-    val outputName = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_NAME)
-    val outputMessage = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_MESSAGE)
-    val progress = info?.progress?.getInt(FilterWorker.KEY_PROGRESS, 0) ?: 0
-    val stageText = info?.progress?.getString(FilterWorker.KEY_STAGE).orEmpty()
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            pickedUri = uri
-            pickedName = queryDisplayName(context, uri)
-        }
-    }
-
-    fun startJob() {
-        JobController.start(context, ops, pickedUri?.toString())
-    }
-
-    val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        startJob() // start whether granted or not; without it the job runs but its notification is hidden
-    }
-    // Pre-Q, saving into public Movies/Naqi needs WRITE_EXTERNAL_STORAGE; a Worker can't request it, so ask here.
-    val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        startJob() // if denied, publish() fails fast with a surfaced message rather than saving nowhere
-    }
-
-    fun onContinue() {
-        // Disjoint by API level: storage is pre-Q only, notifications are API 33+, so at most one is asked.
-        val needsStorage = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-        val needsNotif = Build.VERSION.SDK_INT >= 33 &&
-            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        when {
-            needsStorage -> storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            needsNotif -> notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-            else -> startJob()
+            onPicked(uri, queryDisplayName(context, uri))
         }
     }
 
@@ -133,7 +95,7 @@ fun PickOpsScreen(modifier: Modifier = Modifier) {
             Wordmark()
             Spacer(Modifier.height(NaqiTokens.space6))
 
-            PickVideoCard(pickedName) { picker.launch(arrayOf("video/*")) }
+            PickVideoCard(picked = pickedUri != null, fileName = pickedName) { picker.launch(arrayOf("video/*")) }
             Spacer(Modifier.height(NaqiTokens.space5))
 
             Eyebrow("CHOOSE WHAT TO FILTER")
@@ -143,34 +105,28 @@ fun PickOpsScreen(modifier: Modifier = Modifier) {
                 title = "Remove music",
                 desc = "Strip the soundtrack, keep dialogue.",
                 selected = ops.removeMusic,
-            ) { ops = ops.copy(removeMusic = !ops.removeMusic) }
+            ) { onOpsChange(ops.copy(removeMusic = !ops.removeMusic)) }
             Spacer(Modifier.height(NaqiTokens.space3))
             OperationCard(
                 icon = NaqiIcons.Shield,
                 title = "Censor women",
                 desc = "Blur female faces and flagged scenes.",
                 selected = ops.censorWomen,
-            ) { ops = ops.copy(censorWomen = !ops.censorWomen) }
+            ) { onOpsChange(ops.copy(censorWomen = !ops.censorWomen)) }
 
             Spacer(Modifier.height(NaqiTokens.space5))
-            if (running) {
-                JobProgressCard(stageText, progress) { JobController.cancel(context) }
-            } else {
-                Button(
-                    onClick = ::onContinue,
-                    enabled = ops.any,
-                    shape = RoundedCornerShape(NaqiTokens.radiusButton),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                ) { Text("Continue", style = MaterialTheme.typography.labelLarge) }
-            }
+            Button(
+                onClick = onContinue,
+                // Both are required: a job without a video has nothing to filter, one without an op nothing to do.
+                enabled = pickedUri != null && ops.any,
+                shape = RoundedCornerShape(NaqiTokens.radiusButton),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+            ) { Text("Continue", style = MaterialTheme.typography.labelLarge) }
 
             Spacer(Modifier.height(NaqiTokens.space4))
-            ReassuranceLine(
-                savedName = if (succeeded) outputName else null,
-                errorMessage = if (failed) outputMessage else null,
-            )
+            ReassuranceLine()
 
             Spacer(Modifier.height(NaqiTokens.space6))
             DiagnosticsFooter(smoke)
@@ -224,9 +180,8 @@ private fun Wordmark() {
 }
 
 @Composable
-private fun PickVideoCard(fileName: String?, onClick: () -> Unit) {
+private fun PickVideoCard(picked: Boolean, fileName: String?, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
-    val picked = fileName != null
     Column(
         Modifier
             .fillMaxWidth()
@@ -245,7 +200,8 @@ private fun PickVideoCard(fileName: String?, onClick: () -> Unit) {
         )
         Spacer(Modifier.height(NaqiTokens.space2))
         Text(
-            fileName ?: "Pick a video",
+            // A provider may not expose a display name; the video is still picked, so don't look unpicked.
+            fileName ?: if (picked) "Video selected" else "Pick a video",
             style = MaterialTheme.typography.titleMedium,
             color = cs.onSurface,
             maxLines = 1,
@@ -258,18 +214,6 @@ private fun PickVideoCard(fileName: String?, onClick: () -> Unit) {
             color = cs.onSurfaceVariant,
         )
     }
-}
-
-@Composable
-private fun Eyebrow(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = NaqiTokens.space1),
-    )
 }
 
 @Composable
@@ -323,81 +267,11 @@ private fun OperationCard(
 }
 
 @Composable
-private fun SelectDot(selected: Boolean) {
+private fun ReassuranceLine() {
     val cs = MaterialTheme.colorScheme
-    Box(
-        Modifier
-            .size(24.dp)
-            .clip(CircleShape)
-            .background(if (selected) cs.primary else Color.Transparent)
-            .border(1.5.dp, if (selected) Color.Transparent else cs.outline, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (selected) Icon(NaqiIcons.Check, null, tint = cs.onPrimary, modifier = Modifier.size(15.dp))
-    }
-}
-
-@Composable
-private fun JobProgressCard(stage: String, progress: Int, onCancel: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(NaqiTokens.radiusCard))
-            .background(cs.surfaceContainer)
-            .border(1.dp, cs.outlineVariant, RoundedCornerShape(NaqiTokens.radiusCard))
-            .padding(NaqiTokens.space4),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stage.ifEmpty { "Starting…" },
-                style = MaterialTheme.typography.titleSmall,
-                color = cs.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            Text("$progress%", style = MaterialTheme.typography.labelMedium, color = cs.primary)
-        }
-        Spacer(Modifier.height(NaqiTokens.space3))
-        LinearProgressIndicator(
-            progress = { progress / 100f },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(NaqiTokens.radiusPill)),
-            color = cs.primary,
-            trackColor = cs.surfaceContainerHighest,
-        )
-        Spacer(Modifier.height(NaqiTokens.space2))
-        TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.End)) { Text("Cancel") }
-    }
-}
-
-@Composable
-private fun ReassuranceLine(savedName: String?, errorMessage: String?) {
-    val cs = MaterialTheme.colorScheme
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NaqiTokens.space1)) {
-            Icon(NaqiIcons.Check, null, tint = cs.primary, modifier = Modifier.size(15.dp))
-            Text("Original file is never changed.", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
-        }
-        if (savedName != null) {
-            Spacer(Modifier.height(NaqiTokens.space1))
-            Text(
-                "Saved to Movies/Naqi/$savedName",
-                style = MaterialTheme.typography.bodySmall,
-                color = cs.primary,
-                textAlign = TextAlign.Center,
-            )
-        }
-        if (errorMessage != null) {
-            Spacer(Modifier.height(NaqiTokens.space1))
-            Text(
-                errorMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = cs.error,
-                textAlign = TextAlign.Center,
-            )
-        }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NaqiTokens.space1)) {
+        Icon(NaqiIcons.Check, null, tint = cs.primary, modifier = Modifier.size(15.dp))
+        Text("Original file is never changed.", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
     }
 }
 
