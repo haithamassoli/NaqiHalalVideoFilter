@@ -3,7 +3,7 @@
     <!-- ============================================================
          App
          ============================================================ -->
-    <string name="app_name">نقي — فلتر الفيديو الحلال</string>
+    <string name="app_name">نقي</string>
 
     <!-- ============================================================
          Pick / onboarding — step 1, PickOpsScreen
@@ -82,6 +82,10 @@
     <string name="action_show">إظهار</string>
     <string name="opt_blur_unknown_faces_title">تمويه الوجوه غير المُصنَّفة</string>
     <string name="opt_blur_unknown_faces_desc">يحجب الوجوه التي يتعذّر تحديد جنسها. مُعطَّل افتراضيًا لأنه يُموّه الرجال أيضًا.</string>
+
+    <!-- Language picker (API 33+). Opens system per-app language settings. -->
+    <string name="opt_language">اللغة</string>
+    <string name="opt_language_desc">اختر بين الإنجليزية أو العربية لهذا التطبيق.</string>
 
     <!-- Primary CTA: enqueues the filtering job. -->
     <string name="action_start">بدء</string>

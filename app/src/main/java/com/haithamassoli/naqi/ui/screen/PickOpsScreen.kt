@@ -3,7 +3,9 @@ package com.haithamassoli.naqi.ui.screen
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -49,6 +51,7 @@ import com.haithamassoli.naqi.ml.ModelSmoke
 import com.haithamassoli.naqi.ml.SmokeReport
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.Eyebrow
+import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.NaqiIcons
 import com.haithamassoli.naqi.ui.SelectDot
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
@@ -127,6 +130,34 @@ fun PickOpsScreen(
                     .fillMaxWidth()
                     .height(56.dp),
             ) { Text(stringResource(R.string.action_continue), style = MaterialTheme.typography.labelLarge) }
+
+            // ponytail: system per-app language picker (API 33+); in-app switcher needs appcompat, add when pre-33 users complain.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Spacer(Modifier.height(NaqiTokens.space4))
+                NaqiCard(
+                    Modifier.clickable {
+                        runCatching {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_APP_LOCALE_SETTINGS,
+                                    Uri.fromParts("package", context.packageName, null),
+                                ),
+                            )
+                        }
+                    },
+                ) {
+                    Text(
+                        stringResource(R.string.opt_language),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.opt_language_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             Spacer(Modifier.height(NaqiTokens.space4))
             ReassuranceLine()

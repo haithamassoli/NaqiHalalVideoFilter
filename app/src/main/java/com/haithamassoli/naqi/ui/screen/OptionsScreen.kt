@@ -1,11 +1,9 @@
 package com.haithamassoli.naqi.ui.screen
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -176,33 +174,7 @@ fun OptionsScreen(
                 Spacer(Modifier.height(NaqiTokens.space5))
             }
 
-            // ponytail: system per-app language picker (API 33+); in-app switcher needs appcompat, add when pre-33 users complain.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                NaqiCard(
-                    Modifier.clickable {
-                        runCatching {
-                            context.startActivity(
-                                Intent(
-                                    Settings.ACTION_APP_LOCALE_SETTINGS,
-                                    Uri.fromParts("package", context.packageName, null),
-                                ),
-                            )
-                        }
-                    },
-                ) {
-                    Text(
-                        stringResource(R.string.opt_language),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        stringResource(R.string.opt_language_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(Modifier.height(NaqiTokens.space5))
-            }
+
 
             Button(
                 onClick = ::onStart,
