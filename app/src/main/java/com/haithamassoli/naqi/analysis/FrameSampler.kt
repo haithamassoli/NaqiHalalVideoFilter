@@ -9,6 +9,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import com.haithamassoli.naqi.media.requireTrackIndex
 import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.coroutineContext
 import kotlin.math.roundToInt
@@ -37,7 +38,7 @@ object FrameSampler {
         val mmr = MediaMetadataRetriever()
         try {
             extractor.setDataSource(context, uri, null)
-            val format = extractor.getTrackFormat(videoTrackIndex(extractor))
+            val format = extractor.getTrackFormat(extractor.requireTrackIndex("video/"))
             mmr.setDataSource(context, uri)
             // MMR is the reliable rotation/duration source; the track format is the fallback.
             val rotation = (mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
@@ -85,7 +86,7 @@ object FrameSampler {
         var codec: MediaCodec? = null
         try {
             extractor.setDataSource(context, uri, null)
-            val trackIndex = videoTrackIndex(extractor)
+            val trackIndex = extractor.requireTrackIndex("video/")
             extractor.selectTrack(trackIndex)
             // Decoding has to start at a sync sample at or before the window, and the frames between it
             // and startMs are decoded but never emitted (they are the reference frames the window needs).
@@ -155,13 +156,6 @@ object FrameSampler {
             }
             extractor.release()
         }
-    }
-
-    private fun videoTrackIndex(extractor: MediaExtractor): Int {
-        for (i in 0 until extractor.trackCount) {
-            if (extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true) return i
-        }
-        throw IllegalArgumentException("no video track in $extractor")
     }
 
     /** KEY_FRAME_RATE is stored as a Float on some devices and an Integer on others. */

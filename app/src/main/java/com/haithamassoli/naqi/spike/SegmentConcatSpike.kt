@@ -11,6 +11,8 @@ import com.haithamassoli.naqi.audio.ConcatPart
 import com.haithamassoli.naqi.audio.Remux
 import com.haithamassoli.naqi.audio.TrackSource
 import com.haithamassoli.naqi.edl.Edl
+import com.haithamassoli.naqi.media.firstTrackIndex
+import com.haithamassoli.naqi.media.requireTrackIndex
 import com.haithamassoli.naqi.render.RenderPipeline
 import com.haithamassoli.naqi.render.RenderSegment
 import kotlinx.coroutines.runBlocking
@@ -184,9 +186,7 @@ object SegmentConcatSpike {
         val ext = MediaExtractor()
         return try {
             ext.setDataSource(context, uri, null)
-            (0 until ext.trackCount).any {
-                ext.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
-            }
+            ext.firstTrackIndex("audio/") != null
         } catch (_: Throwable) {
             false
         } finally {
@@ -199,9 +199,7 @@ object SegmentConcatSpike {
         val ext = MediaExtractor()
         try {
             ext.setDataSource(file.absolutePath)
-            val ix = (0 until ext.trackCount).firstOrNull {
-                ext.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
-            } ?: return null
+            val ix = ext.firstTrackIndex("video/") ?: return null
             ext.selectTrack(ix)
             val f = ext.getTrackFormat(ix)
             var buf = ByteBuffer.allocate(1 shl 21)
@@ -260,9 +258,7 @@ object SegmentConcatSpike {
         var maxPtsUs = -1L
         try {
             ext.setDataSource(file.absolutePath)
-            val ix = (0 until ext.trackCount).first {
-                ext.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
-            }
+            val ix = ext.requireTrackIndex("video/")
             ext.selectTrack(ix)
             val format = ext.getTrackFormat(ix)
             codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)

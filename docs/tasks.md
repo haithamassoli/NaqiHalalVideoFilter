@@ -160,7 +160,7 @@ locations, the `VideoSource`→`TrackSource` rename and `AudioPipeline`'s signat
 real risk): censor-only unsegmented, music-only (`resumable=false`), combined unsegmented, censor-only
 segmented, and combined segmented with the resumable separator — plus kill/resume on the last two.
 
-**Open, and honest about it:**
+**Open, and honest about it** (each with an exit criterion in `long-film-followups.md`):
 
 - **~2 video frames are lost per segment seam** (4 619 vs 4 625 frames; a 148 ms inter-frame gap at the 60 s
   seam against a normal 41.7 ms). Reads as a ~100 ms freeze per seam — no drift, no desync. At the 5-min

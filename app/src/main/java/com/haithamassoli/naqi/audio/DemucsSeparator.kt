@@ -346,9 +346,10 @@ class HtdemucsSession(context: Context) : AutoCloseable {
         session.close()
     }
 
-    // Mirror of Infer.sessionOptions (XNNPACK EP, single intra-op thread, spinning disabled) PLUS
-    // memory clamps: the default BFC arena + memory-pattern planning retain multi-GB high-water
-    // allocations across htdemucs runs (lmkd killed the app at 5.6 GB RSS without these two).
+    // Deliberately NOT com.haithamassoli.naqi.ml.imageSessionOptions: that one is XNNPACK + a single
+    // intra-op thread, and neither is right here. Plus memory clamps — the default BFC arena +
+    // memory-pattern planning retain multi-GB high-water allocations across htdemucs runs (lmkd
+    // killed the app at 5.6 GB RSS without these two).
     private fun sessionOptions() = OrtSession.SessionOptions().apply {
         // CPU EP (multi-threaded), NOT XNNPACK: XNNPACK's fp16 kernels corrupt this f16 graph's
         // spectral branch on-device (broadband-noise stems; time branch survives) — same family of

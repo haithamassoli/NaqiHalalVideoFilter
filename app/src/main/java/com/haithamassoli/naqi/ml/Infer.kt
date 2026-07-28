@@ -13,8 +13,8 @@ import java.nio.FloatBuffer
  * M1 ORT inference for the two image models — the NSFW gate and NudeNet, per the locked
  * contracts in [NaqiModel]. Preprocessing (resize/pad, RGB, /255, NCHW) and postprocessing
  * (softmax passthrough; YOLO decode + per-class NMS) live here so pass-1 workers see typed
- * results only. Sessions are created lazily and cached for the process on the XNNPACK EP
- * (same options as [ModelSmoke]).
+ * results only. Sessions are created lazily and cached for the process, on the same
+ * [imageSessionOptions] [ModelSmoke] load-checks them with.
  *
  * Contract: one worker drives this at a time (thread-confined). [close] releases the sessions.
  */
@@ -71,14 +71,7 @@ object Infer {
 
     private fun session(context: Context, model: NaqiModel): OrtSession = sessions.getOrPut(model) {
         val file = ModelSmoke.modelFile(context, model) ?: error("model not bundled: ${model.assetName}")
-        sessionOptions().use { env.createSession(file.absolutePath, it) }
-    }
-
-    // Mirror of ModelSmoke.sessionOptions: XNNPACK EP, single intra-op thread, spinning disabled.
-    private fun sessionOptions() = OrtSession.SessionOptions().apply {
-        setIntraOpNumThreads(1)
-        addConfigEntry("session.intra_op.allow_spinning", "0")
-        addXnnpack(mapOf("intra_op_num_threads" to Runtime.getRuntime().availableProcessors().toString()))
+        imageSessionOptions().use { env.createSession(file.absolutePath, it) }
     }
 
     // ARGB bitmap -> NCHW RGB float buffer, scaled 1/255, no mean/std.

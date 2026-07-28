@@ -56,10 +56,25 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
     /** Soak instrumentation + the live ETA source (`long-film-plan.md` Phase 0). */
     private val stats = JobStats(ctx)
 
+    // The tuning knobs, read once. Every shape below used to re-read its own subset out of inputData,
+    // which meant the default for e.g. KEY_STRICTNESS was written out four times — four places for a
+    // future edit to change three of them.
+    private val strictness = inputData.getInt(KEY_STRICTNESS, 50)
+    private val blurAmount = inputData.getInt(KEY_BLUR_AMOUNT, 60)
+    private val grayscale = inputData.getBoolean(KEY_GRAYSCALE, false)
+    private val blurUnknownFaces = inputData.getBoolean(KEY_BLUR_UNKNOWN, false)
+    private val keepStems = inputData.getString(KEY_KEEP_STEMS) ?: "vocals"
+
     /**
      * Key for this job's working directory. Derived from the source and every option that changes the
      * OUTPUT — not from [getId] — so Phase 2's resume finds the same directory after process death, and
      * so a job restarted with different settings can never resume into work rendered under the old ones.
+     *
+     * These reads stay inline rather than using the vals above, even though they look identical. This
+     * hash is a **persisted-state contract**: it names a directory that may already hold hours of
+     * rendered segments waiting for a Resume tap. `getString(KEY_KEEP_STEMS)` hashes an absent key as
+     * "null" where the val substitutes "vocals", so folding them in would change the key for that one
+     * input and orphan exactly the work this key exists to find again. Not worth five lines.
      */
     private val jobKey by lazy {
         JobStore.keyOf(
@@ -156,12 +171,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         removeMusic: Boolean,
         durationMs: Long,
     ): Result {
-        val strictness = inputData.getInt(KEY_STRICTNESS, 50)
-        val blurAmount = inputData.getInt(KEY_BLUR_AMOUNT, 60)
-        val grayscale = inputData.getBoolean(KEY_GRAYSCALE, false)
-        val blurUnknownFaces = inputData.getBoolean(KEY_BLUR_UNKNOWN, false)
-        val keepStems = inputData.getString(KEY_KEEP_STEMS) ?: "vocals"
-
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val audioTemp = File(workDir, "audio.m4a")
@@ -355,11 +364,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
     // ---- Censor-only: identical to M1 (only extracted into a function) ----
     private suspend fun runCensorOnly(inputUri: Uri): Result {
-        val strictness = inputData.getInt(KEY_STRICTNESS, 50)
-        val blurAmount = inputData.getInt(KEY_BLUR_AMOUNT, 60)
-        val grayscale = inputData.getBoolean(KEY_GRAYSCALE, false)
-        val blurUnknownFaces = inputData.getBoolean(KEY_BLUR_UNKNOWN, false)
-
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val tempFile = File(workDir, "render.mp4")
@@ -386,8 +390,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
     // ---- Music-only: audio 1..93, mux 93..99, video passthrough from the original Uri ----
     private suspend fun runMusicOnly(inputUri: Uri, durationMs: Long): Result {
-        val keepStems = inputData.getString(KEY_KEEP_STEMS) ?: "vocals"
-
         setForeground(foregroundInfo(stage(R.string.stage_separating), 1))
 
         val audioTemp = File(workDir, "audio.m4a")
@@ -432,12 +434,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
     // ---- Combined: analyze 0..25, render 25..50, separate 50..93, mux 93..99 ----
     private suspend fun runCombined(inputUri: Uri): Result {
-        val strictness = inputData.getInt(KEY_STRICTNESS, 50)
-        val blurAmount = inputData.getInt(KEY_BLUR_AMOUNT, 60)
-        val grayscale = inputData.getBoolean(KEY_GRAYSCALE, false)
-        val blurUnknownFaces = inputData.getBoolean(KEY_BLUR_UNKNOWN, false)
-        val keepStems = inputData.getString(KEY_KEEP_STEMS) ?: "vocals"
-
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val renderTemp = File(workDir, "render.mp4")

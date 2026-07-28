@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.SonicAudioProcessor
+import com.haithamassoli.naqi.media.requireTrackIndex
 import kotlinx.coroutines.CancellationException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -78,7 +79,7 @@ object AudioDecoder {
         var sonic: SonicAudioProcessor? = null
         try {
             extractor.setDataSource(context, uri, null)
-            val trackIndex = audioTrackIndex(extractor)
+            val trackIndex = extractor.requireTrackIndex("audio/")
             extractor.selectTrack(trackIndex)
             val trackFormat = extractor.getTrackFormat(trackIndex)
             val codecInst = MediaCodec.createDecoderByType(trackFormat.getString(MediaFormat.KEY_MIME)!!)
@@ -240,10 +241,4 @@ object AudioDecoder {
         }
     }
 
-    private fun audioTrackIndex(extractor: MediaExtractor): Int {
-        for (i in 0 until extractor.trackCount) {
-            if (extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) return i
-        }
-        throw IllegalArgumentException("no audio track in $extractor")
-    }
 }

@@ -39,7 +39,7 @@ import kotlin.math.abs
 class FaceTracker(
     private val context: Context,
     private val blurUnknownFaces: Boolean,
-) : AutoCloseable {
+) {
 
     /** Live tracks keyed by ML Kit tracking id — only those still being seen, or not yet voted. */
     private val tracks = LinkedHashMap<Int, TrackState>()
@@ -148,9 +148,6 @@ class FaceTracker(
         detector?.close()
         detector = null
     }
-
-    /** [AutoCloseable] delegates to [closeDetector] so the tracker fits a `use { }` block. */
-    override fun close() = closeDetector()
 
     private fun detector(): FaceDetector = detector ?: FaceDetection.getClient(
         FaceDetectorOptions.Builder()

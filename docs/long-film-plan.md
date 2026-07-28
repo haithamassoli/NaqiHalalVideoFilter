@@ -126,6 +126,13 @@ Cheaper than it sounds, because three pieces already exist. **Prove the concat f
   - **44.1 kHz, not 48, is load-bearing.** Resampling before the scratch would restart the 44.1→48 Sonic session at the resume seam (different interpolation phase, a click, a rounding-different frame count). At 44.1 kHz there is one uninterrupted session at the end and 1 scratch frame == 1 separator frame, which is what makes `framesEmitted * 4` an exact byte offset — confirmed on device, where the checkpoint and the file agreed exactly. int16 measured 87.3 dB round-trip SNR, ~50 dB below what AAC-LC at 192 kbps discards; f32 would double the disk for nothing, and disk is wall #4.
 - [x] **Resume triggers** — `Result.retry()` with backoff on stop reasons that warrant it, **plus a user-triggered Resume in the app**. If the FGS budget is exhausted WorkManager cannot start another one, but the user reopening the app and tapping Resume works regardless of how open question 3 resolves. A button de-risks the whole scheduling question. **`Result.retry()` turned out to be unnecessary** — WorkManager reschedules a *stopped* (as opposed to cancelled) worker by itself, which was observed restarting the worker after every SIGKILL; the checkpoints are what make that restart cheap. What did need writing is the distinction between a stop and a cancel: only `WorkInfo.STOP_REASON_CANCELLED_BY_APP` deletes the work directory, because the 6 h FGS cap, an lmkd kill and a reboot all arrive as cancellation too and those are exactly the cases this phase exists to survive. Pre-31 has no stop reason and therefore keeps the work — an orphan the 7-day sweep collects is a far cheaper mistake than deleting three hours of rendering. The user-facing Resume button is in `JobsScreen`, shown when a failure reports `KEY_RESUMABLE`.
 
+## What is still open
+
+Phases 0–2 are closed. The four things this verification exposed or could not reach — a real film's AC-3 audio
+having no resume path, the ~2 frames lost per seam, the unexplained resumed-separator timing, and the fact
+that feature length has still never been run to completion — plus the long-standing QA-set and 778G blockers,
+live in **`long-film-followups.md`** with an exit criterion each.
+
 ## Open questions
 
 1. **Is a film in scope at all?** (the gate above) — everything else is downstream of this.

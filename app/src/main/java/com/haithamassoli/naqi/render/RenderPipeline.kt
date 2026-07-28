@@ -24,6 +24,7 @@ import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import com.haithamassoli.naqi.analysis.VideoMeta
 import com.haithamassoli.naqi.edl.Edl
+import com.haithamassoli.naqi.media.firstTrackFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -151,15 +152,11 @@ object RenderPipeline {
         val extractor = MediaExtractor()
         try {
             extractor.setDataSource(context, uri, null)
-            for (i in 0 until extractor.trackCount) {
-                val format = extractor.getTrackFormat(i)
-                if (format.getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true) {
-                    val w = format.intOrNull(MediaFormat.KEY_WIDTH) ?: 0
-                    val h = format.intOrNull(MediaFormat.KEY_HEIGHT) ?: 0
-                    pixels = w.toLong() * h
-                    sourceBitrate = format.intOrNull(MediaFormat.KEY_BIT_RATE) // per-track, video-only
-                    break
-                }
+            extractor.firstTrackFormat("video/")?.let { format ->
+                val w = format.intOrNull(MediaFormat.KEY_WIDTH) ?: 0
+                val h = format.intOrNull(MediaFormat.KEY_HEIGHT) ?: 0
+                pixels = w.toLong() * h
+                sourceBitrate = format.intOrNull(MediaFormat.KEY_BIT_RATE) // per-track, video-only
             }
         } catch (_: Exception) {
         } finally {

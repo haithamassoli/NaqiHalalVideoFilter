@@ -12,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -21,9 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
 import com.haithamassoli.naqi.model.FilterOps
-import com.haithamassoli.naqi.spike.MuxerLimitSpike
 import com.haithamassoli.naqi.spike.SegmentConcatSpike
 import com.haithamassoli.naqi.ui.NaqiApp
 import com.haithamassoli.naqi.ui.theme.NaqiTheme
@@ -39,7 +40,7 @@ class MainActivity : ComponentActivity() {
     // API 30+ fallback: the system asks the user itself, the only path that works for media we don't own.
     private val systemDelete =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            toast(if (result.resultCode == RESULT_OK) "Original deleted" else "Original kept")
+            toast(if (result.resultCode == RESULT_OK) R.string.dlg_original_deleted else R.string.dlg_original_kept)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,7 +75,9 @@ class MainActivity : ComponentActivity() {
     private fun deleteTargetOf(intent: Intent): Pair<Uri, String>? {
         if (intent.action != JobNotifications.ACTION_CONFIRM_DELETE) return null
         val uri = intent.getStringExtra(JobNotifications.EXTRA_DELETE_ORIGINAL)?.takeIf { it.isNotBlank() } ?: return null
-        return uri.toUri() to (intent.getStringExtra(JobNotifications.EXTRA_DELETE_NAME) ?: "this video")
+        val name = intent.getStringExtra(JobNotifications.EXTRA_DELETE_NAME)
+            ?: getString(R.string.dlg_delete_original_fallback_name)
+        return uri.toUri() to name
     }
 
     /**
@@ -92,17 +95,17 @@ class MainActivity : ComponentActivity() {
             }
         }.getOrDefault(false)
         if (deleted) {
-            toast("Original deleted")
+            toast(R.string.dlg_original_deleted)
             return
         }
         val asked = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && runCatching {
             val request = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
             systemDelete.launch(IntentSenderRequest.Builder(request.intentSender).build())
         }.isSuccess
-        if (!asked) toast("Couldn’t delete the original — remove it from your gallery instead.")
+        if (!asked) toast(R.string.dlg_delete_original_failed)
     }
 
-    private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+    private fun toast(@StringRes resId: Int) = Toast.makeText(this, resId, Toast.LENGTH_SHORT).show()
 
     /**
      * Debug E2E entry point: `-e autorun_path <file>` starts a job with no permission prompts, and
@@ -114,15 +117,7 @@ class MainActivity : ComponentActivity() {
             JobController.cancel(this)
             return
         }
-        // Phase-0 spike: writes a >4 GiB mp4 and reads it back. Minutes of blocking I/O, so its own
-        // thread; there is nothing to show on screen, the answer comes out of logcat.
-        if (intent.getBooleanExtra("muxer_limit_probe", false)) {
-            val source = intent.getStringExtra("probe_source")
-                ?: File(filesDir, "movie-test.mp4").absolutePath
-            Thread { MuxerLimitSpike.run(applicationContext, source) }.start()
-            return
-        }
-        // Phase-2 spike: two clipped exports, concatenated and decoded back. Also its own thread —
+        // Phase-2 spike: two clipped exports, concatenated and decoded back. Its own thread —
         // RenderPipeline blocks on a Transformer export, which must not be driven from onCreate.
         if (intent.getBooleanExtra("segment_concat_probe", false)) {
             val source = intent.getStringExtra("probe_source")
@@ -160,15 +155,14 @@ class MainActivity : ComponentActivity() {
 private fun ConfirmDeleteDialog(name: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete the original?") },
+        title = { Text(stringResource(R.string.dlg_delete_original_title)) },
         text = {
             Text(
-                "The filtered copy ($name) stays in Movies/Naqi. The original video will be removed " +
-                    "from this device and can’t be recovered.",
+                stringResource(R.string.dlg_delete_original_body, name),
                 style = MaterialTheme.typography.bodyMedium,
             )
         },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Delete") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Keep") } },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_delete)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_keep)) } },
     )
 }

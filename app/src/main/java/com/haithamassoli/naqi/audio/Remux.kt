@@ -7,6 +7,8 @@ import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
 import android.net.Uri
+import com.haithamassoli.naqi.media.firstTrackFormat
+import com.haithamassoli.naqi.media.requireTrackIndex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -47,10 +49,8 @@ fun canCopyAudio(context: Context, uri: Uri): Boolean {
     val ext = MediaExtractor()
     return try {
         ext.setDataSource(context, uri, null)
-        val mime = (0 until ext.trackCount)
-            .map { ext.getTrackFormat(it).getString(MediaFormat.KEY_MIME).orEmpty() }
-            .firstOrNull { it.startsWith("audio/") }
-            ?: return true // no audio track: nothing to copy
+        // No audio track at all: nothing to copy, which is equally fine for concat.
+        val mime = ext.firstTrackFormat("audio/")?.getString(MediaFormat.KEY_MIME) ?: return true
         mime in MUXABLE_AUDIO
     } catch (_: Throwable) {
         false // unreadable is Preflight's story to tell; just don't take the segmented path
@@ -91,12 +91,12 @@ object Remux {
                 is TrackSource.FromUri -> vExt.setDataSource(context, video.uri, null)
                 is TrackSource.FromFile -> vExt.setDataSource(video.file.absolutePath)
             }
-            val vTrackIx = firstTrack(vExt, "video/")
+            val vTrackIx = vExt.requireTrackIndex("video/")
             vExt.selectTrack(vTrackIx)
             val vFormat = vExt.getTrackFormat(vTrackIx)
 
             aExt.setDataSource(audioM4a.absolutePath)
-            val aTrackIx = firstTrack(aExt, "audio/")
+            val aTrackIx = aExt.requireTrackIndex("audio/")
             aExt.selectTrack(aTrackIx)
             val aFormat = aExt.getTrackFormat(aTrackIx)
 
@@ -165,7 +165,7 @@ object Remux {
         var failed = true
         try {
             vExt.setDataSource(parts[0].file.absolutePath)
-            val vTrackIx = firstTrack(vExt, "video/")
+            val vTrackIx = vExt.requireTrackIndex("video/")
             vExt.selectTrack(vTrackIx)
             val vFormat = vExt.getTrackFormat(vTrackIx)
 
@@ -177,7 +177,7 @@ object Remux {
                     is TrackSource.FromFile -> ext.setDataSource(audio.file.absolutePath)
                     null -> error("unreachable")
                 }
-                val ix = firstTrack(ext, "audio/")
+                val ix = ext.requireTrackIndex("audio/")
                 ext.selectTrack(ix)
                 Src(ext, muxer.addTrack(ext.getTrackFormat(ix)), allocFor(ext.getTrackFormat(ix)))
             }
@@ -207,7 +207,7 @@ object Remux {
                             val next = MediaExtractor()
                             vExt = next // the finally releases whichever segment is open when we exit
                             next.setDataSource(parts[partIx].file.absolutePath)
-                            val ix = firstTrack(next, "video/")
+                            val ix = next.requireTrackIndex("video/")
                             next.selectTrack(ix)
                             requireSameFormat(vFormat, next.getTrackFormat(ix), partIx)
                             videoSrc.ext = next
@@ -327,10 +327,4 @@ object Remux {
         return ((deg % 360) + 360) % 360
     }
 
-    private fun firstTrack(ext: MediaExtractor, mimePrefix: String): Int {
-        for (i in 0 until ext.trackCount) {
-            if (ext.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith(mimePrefix) == true) return i
-        }
-        throw IllegalArgumentException("no $mimePrefix track")
-    }
 }

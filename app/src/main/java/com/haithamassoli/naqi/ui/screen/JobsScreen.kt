@@ -231,13 +231,13 @@ private fun SavedCard(name: String?, uri: Uri?, context: Context) {
                     onClick = { view(context, uri) },
                     shape = RoundedCornerShape(NaqiTokens.radiusButton),
                     modifier = Modifier.weight(1f),
-                ) { Text("Open") }
+                ) { Text(stringResource(R.string.action_open)) }
                 Spacer(Modifier.width(NaqiTokens.space3))
                 OutlinedButton(
                     onClick = { share(context, uri) },
                     shape = RoundedCornerShape(NaqiTokens.radiusButton),
                     modifier = Modifier.weight(1f),
-                ) { Text("Share") }
+                ) { Text(stringResource(R.string.action_share)) }
             }
         }
     }
@@ -320,8 +320,17 @@ private fun share(context: Context, uri: Uri) {
         .setType(MIME_MP4)
         .putExtra(Intent.EXTRA_STREAM, uri)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    runCatching { context.startActivity(Intent.createChooser(intent, "Share video")) }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.jobs_share_chooser_title)))
+    }
 }
 
+/**
+ * Whole resource strings rather than a number glued to a unit — same rule [durationText] follows, and
+ * for the same reason: Arabic wants its own digits AND its own unit word ("غيغابايت"), which
+ * `"%.1f GB".format(...)` cannot produce.
+ */
+@Composable
 private fun formatSize(bytes: Long): String =
-    if (bytes >= 1_000_000_000) "%.1f GB".format(bytes / 1e9) else "%.0f MB".format(bytes / 1e6)
+    if (bytes >= 1_000_000_000) stringResource(R.string.jobs_size_gb, bytes / 1e9f)
+    else stringResource(R.string.jobs_size_mb, bytes / 1e6f)

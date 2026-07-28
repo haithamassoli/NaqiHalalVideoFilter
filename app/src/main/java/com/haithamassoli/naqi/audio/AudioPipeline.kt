@@ -1,8 +1,6 @@
 package com.haithamassoli.naqi.audio
 
 import android.content.Context
-import android.media.MediaExtractor
-import android.media.MediaFormat
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
@@ -50,22 +48,6 @@ object AudioPipeline {
         }
         Log.i(TAG, "thermal status ${pm.currentThermalStatus} — yielding ${pause}ms")
         runCatching { Thread.sleep(pause) }
-    }
-
-    /** True iff [uri] has at least one audio track. Preflight uses this for the no-audio error. */
-    fun hasAudioTrack(context: Context, uri: Uri): Boolean {
-        val extractor = MediaExtractor()
-        try {
-            extractor.setDataSource(context, uri, null)
-            for (i in 0 until extractor.trackCount) {
-                if (extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) {
-                    return true
-                }
-            }
-            return false
-        } finally {
-            extractor.release()
-        }
     }
 
     /**

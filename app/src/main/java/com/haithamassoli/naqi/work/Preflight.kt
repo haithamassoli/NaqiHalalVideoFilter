@@ -2,11 +2,11 @@ package com.haithamassoli.naqi.work
 
 import android.content.Context
 import android.media.MediaExtractor
-import android.media.MediaFormat
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.annotation.StringRes
 import com.haithamassoli.naqi.R
+import com.haithamassoli.naqi.media.firstTrackIndex
 import java.io.FileNotFoundException
 import java.io.IOException
 
@@ -72,11 +72,8 @@ internal object Preflight {
             // Non-empty PSSH = the container carries DRM init data. Checked before codec lookup
             // because a protected track otherwise fails later with an opaque crypto error.
             if (extractor.psshInfo?.isNotEmpty() == true) return DRM
-            for (i in 0 until extractor.trackCount) {
-                val mime = extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME).orEmpty()
-                if (mime.startsWith("video/")) hasVideo = true
-                if (mime.startsWith("audio/")) hasAudio = true
-            }
+            hasVideo = extractor.firstTrackIndex("video/") != null
+            hasAudio = extractor.firstTrackIndex("audio/") != null
         } catch (_: IOException) {
             return UNREADABLE // "Failed to instantiate extractor" — unsupported container or damaged file
         } catch (_: IllegalArgumentException) {

@@ -4,15 +4,12 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
-import ai.onnxruntime.providers.NNAPIFlags
 import android.content.Context
-import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import java.io.File
 import java.io.FileNotFoundException
 import java.nio.FloatBuffer
-import java.util.EnumSet
 
 /**
  * The bundled ONNX models and their locked inference contracts (M0).
@@ -106,9 +103,6 @@ data class SmokeReport(val providers: List<String>, val models: List<ModelReport
 object ModelSmoke {
     private const val TAG = "ModelSmoke"
 
-    /** Debug flag — XNNPACK is the portable default; NNAPI is opt-in and legacy (deprecated at API 35). */
-    var useNnapi: Boolean = false
-
     // Process-scoped: the result cannot change while the process lives, and re-running it creates
     // three ORT sessions (87 MB htdemucs among them) — which the UI would otherwise do every time the
     // user navigates back to the pick screen, i.e. potentially alongside a running filter job.
@@ -131,7 +125,7 @@ object ModelSmoke {
             ModelReport(model, bundled = false, ok = false, detail = "not installed")
         } else {
             val t0 = SystemClock.elapsedRealtime()
-            sessionOptions().use { opts ->
+            imageSessionOptions().use { opts ->
                 env.createSession(file.absolutePath, opts).use { session ->
                     if (model == NaqiModel.HTDEMUCS) {
                         // Load-only: a full htdemucs run peaks at multiple GB and takes ~9 s; running it
@@ -191,12 +185,16 @@ object ModelSmoke {
     internal fun modelFile(context: Context, model: NaqiModel): File? =
         ModelDownloader.installed(context, model) ?: extracted(context, model)
 
-    private fun sessionOptions() = OrtSession.SessionOptions().apply {
-        setIntraOpNumThreads(1)
-        addConfigEntry("session.intra_op.allow_spinning", "0")
-        addXnnpack(mapOf("intra_op_num_threads" to Runtime.getRuntime().availableProcessors().toString()))
-        if (useNnapi && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            addNnapi(EnumSet.of(NNAPIFlags.USE_FP16))
-        }
-    }
+}
+
+/**
+ * The image-model ORT session options, shared by [ModelSmoke]'s load check and [Infer]'s real runs so
+ * a model can never smoke-test under different options than it infers under. XNNPACK EP; one intra-op
+ * thread with spinning disabled, because these run on a worker that is already saturating the CPU.
+ * htdemucs deliberately does NOT use this — see [com.haithamassoli.naqi.audio.HtdemucsSession].
+ */
+internal fun imageSessionOptions() = OrtSession.SessionOptions().apply {
+    setIntraOpNumThreads(1)
+    addConfigEntry("session.intra_op.allow_spinning", "0")
+    addXnnpack(mapOf("intra_op_num_threads" to Runtime.getRuntime().availableProcessors().toString()))
 }

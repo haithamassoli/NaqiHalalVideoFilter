@@ -20,3 +20,6 @@ local.properties
 
 # Python bytecode from scripts/
 scripts/__pycache__/
+
+# Release build outputs — a 134 MB .aab was staged for commit once; git is not an artifact store.
+/app/release/
