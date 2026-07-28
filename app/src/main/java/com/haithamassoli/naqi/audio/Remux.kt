@@ -31,29 +31,39 @@ data class ConcatPart(val file: File, val startMs: Long)
 /** What MPEG-4 `MediaMuxer` will accept as an audio track (framework `MPEG4Writer`). */
 private val MUXABLE_AUDIO = setOf("audio/mp4a-latm", "audio/3gpp", "audio/amr-wb")
 
+/** What the segmented route must do with [uri]'s audio to get it through [Remux.concat]. */
+enum class ConcatAudio {
+    /** Framework `MediaMuxer` carries this codec: copy the source samples verbatim, bit-identical. */
+    COPY,
+
+    /** It does not: [com.haithamassoli.naqi.audio.AudioPipeline.transcodeToAac] makes an AAC copy first. */
+    TRANSCODE,
+
+    /** No audio track at all — [Remux.concat] takes a null audio source and writes a video-only file. */
+    NONE,
+}
+
 /**
- * True when [uri]'s audio track can be copied into a framework `MediaMuxer` verbatim — or when there is no
- * audio track at all, which is equally fine for [Remux.concat].
+ * Which of the three [ConcatAudio] cases [uri] is, decided up front so the segmented censor-only route
+ * knows whether it owes itself a transcode before it spends hours rendering.
  *
- * This gates the segmented censor-only route. That shape currently lets Transformer transmux the source
- * audio inside each export, and Transformer silently TRANSCODES anything the muxer cannot carry.
- * [Remux.concat] copies samples instead, so an AC-3 / E-AC-3 / DTS / Opus track — which is what a real film
- * often carries — would make `addTrack` throw. Feature films are precisely the target here, so this is
- * checked up front and such a source takes the unsegmented (non-resumable) route rather than failing.
+ * This used to be a Boolean `canCopyAudio`, and the Boolean is what made it wrong: it folded NONE in with
+ * COPY ("nothing to copy, which is equally fine for concat"), but the caller then passed
+ * `TrackSource.FromUri` unconditionally and [Remux.concat] calls `requireTrackIndex("audio/")` on it — so a
+ * long silent source (a screen recording, a dashcam clip) threw after the whole analyze+render pass, with
+ * no per-cause message. Three states, three branches.
  *
- * ponytail: the honest fix is one AAC transcode pass over the source audio, after which every film could
- * resume. Worth building the first time someone hits it; a fallback that still produces the right file is
- * enough today.
+ * An unreadable source answers TRANSCODE, not NONE: the transcode then fails with a clear message, where
+ * NONE would silently publish a film with its audio missing.
  */
-fun canCopyAudio(context: Context, uri: Uri): Boolean {
+fun concatAudio(context: Context, uri: Uri): ConcatAudio {
     val ext = MediaExtractor()
     return try {
         ext.setDataSource(context, uri, null)
-        // No audio track at all: nothing to copy, which is equally fine for concat.
-        val mime = ext.firstTrackFormat("audio/")?.getString(MediaFormat.KEY_MIME) ?: return true
-        mime in MUXABLE_AUDIO
+        val mime = ext.firstTrackFormat("audio/")?.getString(MediaFormat.KEY_MIME) ?: return ConcatAudio.NONE
+        if (mime in MUXABLE_AUDIO) ConcatAudio.COPY else ConcatAudio.TRANSCODE
     } catch (_: Throwable) {
-        false // unreadable is Preflight's story to tell; just don't take the segmented path
+        ConcatAudio.TRANSCODE // never NONE — losing the audio silently is the worse failure
     } finally {
         runCatching { ext.release() }
     }

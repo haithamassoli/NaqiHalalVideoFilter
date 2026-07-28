@@ -108,7 +108,13 @@ internal object Preflight {
         return when {
             "enospc" in text || "no space left" in text -> OUT_OF_SPACE
             "crypto" in text || "drm" in text -> DRM
-            "codec" in text || "decoder" in text || "encoder" in text -> UNSUPPORTED_CODEC
+            // "failed to initialize" is MediaCodec.createDecoderByType's own wording when the device has
+            // no codec for a mime ("Failed to initialize audio/ac3, error 0x80001001") — it names neither
+            // "codec" nor "decoder", so it used to fall through to GENERIC. That is the single most likely
+            // failure of the AAC transcode a segmented AC-3/DTS job now runs, and "this video uses a codec
+            // this device can't decode" is exactly the right sentence for it.
+            "codec" in text || "decoder" in text || "encoder" in text ||
+                "failed to initialize" in text -> UNSUPPORTED_CODEC
             t is FileNotFoundException -> UNREADABLE
             t is IOException -> UNREADABLE
             else -> GENERIC

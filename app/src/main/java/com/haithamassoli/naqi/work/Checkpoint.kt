@@ -45,15 +45,39 @@ internal object Checkpoint {
      * [forcedSegmentMs] is the debug override: any positive value segments regardless of duration, which is
      * the only way to exercise multi-segment concat and kill/resume on a clip short enough to iterate on.
      */
-    fun plan(durationMs: Long, forcedSegmentMs: Long = 0L): List<RenderSegment> {
+    /**
+     * [cutAtMs] moves each INTERIOR boundary to a point the source can actually be cut at, and it is the
+     * whole of `long-film-followups.md` item 2. media3 ends a clipped read at the first sample **in decode
+     * order** whose pts reaches the clip end (1.10.1 `ClippingMediaPeriod.java:430`), so on any B-frame
+     * stream the frames that DISPLAY before the boundary but DECODE after that sample are never read: 1-3
+     * per seam depending only on where the cut lands inside the B-pyramid, and 49 frames over 31 seams on
+     * a 2.6 h film. A sync sample is the one cut where that cannot happen — nothing decoded before an IDR
+     * displays after it, so the previous segment reads every frame it owns.
+     *
+     * Measured against the real packet tables: the un-snapped plan loses 1 frame on `test-video.mp4` and 6
+     * on `women-music-3min-video.mp4`; snapping to the next sync sample loses **0** on both. The item's own
+     * proposal — snapping to the middle of a frame interval — was simulated too and does NOT work (1 and 4):
+     * it only moves the cut inside the B-pyramid, and it cannot even be aimed, because `MediaFormat`
+     * reports 24 for 24000/1001 content on this device.
+     *
+     * The default is identity, which reproduces the un-snapped plan exactly. [cutAtMs] must be
+     * non-decreasing; both real callers are.
+     */
+    fun plan(durationMs: Long, forcedSegmentMs: Long = 0L, cutAtMs: (Long) -> Long = { it }): List<RenderSegment> {
         val segmentMs = if (forcedSegmentMs > 0) forcedSegmentMs else SEGMENT_MS
         if (durationMs <= 0) return emptyList()
         if (forcedSegmentMs <= 0 && durationMs < Eta.CONFIRM_THRESHOLD_MS) return emptyList()
         if (durationMs <= segmentMs) return emptyList()
         val count = ((durationMs + segmentMs - 1) / segmentMs).toInt()
-        return (0 until count).map { i ->
-            RenderSegment(i, i * segmentMs, minOf((i + 1) * segmentMs, durationMs))
-        }
+        // 0 and durationMs are the film's own ends and are never snapped. distinct() collapses two cuts
+        // that a sparse-keyframe source snapped onto the same sample, so such a source gets fewer, longer
+        // segments rather than an empty one — which would make media3 throw on an inverted clip.
+        val cuts = (
+            listOf(0L) +
+                (1 until count).map { cutAtMs(it * segmentMs).coerceIn(0L, durationMs) } +
+                durationMs
+            ).distinct().sorted()
+        return cuts.zipWithNext().mapIndexed { i, (from, to) -> RenderSegment(i, from, to) }
     }
 
     // ---- per-segment analysis ----

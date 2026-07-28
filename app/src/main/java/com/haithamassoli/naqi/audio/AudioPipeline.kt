@@ -1,12 +1,14 @@
 package com.haithamassoli.naqi.audio
 
 import android.content.Context
+import android.media.MediaExtractor
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import com.haithamassoli.naqi.media.requireTrackIndex
 import com.haithamassoli.naqi.work.Checkpoint
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -106,6 +108,95 @@ object AudioPipeline {
             } finally {
                 runCatching { writer.close() } // safe after finish or on error; don't mask the original throw
             }
+        }
+    }
+
+    /**
+     * Transcode [uri]'s audio track to AAC-LC 48 kHz 192 kbps into [tempM4a] — [removeMusic] with the
+     * separator deleted (`long-film-followups.md` item 1).
+     *
+     * One caller, one reason: [Remux.concat] copies the audio track sample-for-sample and framework
+     * `MediaMuxer` carries only AAC/AMR, so an AC-3/E-AC-3/DTS film — or ANY MKV/WebM, which is Opus or
+     * Vorbis — used to have to give up the segmented route entirely. That meant correct output with **no
+     * resume on a ~3 h job**, which is the exact failure Phase 2 exists to remove. Transcode that one track
+     * up front and the concat copies THAT instead.
+     *
+     * **This replaces one transcode with one transcode, not passthrough with a transcode.** The
+     * unsegmented fallback had Transformer silently re-encoding the same track inside every export
+     * already; bit-identical passthrough was never on offer for a source the muxer cannot carry. A source
+     * it CAN carry never reaches here and still gets its own bytes back verbatim.
+     *
+     * [AudioDecoder.stream] emits exactly what [AacWriter] eats — interleaved f32 stereo 44.1 kHz, both
+     * fixed constants — so the two compose with no glue but the soft clip; see the sink.
+     *
+     * ponytail: two ceilings, both inherited from reusing the separator's ingress/egress verbatim.
+     * (1) A >2-channel source is **limited, not merely guarded** — the soft clip maps the un-normalized
+     * BS.775 downmix's peaks into [0.95, 1), and a synthetic 5.1 asset measured +10.7 dBFS before it, so a
+     * loud passage loses several dB of dynamics. Still strictly better than the hard clip that would
+     * otherwise happen, and a source the muxer CAN copy never comes through here.
+     * (2) A 48 kHz source is resampled 48 -> 44.1 (AudioDecoder) -> 48 (AacWriter) for nothing; 44.1 is
+     * htdemucs's rate and there is no htdemucs here. The upgrade path for both is the same and is a
+     * different shape of change: run this as an audio-only media3 Transformer export, which downmixes
+     * with proper gain and keeps the source rate. Worth it if a real 5.1 film ever sounds wrong — no such
+     * asset exists in `qa-assets/` to measure against today.
+     */
+    suspend fun transcodeToAac(
+        context: Context,
+        uri: Uri,
+        tempM4a: File,
+        isCancelled: () -> Boolean,
+    ) = withContext(Dispatchers.Default) {
+        val writer = AacWriter(tempM4a, firstAudioPtsUs(context, uri))
+        try {
+            var frames = 0L
+            AudioDecoder.stream(context, uri, isCancelled) { buf, n ->
+                // AacWriter.write's contract is "already soft-clipped upstream", and deleting the separator
+                // deletes the only thing that ever satisfied it. This is not belt-and-braces: AudioDecoder's
+                // >2-channel BS.775 downmix is deliberately UN-normalized (level is irrelevant to the
+                // separator, which divides and re-multiplies by the same std), so a 5.1 film — precisely the
+                // source this function exists for — arrives at |x| up to ~2.4 and AacWriter's int16
+                // quantizer would hard-clip every peak. In place: buf is AudioDecoder's own hot buffer,
+                // fully rewritten before each sink call.
+                for (i in 0 until 2 * n) buf[i] = softclip(buf[i])
+                writer.write(buf, n)
+                frames += n
+            }
+            // Checked BEFORE finish(): with no samples the encoder never emits INFO_OUTPUT_FORMAT_CHANGED,
+            // so the muxer is never started and the .m4a has no moov for the concat to open — a confusing
+            // failure two stages later instead of a clear one here.
+            if (frames == 0L) error("Could not decode any audio from this video.")
+            writer.finish()
+            Log.i(TAG, "transcodeToAac: $frames frames -> ${tempM4a.length()}B")
+        } finally {
+            runCatching { writer.close() } // safe after finish or on error; don't mask the original throw
+        }
+    }
+
+    /**
+     * The source audio track's first sample PTS, without decoding anything — the epoch [AacWriter] stamps
+     * from, so the transcoded track lands where the source's own track did and keeps whatever inter-track
+     * offset it authored.
+     *
+     * [AudioDecoder] derives this exact value from `extractor.sampleTime` on its first read, but only
+     * hands it back once the WHOLE track is decoded, and [AacWriter] needs it in its constructor.
+     * [removeMusic] reads it off the stats pass it has to run anyway; there is no stats pass here, and a
+     * second full decode of a 155-min film's audio to learn one Long is not a trade worth making.
+     *
+     * Honestly: this is 0 on every asset measured here, and it only differs from 0 on a source whose audio
+     * track starts later than its video. It is kept because that source exists and would otherwise have its
+     * audio pulled early by exactly that offset, not because it has ever been observed to matter.
+     */
+    private fun firstAudioPtsUs(context: Context, uri: Uri): Long {
+        val ext = MediaExtractor()
+        return try {
+            ext.setDataSource(context, uri, null)
+            ext.selectTrack(ext.requireTrackIndex("audio/"))
+            // Negative on a source carrying an AAC priming edit. MediaMuxer rejects negative sample times
+            // and our own re-encode introduces its own priming anyway — same clamp, same reason, as
+            // removeMusic's stats.firstPtsUs.coerceAtLeast(0L).
+            ext.sampleTime.coerceAtLeast(0L)
+        } finally {
+            runCatching { ext.release() }
         }
     }
 

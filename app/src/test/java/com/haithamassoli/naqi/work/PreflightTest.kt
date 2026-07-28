@@ -27,6 +27,19 @@ class PreflightTest {
         assertEquals(Preflight.UNSUPPORTED_CODEC, Preflight.messageFor(IllegalArgumentException("Failed to create decoder for video/av01")))
     }
 
+    /**
+     * A device with no AC-3/DTS decoder is the likeliest way the segmented route's AAC transcode fails,
+     * and `MediaCodec.createDecoderByType` words it in a way that names neither "codec" nor "decoder" —
+     * so this used to reach the user as the generic "Filtering failed".
+     */
+    @Test
+    fun aMissingDecoderReportsAsUnsupportedRatherThanGeneric() {
+        assertEquals(
+            Preflight.UNSUPPORTED_CODEC,
+            Preflight.messageFor(IllegalArgumentException("Failed to initialize audio/ac3, error 0x80001001")),
+        )
+    }
+
     @Test
     fun ioFailuresReportAsUnreadable() {
         assertEquals(Preflight.UNREADABLE, Preflight.messageFor(FileNotFoundException("/data/x.mp4")))

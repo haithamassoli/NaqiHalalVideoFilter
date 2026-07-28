@@ -239,13 +239,6 @@ class DemucsSeparator(
         if (n > 0) emit(emitBuf, n)
     }
 
-    // PRD soft-clip guard: transparent below 0.95, tanh knee bounding |y| < 1.0 (dsp-spec §6).
-    private fun softclip(x: Float): Float {
-        val a = abs(x)
-        if (a <= 0.95f) return x
-        return sign(x) * (0.95f + tanh((a - 0.95) / 0.05).toFloat() * 0.05f)
-    }
-
     companion object {
         /**
          * Segment geometry, fixed by the exported graph — change these only together with a matching
@@ -380,4 +373,18 @@ class HtdemucsSession(context: Context) : AutoCloseable {
         private val INTRA_OP_THREADS = Runtime.getRuntime().availableProcessors().coerceAtMost(6)
         private const val ALLOW_SPINNING = "0"
     }
+}
+
+/**
+ * PRD soft-clip guard: transparent below 0.95, tanh knee bounding |y| < 1.0 (dsp-spec §6).
+ *
+ * File-level rather than a member of [DemucsSeparator] because it is the ENCODER's precondition, not
+ * part of separation: [AacWriter.write] documents "already soft-clipped upstream", and this was the only
+ * thing satisfying it. [AudioPipeline.transcodeToAac] runs the same decoder into the same encoder with no
+ * separator in between, so it needs the identical guard. Still Android-free, so the JVM tests are unaffected.
+ */
+internal fun softclip(x: Float): Float {
+    val a = abs(x)
+    if (a <= 0.95f) return x
+    return sign(x) * (0.95f + tanh((a - 0.95) / 0.05).toFloat() * 0.05f)
 }

@@ -163,9 +163,17 @@ class AacWriter(tempM4a: File, private val firstPtsUs: Long) : AutoCloseable {
         }
     }
 
+    /**
+     * [endOfStream] also picks the dequeue timeout, and that is not a detail: mid-stream this is called
+     * after EVERY input buffer and returns on the first TRY_AGAIN_LATER, so a blocking timeout was paid
+     * ~10 000 times per pass — measured at **135 s to transcode a 193 s track on an S23 (1.43x realtime)**,
+     * of which ~129 s was this sleep. Non-blocking there costs nothing: the caller's own
+     * `dequeueInputBuffer(TIMEOUT_US)` is what applies backpressure, so this cannot spin. Draining EOS
+     * still blocks, because there the encoder tail is exactly what we are waiting for.
+     */
     private fun drainEncoder(endOfStream: Boolean) {
         while (true) {
-            val outIx = encoder.dequeueOutputBuffer(info, TIMEOUT_US)
+            val outIx = encoder.dequeueOutputBuffer(info, if (endOfStream) TIMEOUT_US else 0L)
             when {
                 outIx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     // The CSD (AudioSpecificConfig) lives in THIS format — addTrack MUST use it, never encFmt.

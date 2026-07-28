@@ -2,6 +2,7 @@ package com.haithamassoli.naqi.work
 
 import android.content.ContentValues
 import android.content.Context
+import android.media.MediaExtractor
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
@@ -22,12 +23,14 @@ import com.haithamassoli.naqi.analysis.FaceTracker
 import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.analysis.NsfwGate
 import com.haithamassoli.naqi.audio.AudioPipeline
+import com.haithamassoli.naqi.audio.ConcatAudio
 import com.haithamassoli.naqi.audio.ConcatPart
 import com.haithamassoli.naqi.audio.Remux
 import com.haithamassoli.naqi.audio.TrackSource
-import com.haithamassoli.naqi.audio.canCopyAudio
+import com.haithamassoli.naqi.audio.concatAudio
 import com.haithamassoli.naqi.edl.Edl
 import com.haithamassoli.naqi.edl.FaceTrackEdl
+import com.haithamassoli.naqi.media.requireTrackIndex
 import com.haithamassoli.naqi.ml.Infer
 import com.haithamassoli.naqi.render.RenderPipeline
 import com.haithamassoli.naqi.render.RenderSegment
@@ -90,6 +93,12 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             inputData.getBoolean(KEY_BLUR_UNKNOWN, false),
             inputData.getString(KEY_KEEP_STEMS),
             inputData.getString(KEY_FORCE_INTERVALS), // debug hook, but it does change the output
+            // Not an input: a plan generation. Segment boundaries moved to sync samples in
+            // long-film-followups.md item 2, so an `an-NNN.json` or `seg-NNN.mp4` left by an older build
+            // describes a DIFFERENT time window under the same index. Resuming into it would fold analysis
+            // into the wrong span and have Remux.concat place rendered frames at the wrong absolute time —
+            // silently. Bumping this orphans that directory instead, and the 7-day sweep collects it.
+            "plan2",
         )
     }
 
@@ -114,15 +123,19 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         // exactly the M1/M2 route it always did. Probed before Preflight because the plan changes how much
         // scratch the job needs.
         val durationMs = runCatching { FrameSampler.probe(applicationContext, inputUri).durationMs }.getOrDefault(0L)
-        var plan = Checkpoint.plan(durationMs, inputData.getLong(KEY_SEGMENT_MS, 0L))
-        // Censor-only concat copies the SOURCE audio track sample-for-sample, which framework MediaMuxer
-        // only accepts for AAC/AMR. A film with AC-3 audio therefore takes the unsegmented route, where
-        // Transformer transcodes the audio for us — correct output, just no resume. See Remux.canCopyAudio.
-        if (plan.isNotEmpty() && censorWomen && !removeMusic && !canCopyAudio(applicationContext, inputUri)) {
-            Log.w(TAG, "source audio cannot be copied by MediaMuxer — falling back to the unsegmented route")
-            plan = emptyList()
-        }
+        val plan = planFor(inputUri, durationMs, inputData.getLong(KEY_SEGMENT_MS, 0L))
         val segmented = censorWomen && plan.isNotEmpty()
+        // The censor-only concat copies the SOURCE audio track sample-for-sample, and framework MediaMuxer
+        // carries only AAC/AMR — which rejects the AC-3/E-AC-3/DTS a film ships AND the Opus/Vorbis in every
+        // MKV/WebM. Such a source used to give up the segmented route entirely: correct output, but NO
+        // RESUME on a ~3 h job, which is the exact failure Phase 2 exists to remove, and no asset in
+        // qa-assets/ exercised it. Now the track is transcoded to AAC once up front and the concat copies
+        // that. Nothing is traded away — the unsegmented fallback was already having Transformer transcode
+        // the same track inside every export. See AudioPipeline.transcodeToAac.
+        // Only meaningful for the censor-only segmented shape; with music removal the concat's audio is the
+        // separator's own AAC output, so the source's codec never reaches the muxer.
+        val audioPlan = if (segmented && !removeMusic) concatAudio(applicationContext, inputUri) else ConcatAudio.COPY
+        if (segmented && !removeMusic) Log.i(TAG, "segmented audio: $audioPlan")
         // The debug segment override also turns the audio scratch on, so the resumable separator can be
         // exercised on a clip short enough to kill and resume by hand — it is otherwise unreachable below
         // 30 min, which is far too long an iteration loop for the fiddliest code in the phase.
@@ -143,12 +156,17 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 removeMusic && censorWomen -> 2
                 else -> 1
             },
-            // The separated-audio scratch: int16 stereo 44.1 kHz = 176 400 B per second of source.
-            extraScratchBytes = if (resumableAudio || (segmented && removeMusic)) durationMs / 1000 * 176_400 else 0L,
+            // The separated-audio scratch: int16 stereo 44.1 kHz = 176 400 B per second of source. Plus,
+            // for a source MediaMuxer cannot copy, the AAC transcode the concat copies instead: 192 000
+            // bit/s stereo = 24 000 B per second, ~220 MB on a 155-min film, same lifetime as the PCM.
+            // The two are mutually exclusive (TRANSCODE is only chosen when !removeMusic); they are added
+            // rather than branched so a later edit does not have to re-prove that exclusivity.
+            extraScratchBytes = (if (resumableAudio || (segmented && removeMusic)) durationMs / 1000 * 176_400 else 0L) +
+                (if (audioPlan == ConcatAudio.TRANSCODE) durationMs / 1000 * 24_000 else 0L),
         )?.let { return Result.failure(workDataOf(KEY_OUTPUT_MESSAGE to it)) }
 
         return when {
-            segmented -> runSegmented(inputUri, plan, removeMusic, durationMs)
+            segmented -> runSegmented(inputUri, plan, removeMusic, audioPlan, durationMs)
             removeMusic && censorWomen -> runCombined(inputUri)
             removeMusic -> runMusicOnly(inputUri, durationMs)
             else -> runCensorOnly(inputUri) // M1's unsegmented path
@@ -172,6 +190,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         inputUri: Uri,
         plan: List<RenderSegment>,
         removeMusic: Boolean,
+        audioPlan: ConcatAudio,
         durationMs: Long,
     ): Result {
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
@@ -183,23 +202,47 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         val renderBase = if (removeMusic) 25 else 40
         val renderSpan = if (removeMusic) 25 else 50
         try {
+            // Up front, before the two long passes, because a device with no decoder for this codec cannot
+            // do the job at all — the old unsegmented fallback needed the same decoder for Transformer to
+            // transcode — so failing here costs seconds instead of the hours it would cost next to the
+            // concat.
+            if (audioPlan == ConcatAudio.TRANSCODE && audioTemp.length() == 0L) {
+                stats.stage("transcode")
+                report(stage(R.string.stage_preparing), 0)
+                // Written to `.part` and renamed, exactly as renderSegments commits a segment: the final
+                // name then EXISTS only over a complete file, so the length check above is a safe skip and
+                // a SIGKILL mid-transcode cannot leave a truncated .m4a that looks finished. That is an
+                // atomic write, not a checkpoint — no state file, nothing to keep in sync — so it honours
+                // "do not checkpoint the transcode" while saving a resumed film ~10 min of redoing it.
+                val part = File(workDir, "audio.m4a.part")
+                runCatching { part.delete() }
+                AudioPipeline.transcodeToAac(applicationContext, inputUri, part) { isStopped }
+                check(part.renameTo(audioTemp)) { "could not commit the transcoded audio" }
+            }
             val edl = analyzeSegments(inputUri, plan, strictness, blurUnknownFaces, durationMs, 0, renderBase)
             renderSegments(inputUri, plan, edl, blurAmount, grayscale, renderBase, renderSpan)
 
-            val audio = if (removeMusic) {
-                val sep = stage(R.string.stage_separating)
-                stats.stage("separate")
-                AudioPipeline.removeMusic(
-                    applicationContext, inputUri, keepStems, audioTemp,
-                    onProgress = { p -> reportBand(sep, p, 50, 40) }, // 0..100 -> 50..90
-                    isCancelled = { isStopped },
-                    jobDir = workDir,
-                )
-                TrackSource.FromFile(audioTemp)
-            } else {
+            val audio = when {
+                removeMusic -> {
+                    val sep = stage(R.string.stage_separating)
+                    stats.stage("separate")
+                    AudioPipeline.removeMusic(
+                        applicationContext, inputUri, keepStems, audioTemp,
+                        onProgress = { p -> reportBand(sep, p, 50, 40) }, // 0..100 -> 50..90
+                        isCancelled = { isStopped },
+                        jobDir = workDir,
+                    )
+                    TrackSource.FromFile(audioTemp)
+                }
+                // The AAC written before analyze. Copied exactly as an AAC source's own track would be:
+                // one continuous track, so no seam can drift against the video.
+                audioPlan == ConcatAudio.TRANSCODE -> TrackSource.FromFile(audioTemp)
+                // A source with no audio track at all. Remux.concat takes null and writes video only;
+                // passing the Uri would make its requireTrackIndex("audio/") throw after the whole pass.
+                audioPlan == ConcatAudio.NONE -> null
                 // Censor-only: the source audio track is copied verbatim, which is strictly better than
                 // M1's per-export transmux — one continuous track, so no seam can drift against the video.
-                TrackSource.FromUri(inputUri)
+                else -> TrackSource.FromUri(inputUri)
             }
 
             val joining = stage(R.string.stage_muxing)
@@ -238,6 +281,64 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             stats.finish("shape=segmented segments=${plan.size}")
             runCatching { Infer.close() }
             runCatching { if (muxTemp.exists()) muxTemp.delete() } // published or dead; never resumable
+            // audioTemp is deliberately NOT deleted here. On success and on a user cancel JobStore.delete
+            // takes the whole directory anyway; what is left is a resumable failure, and that is exactly
+            // when both writers of this file want it kept — the transcode to skip redoing ~10 min of work,
+            // and removeMusic to skip re-encoding 1.6 GB of PCM.
+        }
+    }
+
+    /**
+     * [Checkpoint.plan] with its interior boundaries snapped to the source's own sync samples — see that
+     * function for why the un-snapped boundaries silently drop 1-3 frames per seam.
+     *
+     * ONE extractor for the whole plan: `seekTo(SEEK_TO_NEXT_SYNC)` then read the sample's own time.
+     * Truncating µs -> ms lands at or BEFORE the sync sample, which is what both ends of a seam need — a
+     * clip end past it fires the decode-order EOS a frame early, and a clip start past it puts the IDR
+     * itself below the clip start, where media3 drops it as negative.
+     *
+     * Boundaries stay whole ms deliberately, even though `setStartPositionUs` exists: `CensorGlEffect`
+     * reconstructs absolute time as `presentationTimeUs / 1000 + startMs`, and that only equals
+     * `floor(absoluteUs / 1000)` when the offset is a whole ms. The price of truncating is that both
+     * passes then seek to the sync sample BEFORE the boundary and decode one extra GOP they discard —
+     * ~5 s per segment on a film, against the ~2.6 s they already discarded. Real but small (<1 % of
+     * decode work), and the alternative is plumbing µs through RenderSegment, Remux.concat and the EDL
+     * lookup to save it.
+     */
+    private fun planFor(inputUri: Uri, durationMs: Long, forcedSegmentMs: Long): List<RenderSegment> {
+        val ext = MediaExtractor()
+        return try {
+            ext.setDataSource(applicationContext, inputUri, null)
+            ext.selectTrack(ext.requireTrackIndex("video/"))
+            Checkpoint.plan(durationMs, forcedSegmentMs) { ms ->
+                ext.seekTo(ms * 1000, MediaExtractor.SEEK_TO_NEXT_SYNC)
+                val t = ext.sampleTime
+                when {
+                    // No sync sample at or after `ms`, so no LATER cut can be snapped either. Collapsing
+                    // this cut and the rest into the final segment keeps the invariant that every interior
+                    // boundary is a sync sample. Answering `ms` here instead puts back exactly the
+                    // decode-order tail loss this function exists to remove — measured on test-video.mp4,
+                    // whose only sync samples are at 0 s and 8.3 s: 383 frames of 384 with `ms`, 384 with
+                    // this. The cost is coarser resume near the end of such a source: the cheaper mistake.
+                    t < 0L -> durationMs
+                    // The seek did not move forward, so this source cannot be seeked by time at all — a
+                    // fragmented mp4 with no `sidx` is the known case. Every cut would answer the same
+                    // instant, distinct() would collapse them, and a 2.6 h film would run as ONE segment
+                    // with no resume and no log line. Fall back to the nominal cut: lossy, but segmented.
+                    t < ms * 1000 -> ms
+                    else -> t / 1000
+                }
+            }
+        } catch (t: Throwable) {
+            // Deliberately NOT a second Checkpoint.plan() call. jobKey does not encode the plan, so a first
+            // run that snapped and a resume that fell back would share a work directory: an-NNN.json folded
+            // in for the wrong window, and seg-NNN.mp4 skipped as done then placed by Remux.concat at a
+            // different absolute time — duplicated and missing content, published silently. Giving up
+            // segmentation is correct output with no resume, which is the honest status quo instead.
+            Log.w(TAG, "could not snap segment boundaries; running unsegmented", t)
+            emptyList()
+        } finally {
+            runCatching { ext.release() }
         }
     }
 

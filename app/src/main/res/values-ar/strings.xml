@@ -194,6 +194,7 @@
          The notification is the only surface a user sees during a multi-hour job — the app is closed
          and the phone is locked — so the estimate has to reach here, not just the jobs screen. -->
     <string name="job_notif_stage_eta">%1$s · يتبقّى نحو ‏%2$s</string>
+    <string name="stage_preparing">تجهيز الصوت</string>
     <string name="stage_analyzing">المرحلة ١ — التحليل</string>
     <string name="stage_rendering">المرحلة ٢ — المعالجة</string>
     <string name="stage_separating">إزالة الموسيقى</string>
