@@ -10,7 +10,10 @@ import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import com.haithamassoli.naqi.media.requireTrackIndex
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
 import kotlin.math.roundToInt
 
@@ -28,6 +31,11 @@ import kotlin.math.roundToInt
 object FrameSampler {
 
     private const val TIMEOUT_US = 10_000L
+
+    // perf-plan 1.3b. [RING] must stay above the frames the consumer side can be holding — [QUEUE]
+    // queued plus the one it is reading — or the decoder would overwrite pixels still being read.
+    private const val QUEUE = 2
+    private const val RING = QUEUE + 2
 
     /**
      * Container metadata without decoding. [VideoMeta.fps] falls back to 30 when the track omits a
@@ -57,10 +65,13 @@ object FrameSampler {
      * Sequentially decode the first video track and emit one upright ARGB_8888 bitmap per sample
      * slot (slots spaced `1000/fps` ms, anchored to the first decoded frame — so a video shorter
      * than one slot still emits its first frame). Non-sampled frames are released unconverted.
-     * The bitmap handed to [onFrame] is valid only for that call and is recycled on return.
      * Honours coroutine cancellation and releases the codec + extractor on any exit.
-     */
-    /**
+     *
+     * Decode+convert runs on its own coroutine behind a [Channel] (perf-plan 1.3b) so it overlaps the
+     * consumer's inference instead of taking turns with it; [sample] still returns only once the whole
+     * pass is consumed. The bitmap handed to [onFrame] is one of [RING] the sampler cycles: valid for
+     * that call only, overwritten a few frames later, so a consumer keeping pixels must copy them.
+     *
      * @param startMs/[endMs] restrict the pass to `[startMs, endMs)` for a Phase 2 segment; the defaults
      *   cover the whole track and reproduce the M1 pass byte for byte. A window seeks to the preceding
      *   sync sample and discards frames below [startMs], and anchors the sample grid to [startMs] rather
@@ -82,79 +93,106 @@ object FrameSampler {
         val startUs = startMs * 1000
         val endUs = if (endMs == Long.MAX_VALUE) Long.MAX_VALUE else endMs * 1000
 
-        val extractor = MediaExtractor()
-        var codec: MediaCodec? = null
-        try {
-            extractor.setDataSource(context, uri, null)
-            val trackIndex = extractor.requireTrackIndex("video/")
-            extractor.selectTrack(trackIndex)
-            // Decoding has to start at a sync sample at or before the window, and the frames between it
-            // and startMs are decoded but never emitted (they are the reference frames the window needs).
-            if (startMs > 0L) extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
-            val format = extractor.getTrackFormat(trackIndex)
-            codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
-            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, CodecCapabilities.COLOR_FormatYUV420Flexible)
-            codec.configure(format, null, null, 0)
-            codec.start()
+        // The reused output bitmaps plus the single scratch every convert fills before copying it into the
+        // current slot — only the decode coroutine touches either, and it finishes a frame before starting
+        // the next. maxDim² holds any output (the convert downscales only). Nothing recycles the rotation:
+        // it dies with the pass, and a sweep could only race a reader still going — ML Kit's Task, when
+        // onFrame throws before awaiting it.
+        // ponytail: one decode coroutine, so the floor is now the single-threaded convert, ~41 ms/frame on
+        // an S23. Splitting THAT across cores is the next lever, and a much bigger change than this one.
+        val ring = arrayOfNulls<Bitmap>(RING)
+        val scratch = IntArray(maxDim * maxDim)
+        coroutineScope {
+            val frames = Channel<Pair<Bitmap, Long>>(QUEUE)
+            // The CONSUMER is the child and the decode loop stays in this coroutine, so a throw out of
+            // onFrame (ORT dying mid-pass) cancels the loop rather than leaving it parked in send(). The
+            // cancel() covers the one case that would not: a CancellationException thrown BY onFrame
+            // completes this child quietly, without cancelling the scope the decode loop is checking.
+            launch { try { for ((bmp, ptsMs) in frames) onFrame(bmp, ptsMs) } finally { frames.cancel() } }
 
-            val info = MediaCodec.BufferInfo()
-            var inputDone = false
-            var outputDone = false
-            // Windowed: the grid is anchored to the window start, so a segment is reproducible.
-            // Unwindowed: anchored to the first decoded frame's pts, exactly as M1 did.
-            var nextSlotUs = if (windowed) startUs else Long.MIN_VALUE
+            var slot = 0
+            val extractor = MediaExtractor()
+            var codec: MediaCodec? = null
+            try {
+                extractor.setDataSource(context, uri, null)
+                val trackIndex = extractor.requireTrackIndex("video/")
+                extractor.selectTrack(trackIndex)
+                // Decoding has to start at a sync sample at or before the window, and the frames between it
+                // and startMs are decoded but never emitted (they are the reference frames the window needs).
+                if (startMs > 0L) extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                val format = extractor.getTrackFormat(trackIndex)
+                codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
+                format.setInteger(MediaFormat.KEY_COLOR_FORMAT, CodecCapabilities.COLOR_FormatYUV420Flexible)
+                // perf-plan 1.4 proposed KEY_OPERATING_RATE=MAX_VALUE + KEY_PRIORITY=1 here ("ask the decoder
+                // to run flat out"). Tried and REMOVED on 2026-07-28: measured -0.5 % on an S23 analyze pass
+                // (9 985 -> 9 938 ms, i.e. noise). 1.2 explains why — the 53 % "decode+convert" share is
+                // dominated by the Kotlin per-pixel convert below, which no decoder hint can touch. Re-try only
+                // on a device where the DECODE half is shown to be the expensive one.
+                codec.configure(format, null, null, 0)
+                codec.start()
 
-            while (!outputDone) {
-                coroutineContext.ensureActive() // cooperative cancel: throws when the caller cancels
+                val info = MediaCodec.BufferInfo()
+                var inputDone = false
+                var outputDone = false
+                // Windowed: the grid is anchored to the window start, so a segment is reproducible.
+                // Unwindowed: anchored to the first decoded frame's pts, exactly as M1 did.
+                var nextSlotUs = if (windowed) startUs else Long.MIN_VALUE
 
-                if (!inputDone) {
-                    val inIndex = codec.dequeueInputBuffer(0) // non-blocking; drain output when full
-                    if (inIndex >= 0) {
-                        val size = extractor.readSampleData(codec.getInputBuffer(inIndex)!!, 0)
-                        if (size < 0) {
-                            codec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            inputDone = true
-                        } else {
-                            codec.queueInputBuffer(inIndex, 0, size, extractor.sampleTime, 0)
-                            extractor.advance()
+                while (!outputDone) {
+                    coroutineContext.ensureActive() // cooperative cancel: throws when the caller cancels
+
+                    if (!inputDone) {
+                        val inIndex = codec.dequeueInputBuffer(0) // non-blocking; drain output when full
+                        if (inIndex >= 0) {
+                            val size = extractor.readSampleData(codec.getInputBuffer(inIndex)!!, 0)
+                            if (size < 0) {
+                                codec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                                inputDone = true
+                            } else {
+                                codec.queueInputBuffer(inIndex, 0, size, extractor.sampleTime, 0)
+                                extractor.advance()
+                            }
                         }
                     }
-                }
 
-                val outIndex = codec.dequeueOutputBuffer(info, TIMEOUT_US)
-                if (outIndex < 0) continue // TRY_AGAIN_LATER / *_FORMAT_CHANGED / *_BUFFERS_CHANGED
+                    val outIndex = codec.dequeueOutputBuffer(info, TIMEOUT_US)
+                    if (outIndex < 0) continue // TRY_AGAIN_LATER / *_FORMAT_CHANGED / *_BUFFERS_CHANGED
 
-                val ptsUs = info.presentationTimeUs
-                if (nextSlotUs == Long.MIN_VALUE && info.size > 0) nextSlotUs = ptsUs
-                // Past the window: stop. Decode order is not display order, so this trusts the sample's
-                // own pts rather than assuming the stream reached the end.
-                if (info.size > 0 && ptsUs >= endUs) {
-                    codec.releaseOutputBuffer(outIndex, false)
-                    break
-                }
-                val render = info.size > 0 && ptsUs >= nextSlotUs
-                val bitmap = if (render) {
-                    codec.getOutputImage(outIndex)?.let { image ->
-                        try { toUprightBitmap(image, rotation, maxDim) } finally { image.close() }
+                    val ptsUs = info.presentationTimeUs
+                    if (nextSlotUs == Long.MIN_VALUE && info.size > 0) nextSlotUs = ptsUs
+                    // Past the window: stop. Decode order is not display order, so this trusts the sample's
+                    // own pts rather than assuming the stream reached the end.
+                    if (info.size > 0 && ptsUs >= endUs) {
+                        codec.releaseOutputBuffer(outIndex, false)
+                        break
                     }
-                } else null
-                if (render) {
-                    nextSlotUs += slotIntervalUs
-                    if (nextSlotUs <= ptsUs) nextSlotUs = ptsUs + slotIntervalUs // resync after a gap
-                }
-                codec.releaseOutputBuffer(outIndex, false) // release before the (suspending) callback
+                    val render = info.size > 0 && ptsUs >= nextSlotUs
+                    val bitmap = if (render) {
+                        codec.getOutputImage(outIndex)?.let { image ->
+                            try { toUprightBitmap(image, rotation, maxDim, ring[slot], scratch) }
+                            finally { image.close() }
+                        }?.also { ring[slot] = it } // first RING frames fill the rotation, the rest reuse it
+                    } else null
+                    if (render) {
+                        nextSlotUs += slotIntervalUs
+                        if (nextSlotUs <= ptsUs) nextSlotUs = ptsUs + slotIntervalUs // resync after a gap
+                    }
+                    codec.releaseOutputBuffer(outIndex, false) // release before handing the frame over
 
-                if (bitmap != null) {
-                    try { onFrame(bitmap, ptsUs / 1000) } finally { bitmap.recycle() } // µs -> ms
+                    if (bitmap != null) {
+                        frames.send(bitmap to ptsUs / 1000) // µs -> ms; parks here when the consumer is behind
+                        slot = (slot + 1) % RING
+                    }
+                    if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outputDone = true
                 }
-                if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outputDone = true
+            } finally {
+                frames.close() // ends the consumer's loop on ANY exit, cancel included
+                codec?.let {
+                    runCatching { it.stop() } // stop() throws if the codec already errored; release regardless
+                    it.release()
+                }
+                extractor.release()
             }
-        } finally {
-            codec?.let {
-                runCatching { it.stop() } // stop() throws if the codec already errored; release regardless
-                it.release()
-            }
-            extractor.release()
         }
     }
 
@@ -182,8 +220,11 @@ object FrameSampler {
      * strides) to an upright ARGB_8888 bitmap, downscaling by nearest-neighbour and applying
      * [rotation] in the same pixel walk. [Image.getCropRect] (exclusive-right [android.graphics.Rect])
      * bounds the valid region. Integer BT.601 full-range YUV -> RGB.
+     *
+     * Writes through the caller's [pixels] store into [reuse] when that bitmap already has the output
+     * shape, so a pass allocates [RING] bitmaps instead of one per frame; a mismatch allocates one.
      */
-    private fun toUprightBitmap(image: Image, rotation: Int, maxDim: Int): Bitmap {
+    private fun toUprightBitmap(image: Image, rotation: Int, maxDim: Int, reuse: Bitmap?, pixels: IntArray): Bitmap {
         val crop = image.cropRect
         val cw = crop.width()
         val ch = crop.height()
@@ -205,7 +246,6 @@ object FrameSampler {
         val uBuf = uP.buffer; val uRow = uP.rowStride; val uPix = uP.pixelStride; val uBase = uBuf.position()
         val vBuf = vP.buffer; val vRow = vP.rowStride; val vPix = vP.pixelStride; val vBase = vBuf.position()
 
-        val pixels = IntArray(outW * outH)
         for (oy in 0 until outH) {
             val row = oy * outW
             for (ox in 0 until outW) {
@@ -230,6 +270,11 @@ object FrameSampler {
                 pixels[row + ox] = -0x1000000 or (r shl 16) or (g shl 8) or b // opaque ARGB
             }
         }
-        return Bitmap.createBitmap(pixels, outW, outH, Bitmap.Config.ARGB_8888)
+        // createBitmap(pixels, ...) would allocate AND return an immutable bitmap; the rotation needs a
+        // mutable one it can refill, and setPixels copies, so the store above is free to be reused.
+        val out = reuse?.takeIf { it.width == outW && it.height == outH }
+            ?: Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+        out.setPixels(pixels, 0, outW, 0, 0, outW, outH)
+        return out
     }
 }

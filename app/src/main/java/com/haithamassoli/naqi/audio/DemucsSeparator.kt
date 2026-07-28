@@ -358,9 +358,26 @@ class HtdemucsSession(context: Context) : AutoCloseable {
         // Samsung's global memory watchdog kills the app; without it RSS drops back between chunks
         // and long jobs survive. The peak itself is intrinsic to the graph (NOT thread scratch —
         // 1 thread peaks HIGHER), which is why M3 re-exported at a 3.9 s segment; see [SEG].
-        setIntraOpNumThreads(Runtime.getRuntime().availableProcessors())
-        addConfigEntry("session.intra_op.allow_spinning", "0")
+        // Neither of those two is a dial. The two below are — see their declarations.
+        setIntraOpNumThreads(INTRA_OP_THREADS)
+        addConfigEntry("session.intra_op.allow_spinning", ALLOW_SPINNING)
         setCPUArenaAllocator(false)
         setMemoryPatternOptimization(false)
+    }
+
+    companion object {
+        /**
+         * The two dials of this stage, both SWEPT on an S23 2026-07-28 (`perf-plan.md` Phase 3.1/3.2),
+         * median per-chunk ms over chunks 3-7:
+         *
+         *     threads 8 (=availableProcessors) 2244 | 6 **2136** | 4 2155      spinning 0 **2244** | 1 2305
+         *
+         * 6 wins by ~5 % because every intra-op barrier waits on the slowest thread and the S23's little
+         * cores are it — 4 of 6's five chunks came in under 8's fastest. Capped rather than hardcoded so a
+         * 4-core device still gets 4. Spinning stays "0": it was chosen for power and is ALSO faster here,
+         * so there is nothing left to trade. Peak RSS moved <0.2 % across every config.
+         */
+        private val INTRA_OP_THREADS = Runtime.getRuntime().availableProcessors().coerceAtMost(6)
+        private const val ALLOW_SPINNING = "0"
     }
 }

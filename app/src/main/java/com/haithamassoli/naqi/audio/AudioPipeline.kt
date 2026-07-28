@@ -78,6 +78,8 @@ object AudioPipeline {
             // negative sample times, and our re-encode introduces its own priming anyway — clamp to 0.
             val writer = AacWriter(tempM4a, stats.firstPtsUs.coerceAtLeast(0L))
             try {
+                // Reset AFTER thermalYield, so a throttle pause is not billed to the next chunk.
+                var tChunk = System.nanoTime()
                 val separator = DemucsSeparator(
                     keepOther = keepStems == "vocals_other",
                     mean = stats.mean,
@@ -85,9 +87,10 @@ object AudioPipeline {
                     totalFrames = stats.frames,
                     infer = session::infer,
                     onChunk = { done, total ->
-                        Log.i(TAG, "chunk $done/$total")
+                        Log.i(TAG, "chunk $done/$total ${(System.nanoTime() - tChunk) / 1_000_000}ms")
                         onProgress(2 + 96 * done / total) // 0..total -> 2..98
                         thermalYield(context, isCancelled)
+                        tChunk = System.nanoTime()
                     },
                     emit = writer::write,
                 )
@@ -160,6 +163,8 @@ object AudioPipeline {
             HtdemucsSession(context).use { session ->
                 FileOutputStream(pcm, /* append = */ true).use { out ->
                     val quantized = ByteArray(4 * DemucsSeparator.STRIDE) // one flush batch, one write
+                    // As above; discard the first line of a RESUMED run — skipped chunks report nothing.
+                    var tChunk = System.nanoTime()
                     val separator = DemucsSeparator(
                         keepOther = keepStems == "vocals_other",
                         mean = stats.mean,
@@ -167,12 +172,13 @@ object AudioPipeline {
                         totalFrames = stats.frames,
                         infer = session::infer,
                         onChunk = { done, total ->
-                            Log.i(TAG, "chunk $done/$total")
+                            Log.i(TAG, "chunk $done/$total ${(System.nanoTime() - tChunk) / 1_000_000}ms")
                             onProgress(2 + 88 * done / total) // 0..total -> 2..90; 90..100 is the AAC pass
                             // After the flush, so `written` is current. Skipped while stopping, so a cancel
                             // that is racing JobStore.delete cannot re-create the file it just removed.
                             if (!isCancelled()) Checkpoint.writeAudio(jobDir, written, stats)
                             thermalYield(context, isCancelled)
+                            tChunk = System.nanoTime()
                         },
                         emit = { interleaved, frames ->
                             var b = 0

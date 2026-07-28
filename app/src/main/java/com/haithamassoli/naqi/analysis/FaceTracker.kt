@@ -3,8 +3,9 @@ package com.haithamassoli.naqi.analysis
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
-import com.google.android.gms.tasks.Tasks
+import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
@@ -12,10 +13,11 @@ import com.haithamassoli.naqi.edl.FaceTrackEdl
 import kotlin.math.abs
 
 /**
- * M1 pass-1 face tracking. The caller feeds sampled upright frames at 10 fps via [onFrame]; this
- * runs ML Kit (bundled, fast, tracking ON), groups detections by tracking id into [FaceTrack]s, and
- * harvests a few frontal crops per track for gender voting. Each track is voted ([GenderVoter]) and
- * turned into a [FaceTrackEdl] *during* the pass; [finish] only drains whatever is still live.
+ * M1 pass-1 face tracking. The caller feeds sampled upright frames at 10 fps — [detect] starts ML Kit
+ * (bundled, fast, tracking ON) and [onFaces] consumes what it found — grouping detections by tracking
+ * id into [FaceTrack]s and harvesting a few frontal crops per track for gender voting. Each track is
+ * voted ([GenderVoter]) and turned into a [FaceTrackEdl] *during* the pass; [finish] only drains
+ * whatever is still live.
  *
  * Coordinates: ML Kit `boundingBox` is pixels in the frame bitmap; every [NRect] here is normalized
  * to that bitmap (upright space — see [Contracts]). Timestamps are MILLIseconds throughout.
@@ -31,10 +33,11 @@ import kotlin.math.abs
  * - **Unseen for [EVICT_AFTER_MS]** ⇒ the track is over: vote it if it never filled its crop budget,
  *   emit its EDL, drop it from the live map.
  *
- * Not thread-safe: [onFrame] must not overlap itself or [closeDetector] — the caller drives frames
- * sequentially on one background dispatcher (blocking `Tasks.await` is why no coroutines-play-services
- * dep is needed). Voting inside [onFrame] means [GenderVoter]'s NudeNet inference now runs on that
- * same dispatcher, which is what spreads the old `finish()` stall across the pass.
+ * Not thread-safe: one frame's [detect]→[onFaces] must complete before the next frame's starts, and
+ * neither may overlap [closeDetector] — the caller drives frames sequentially on one background
+ * dispatcher and blocks there on `Tasks.await` (which is why no coroutines-play-services dep is
+ * needed). Voting inside [onFaces] means [GenderVoter]'s NudeNet inference now runs on that same
+ * dispatcher, which is what spreads the old `finish()` stall across the pass.
  */
 class FaceTracker(
     private val context: Context,
@@ -66,8 +69,15 @@ class FaceTracker(
      */
     fun retention(): String = "tracks=$trackCount peakLiveCrops=$cropCount liveTracks=${tracks.size}"
 
-    suspend fun onFrame(bitmap: Bitmap, ptsMs: Long) {
-        val faces = Tasks.await(detector().process(InputImage.fromBitmap(bitmap, 0)))
+    /**
+     * Start ML Kit and hand the Task back un-awaited (perf-plan 1.3a): it runs on ML Kit's own executor,
+     * so the caller gets the NSFW gate for free by awaiting only after running it. The caller must await
+     * before [bitmap] is recycled — ML Kit reads it until the Task completes.
+     */
+    fun detect(bitmap: Bitmap): Task<List<Face>> = detector().process(InputImage.fromBitmap(bitmap, 0))
+
+    /** Everything after the detection: group [faces] into tracks, harvest crops, then sweep. */
+    suspend fun onFaces(faces: List<Face>, bitmap: Bitmap, ptsMs: Long) {
         val w = bitmap.width.toFloat()
         val h = bitmap.height.toFloat()
         for (face in faces) {

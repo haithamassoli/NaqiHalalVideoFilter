@@ -15,6 +15,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.google.android.gms.tasks.Tasks
 import com.haithamassoli.naqi.BuildConfig
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.analysis.FaceTracker
@@ -37,10 +38,12 @@ import java.io.File
  * Filtering job. Up to two passes over one source video plus an audio pass, promoted to a foreground
  * service with staged progress and cancellation. Three job shapes:
  *
- * - **Censor-only** (M1, byte-for-byte unchanged): pass 1 (0..50) decodes at 10 fps — every frame
- *   feeds ML Kit face tracking, every 2nd frame (5 fps) the NSFW gate; firings become hysteresis
+ * - **Censor-only** (M1's two passes; EDL output unchanged): pass 1 (0..50) decodes at 10 fps — every
+ *   frame feeds ML Kit face tracking, every 2nd frame (5 fps) the NSFW gate; firings become hysteresis
  *   censor intervals and face tracks vote gender, together the [Edl]. Pass 2 (50..100) renders with
  *   [RenderPipeline] into a cache temp. Published directly (no mux).
+ *   perf-plan Phase 2 dropped sampling to 5 fps and was REVERTED — see `docs/perf-plan.md`. The speedup
+ *   in pass 1 is item 1.3's two overlaps, which do not touch which frames are sampled.
  * - **Music-only**: [AudioPipeline.removeMusic] strips music into a temp .m4a (1..93), then
  *   [Remux.mux] copies the ORIGINAL video track verbatim next to the new audio (93..99).
  * - **Combined**: analyze 0..25, render 25..50, separate 50..93, mux the pass-2 video + new audio.
@@ -148,7 +151,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             segmented -> runSegmented(inputUri, plan, removeMusic, durationMs)
             removeMusic && censorWomen -> runCombined(inputUri)
             removeMusic -> runMusicOnly(inputUri, durationMs)
-            else -> runCensorOnly(inputUri) // M1 path, byte-for-byte identical
+            else -> runCensorOnly(inputUri) // M1's unsegmented path
         }
     }
 
@@ -272,6 +275,10 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         stats.stage("analyze")
         val firings = ArrayList<Long>()
         val faceTracks = ArrayList<FaceTrackEdl>()
+        // Outside the segment loop on purpose: report() is an AWAITED setProgress (Room write) plus a
+        // setForeground binder IPC, and the sampler calls it ~93 000 times over a film for ~40 distinct
+        // values. Hoisted, it also kills the duplicate write at every seam and on the resume branch.
+        var lastPct = -1
         for (seg in plan) {
             val done = Checkpoint.readAnalysis(workDir, seg.index)
             if (done != null) {
@@ -279,7 +286,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 faceTracks += done.edl.faceTracks
                 Log.i(TAG, "analyze seg-${seg.index}: resumed from checkpoint " +
                     "(${done.firingsMs.size} firings, ${done.edl.faceTracks.size} tracks)")
-                report(stage, progressBase + (seg.index + 1) * progressSpan / plan.size)
+                val pct = progressBase + (seg.index + 1) * progressSpan / plan.size
+                if (pct != lastPct) { lastPct = pct; report(stage, pct) }
                 continue
             }
             val segFirings = ArrayList<Long>()
@@ -287,20 +295,34 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             // per-track eviction Phase 1 added.
             val tracker = FaceTracker(applicationContext, blurUnknownFaces)
             var index = 0
+            var tDetect = 0L; var tGate = 0L; val tWall = System.nanoTime()
             try {
                 FrameSampler.sample(
                     applicationContext, inputUri, fps = 10f, maxDim = 640,
                     startMs = seg.startMs, endMs = seg.endMs,
                 ) { bitmap, ptsMs ->
-                    tracker.onFrame(bitmap, ptsMs)
-                    if (index % 2 == 0 && NsfwGate.fires(Infer.nsfw(applicationContext, bitmap), strictness)) {
-                        segFirings += ptsMs
+                    // perf-plan 1.3a: ML Kit works on its own executor while the gate runs here, so detect and
+                    // gate now OVERLAP — tDetect times the await (the part that still blocks), and detect+gate
+                    // can exceed wall. Awaiting inside the callback is what keeps the bitmap alive for both.
+                    val task = tracker.detect(bitmap)
+                    if (index % 2 == 0) {
+                        val t1 = System.nanoTime()
+                        val probs = Infer.nsfw(applicationContext, bitmap)
+                        tGate += System.nanoTime() - t1
+                        if (NsfwGate.fires(probs, strictness)) segFirings += ptsMs
                     }
+                    val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
+                    tracker.onFaces(faces, bitmap, ptsMs)
                     index++
                     val within = ((ptsMs - seg.startMs).toFloat() / (seg.endMs - seg.startMs).coerceAtLeast(1))
-                    val pct = progressBase + ((seg.index + within.coerceIn(0f, 1f)) * progressSpan / plan.size).toInt()
-                    report(stage, pct.coerceIn(progressBase, progressBase + progressSpan))
+                    val pct = (progressBase + ((seg.index + within.coerceIn(0f, 1f)) * progressSpan / plan.size).toInt())
+                        .coerceIn(progressBase, progressBase + progressSpan)
+                    if (pct != lastPct) { lastPct = pct; report(stage, pct) }
                 }
+                // perf-plan 1.2, re-read after 1.3b: decode+convert now runs alongside this callback, so wall
+                // is max(producer, consumer) and no subtraction recovers the convert. These two are the
+                // consumer side only — a pass where detect+gate is under wall is one the decoder is pacing.
+                val wallMs = (System.nanoTime() - tWall) / 1_000_000
                 val segTracks = tracker.finish()
                 // The checkpoint goes in only once BOTH halves of this segment's analysis exist, and it is
                 // written atomically — so a file under its final name always means a complete segment.
@@ -308,7 +330,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 firings += segFirings
                 faceTracks += segTracks
                 Log.i(TAG, "analyze seg-${seg.index} [${seg.startMs}..${seg.endMs}): " +
-                    "firings=${segFirings.size} censorTracks=${segTracks.size} ${tracker.retention()}")
+                    "firings=${segFirings.size} censorTracks=${segTracks.size} ${tracker.retention()} " +
+                    "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms")
             } finally {
                 runCatching { tracker.closeDetector() }
             }
@@ -362,7 +385,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         }
     }
 
-    // ---- Censor-only: identical to M1 (only extracted into a function) ----
+    // ---- Censor-only: M1's shape, extracted into a function ----
     private suspend fun runCensorOnly(inputUri: Uri): Result {
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
@@ -484,7 +507,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
 
     /**
-     * Pass 1: sample once, run faces every frame + the gate every 2nd frame, build the EDL. [pct]
+     * Pass 1: sample once, run faces and the gate on every sampled frame, build the EDL. [pct]
      * becomes `progressBase + fraction*progressSpan`; the defaults reproduce the M1 0..50 band exactly.
      */
     private suspend fun analyze(
@@ -497,9 +520,18 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         val firings = ArrayList<Long>()
         var index = 0
         var lastPct = -1
+        var tDetect = 0L; var tGate = 0L; val tWall = System.nanoTime()
         FrameSampler.sample(applicationContext, uri, fps = 10f, maxDim = 640) { bitmap, ptsMs ->
-            faceTracker.onFrame(bitmap, ptsMs)
-            if (index % 2 == 0 && NsfwGate.fires(Infer.nsfw(applicationContext, bitmap), strictness)) firings += ptsMs
+            // Same overlapped sequence as analyzeSegments — see the comment there (perf-plan 1.3a).
+            val task = faceTracker.detect(bitmap)
+            if (index % 2 == 0) {
+                val t1 = System.nanoTime()
+                val probs = Infer.nsfw(applicationContext, bitmap)
+                tGate += System.nanoTime() - t1
+                if (NsfwGate.fires(probs, strictness)) firings += ptsMs
+            }
+            val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
+            faceTracker.onFaces(faces, bitmap, ptsMs)
             index++
             val pct = (progressBase + (ptsMs.toFloat() / durationMs) * progressSpan)
                 .toInt().coerceIn(progressBase, progressBase + progressSpan)
@@ -510,6 +542,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             // Every 1 200 sampled frames = every 2 min of source at 10 fps.
             if (index % 1_200 == 0) Log.i(TAG, "pass1 live at=${ptsMs}ms ${faceTracker.retention()}")
         }
+        val wallMs = (System.nanoTime() - tWall) / 1_000_000 // sampling only; the vote below is its own stage
 
         var intervals = NsfwGate.intervals(firings, durationMs)
         // Debug E2E hook: force full-frame spans so SFW test assets still exercise pass 2 censoring.
@@ -526,7 +559,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         // truncates a message at ~4 kB — on the first 155-min soak that silently ate the face counts
         // off the end of the combined line, which were the whole point of logging it.
         Log.i(TAG, "pass1: gateFirings=${firings.size} intervalCount=${intervals.size} " +
-            "censorFaceTracks=${faceTracks.size} ${faceTracker.retention()}")
+            "censorFaceTracks=${faceTracks.size} ${faceTracker.retention()} " +
+            "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms")
         Log.i(TAG, "pass1 intervals=$intervals")
         return Edl(intervals, faceTracks)
     }
