@@ -171,6 +171,119 @@ class DemucsSeparatorTest {
         assertTrue("time-branch SNR", snrDb(input, out, 2 * n) > 60.0)
     }
 
+    // ---- Phase 2 resume (`long-film-plan.md`) ----
+
+    /**
+     * Drive a separator that pretends [resumeFrames] frames are already on disk, and return the frames it
+     * actually emits (i.e. those from [resumeFrames] on), plus how many chunks really ran inference.
+     */
+    private fun runResumed(
+        input: FloatArray,
+        frames: Int,
+        resumeFrames: Long,
+        mean: Float,
+        std: Float,
+    ): Triple<FloatArray, Int, Int> {
+        val fake = SpecFake(mapOf(3 to 1f))
+        var inferCalls = 0
+        var chunkCalls = 0
+        val tail = FloatArray(2 * (frames - resumeFrames).toInt())
+        var cursor = 0
+        val sep = DemucsSeparator(
+            keepOther = false, mean = mean, std = std, totalFrames = frames.toLong(),
+            infer = { w, s -> inferCalls++; fake.infer(w, s) },
+            onChunk = { _, _ -> chunkCalls++ },
+            resumeFrames = resumeFrames,
+        ) { buf, n ->
+            System.arraycopy(buf, 0, tail, cursor, 2 * n)
+            cursor += 2 * n
+        }
+        var fed = 0
+        val slice = FloatArray(2 * 3333)
+        while (fed < frames) {
+            val n = minOf(3333, frames - fed)
+            System.arraycopy(input, 2 * fed, slice, 0, 2 * n)
+            sep.feed(slice, n)
+            fed += n
+        }
+        sep.finish()
+        assertEquals("emitted exactly the un-written tail", tail.size, cursor)
+        return Triple(tail, inferCalls, chunkCalls)
+    }
+
+    /**
+     * The load-bearing claim: a resumed run reproduces the tail of an uninterrupted run **bit for bit**.
+     * Compared with `toRawBits`, not a tolerance — anything less would hide the exact off-by-one-chunk
+     * error the skip formula exists to avoid.
+     */
+    @Test
+    fun resumeIsBitExactAtChunkBoundaries() {
+        val n = 700_000
+        val input = noise(n, seed = 21)
+        val (mean, std) = stats(input, n)
+        val reference = run(input, n, keepOther = false, infer = SpecFake(mapOf(3 to 1f))::infer)
+
+        // Every value a real checkpoint can hold: flush stops at the next chunk's start, so the emitted
+        // count after chunk c is (c+1)*STRIDE - MAX_SHIFT.
+        var boundaries = 0
+        for (c in 1..6) {
+            val resumeFrames = (c + 1).toLong() * STRIDE - MAX_SHIFT
+            if (resumeFrames <= 0 || resumeFrames >= n) continue
+            boundaries++
+            val (tail, inferCalls, _) = runResumed(input, n, resumeFrames, mean, std)
+            for (i in tail.indices) {
+                val expected = reference[2 * resumeFrames.toInt() + i]
+                assertEquals(
+                    "resume@$resumeFrames sample $i: ${expected.toRawBits()} vs ${tail[i].toRawBits()}",
+                    expected.toRawBits(), tail[i].toRawBits(),
+                )
+            }
+            // This assertion is the other half of the proof, and it is what gives the bit-exact comparison
+            // above its teeth. ceil(SEG/STRIDE) = 2 chunks can cover one output position, so exactly the
+            // chunk before the resume point must be re-run. Skip one too MANY and the comparison above
+            // fails (the ring is missing a contribution); skip one too FEW and this count is wrong. Both
+            // directions of an off-by-one in the formula are therefore caught — without a test-only hook
+            // to force a wrong skip count, which would be shipped code existing only for a test.
+            val totalChunks = ((n + MAX_SHIFT + STRIDE - 1L) / STRIDE).toInt()
+            assertEquals("resume@$resumeFrames redoes exactly one chunk", totalChunks - c, inferCalls)
+        }
+        assertTrue("exercised several boundaries", boundaries >= 4)
+    }
+
+    /** Off-boundary resume points are not something a checkpoint produces, but must still be exact. */
+    @Test
+    fun resumeIsBitExactAtArbitraryPoints() {
+        val n = 500_000
+        val input = noise(n, seed = 22)
+        val (mean, std) = stats(input, n)
+        val reference = run(input, n, keepOther = false, infer = SpecFake(mapOf(3 to 1f))::infer)
+        for (resumeFrames in listOf(1L, 12_345L, 100_000L, 250_000L, 499_999L)) {
+            val (tail, _, _) = runResumed(input, n, resumeFrames, mean, std)
+            for (i in tail.indices) {
+                assertEquals(
+                    "resume@$resumeFrames sample $i",
+                    reference[2 * resumeFrames.toInt() + i].toRawBits(), tail[i].toRawBits(),
+                )
+            }
+        }
+    }
+
+    /**
+     * Progress must not fire once per SKIPPED chunk — on a film resumed near the end that would be hundreds
+     * of instant calls, which spam the log, call thermalYield with nothing hot, and poison the live ETA
+     * (JobStats extrapolates elapsed-vs-percent). Exactly ONE extra call is expected and wanted: it lands at
+     * the transition out of the skip and hands the UI the resumed percentage.
+     */
+    @Test
+    fun skippedChunksDoNotReportProgress() {
+        val n = 700_000
+        val input = noise(n, seed = 24)
+        val (mean, std) = stats(input, n)
+        val resumeFrames = 4L * STRIDE - MAX_SHIFT
+        val (_, inferCalls, chunkCalls) = runResumed(input, n, resumeFrames, mean, std)
+        assertEquals("one onChunk per inferred chunk, plus one at the transition", inferCalls + 1, chunkCalls)
+    }
+
     @Test
     fun progressIsMonotonicAndComplete() {
         val n = 700_000

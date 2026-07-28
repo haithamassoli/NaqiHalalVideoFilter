@@ -51,6 +51,15 @@
     <string name="pick_diag_model_line">%1$s %2$s · %3$s</string>
 
     <!-- ============================================================
+         Durations — shared by the up-front estimate (options) and the live ETA (jobs).
+         Whole strings rather than a number glued to a unit, so a locale keeps its own
+         digits, word order and unit words. %1$d = hours, %2$d = minutes.
+         ============================================================ -->
+    <string name="dur_under_min">under a minute</string>
+    <string name="dur_min">%1$d min</string>
+    <string name="dur_h_min">%1$d h %2$d min</string>
+
+    <!-- ============================================================
          Options — step 2, OptionsScreen
          ============================================================ -->
 
@@ -93,6 +102,18 @@
     <!-- Numeric readout beside a slider title. %1$d = the 0–100 value. -->
     <string name="opt_slider_value">%1$d</string>
 
+    <!-- Up-front time estimate above Start. %1$s = a dur_* string. Deliberately worded as a FLOOR:
+         every measurement behind it came from a flagship, so "at least" is the only honest framing. -->
+    <string name="opt_eta_floor">Estimated at least ~%1$s on this phone.</string>
+
+    <!-- Shown above a disabled Start when a job is already running; Naqi runs one job at a time. -->
+    <string name="opt_job_running">A job is already running. Wait for it to finish, or cancel it first.</string>
+
+    <!-- Confirm dialog shown when the estimate is long (Eta.CONFIRM_THRESHOLD_MS). A warning, never a
+         refusal — its confirm button is action_start and its dismiss is action_cancel. %1$s = a dur_* string. -->
+    <string name="dlg_long_job_title">This will take a while</string>
+    <string name="dlg_long_job_body">This video is estimated at ~%1$s at least. Keep the phone plugged in — Naqi keeps working in the background, but the phone will be busy the whole time and the job can\'t be paused, only cancelled.</string>
+
     <!-- ============================================================
          Jobs / library — step 3, JobsScreen
          Also reuses action_cancel, action_open and action_share (see Notifications).
@@ -102,6 +123,9 @@
     <string name="jobs_new_job">← Filter another video</string>
 
     <!-- Empty state inside the job card when nothing is running, succeeded or failed. -->
+    <!-- Phase 2 resume: shown on a failed long job whose finished segments are still on disk. -->
+    <string name="jobs_resume_hint">The finished parts of this job were kept. Resuming picks up where it stopped.</string>
+    <string name="action_resume">Resume</string>
     <string name="jobs_none_running">No job running.</string>
 
     <!-- Library list. Uppercase is literal. "Movies/Naqi" is a real on-disk path — keep it Latin, untranslated. -->
@@ -112,6 +136,9 @@
     <string name="jobs_stage_starting">Starting…</string>
     <!-- %1$d = 0–100 progress; %% is a literal percent sign. -->
     <string name="jobs_progress_percent">%1$d%%</string>
+    <!-- Live remaining time, refined from this device's observed rate. %1$s = a dur_* string.
+         Hidden entirely until the worker has enough throughput to mean it (KEY_ETA_MS == 0). -->
+    <string name="jobs_eta_remaining">~%1$s remaining</string>
 
     <!-- Success card. %1$s = the saved file name; the Movies/Naqi/ segment is a real path and stays Latin. -->
     <string name="jobs_saved_label">Saved</string>
@@ -163,6 +190,10 @@
     <string name="job_channel_desc">Progress for on-device filtering jobs</string>
     <string name="job_notif_title">Filtering video</string>
     <string name="action_cancel">Cancel</string>
+    <!-- Notification second line once an ETA exists. %1$s = a stage_* string, %2$s = a dur_* string.
+         The notification is the only surface a user sees during a multi-hour job — the app is closed
+         and the phone is locked — so the estimate has to reach here, not just the jobs screen. -->
+    <string name="job_notif_stage_eta">%1$s · ~%2$s remaining</string>
     <string name="stage_analyzing">Pass 1 — analyzing</string>
     <string name="stage_rendering">Pass 2 — rendering</string>
     <string name="stage_separating">Removing music</string>

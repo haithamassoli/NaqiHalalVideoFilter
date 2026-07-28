@@ -33,10 +33,24 @@ class PreflightTest {
         assertEquals(Preflight.UNREADABLE, Preflight.messageFor(IOException("Failed to instantiate extractor")))
     }
 
+    /**
+     * An unrecognized cause resolves to the generic message. It used to pass the throwable's own text
+     * through to the screen — untranslated developer text the user can do nothing with.
+     */
     @Test
-    fun anythingElseKeepsItsOwnMessageAndNeverReturnsBlank() {
-        assertEquals("separator emitted 3 of 4 frames", Preflight.messageFor(IllegalStateException("separator emitted 3 of 4 frames")))
+    fun anythingElseFallsBackToTheGenericMessage() {
+        assertEquals(Preflight.GENERIC, Preflight.messageFor(IllegalStateException("separator emitted 3 of 4 frames")))
         assertEquals(Preflight.GENERIC, Preflight.messageFor(RuntimeException()))
+    }
+
+    /** Every cause must be a real resource id — a 0 here would render as the generic fallback in the UI. */
+    @Test
+    fun everyCauseIsANonZeroResourceId() {
+        val ids = listOf(
+            Preflight.DRM, Preflight.UNREADABLE, Preflight.NO_VIDEO, Preflight.NO_AUDIO,
+            Preflight.LOW_SPACE, Preflight.UNSUPPORTED_CODEC, Preflight.OUT_OF_SPACE, Preflight.GENERIC,
+        )
+        assertEquals(ids.size, ids.filter { it != 0 }.distinct().size)
     }
 
     /** ENOSPC surfaces as an IOException too — the space branch must not be shadowed by the IO branch. */

@@ -14,6 +14,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkManager
 import com.haithamassoli.naqi.MainActivity
 import com.haithamassoli.naqi.R
+import com.haithamassoli.naqi.ui.durationText
 import java.util.UUID
 
 /** Notification channel + ForegroundInfo for the filtering job, and the done notification. */
@@ -41,13 +42,23 @@ internal object JobNotifications {
         }
     }
 
-    /** @param progress 0..100, or negative for indeterminate. */
-    fun foregroundInfo(context: Context, workId: UUID, stage: String, progress: Int): ForegroundInfo {
+    /**
+     * @param progress 0..100, or negative for indeterminate.
+     * @param etaMs remaining wall clock from the job's observed rate; 0 while it is too early to say,
+     *   and then the line is just the stage. On a feature-length job this notification is the only
+     *   thing the user ever sees, so the estimate belongs here first.
+     */
+    fun foregroundInfo(context: Context, workId: UUID, stage: String, progress: Int, etaMs: Long): ForegroundInfo {
         ensureChannel(context)
         val cancel = WorkManager.getInstance(context).createCancelPendingIntent(workId)
+        val text = if (etaMs > 0) {
+            context.getString(R.string.job_notif_stage_eta, stage, durationText(context, etaMs))
+        } else {
+            stage
+        }
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(context.getString(R.string.job_notif_title))
-            .setContentText(stage)
+            .setContentText(text)
             .setSmallIcon(R.drawable.ic_notification)
             .setOngoing(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)

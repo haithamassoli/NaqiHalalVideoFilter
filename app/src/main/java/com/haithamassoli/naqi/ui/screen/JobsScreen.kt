@@ -44,6 +44,7 @@ import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.ui.Eyebrow
 import com.haithamassoli.naqi.ui.NaqiCard
+import com.haithamassoli.naqi.ui.durationText
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
 import com.haithamassoli.naqi.work.FilterWorker
 import com.haithamassoli.naqi.work.JobController
@@ -58,7 +59,15 @@ private const val MIME_MP4 = "video/mp4"
  * from WorkManager, so the screen survives leaving and re-entering the app while a job runs.
  */
 @Composable
-fun JobsScreen(onNewJob: () -> Unit, modifier: Modifier = Modifier) {
+fun JobsScreen(
+    onNewJob: () -> Unit,
+    /**
+     * Re-enqueue the same job (`long-film-plan.md` Phase 2). Null when the app has no picked video to
+     * resume with — after process death the saved state can be gone even though the segments are not.
+     */
+    onResume: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
 
     val workFlow = remember { JobController.observe(context) }
@@ -71,8 +80,12 @@ fun JobsScreen(onNewJob: () -> Unit, modifier: Modifier = Modifier) {
     val outputUri = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_URI)
     // A @StringRes id, so a failure re-localizes if the language changes after the job failed; 0 = absent.
     val outputMessageId = info?.outputData?.getInt(FilterWorker.KEY_OUTPUT_MESSAGE, 0) ?: 0
+    val resumable = info?.outputData?.getBoolean(FilterWorker.KEY_RESUMABLE, false) ?: false
     val progress = info?.progress?.getInt(FilterWorker.KEY_PROGRESS, 0) ?: 0
     val stageText = info?.progress?.getString(FilterWorker.KEY_STAGE).orEmpty()
+    // Put as a Long by the worker, so it must be read as one — getInt would silently read 0 forever.
+    // 0 is also the worker's own "too early to say", and both cases mean the same thing here: show nothing.
+    val etaMs = info?.progress?.getLong(FilterWorker.KEY_ETA_MS, 0L) ?: 0L
 
     // Resolved off the main thread: the pre-Q output is a file:// uri that has to be looked up in MediaStore.
     var savedUri by remember { mutableStateOf<Uri?>(null) }
@@ -100,7 +113,7 @@ fun JobsScreen(onNewJob: () -> Unit, modifier: Modifier = Modifier) {
             Spacer(Modifier.height(NaqiTokens.space2))
 
             when {
-                running -> JobProgressCard(stageText, progress) { JobController.cancel(context) }
+                running -> JobProgressCard(stageText, progress, etaMs) { JobController.cancel(context) }
                 succeeded -> SavedCard(outputName, savedUri, context)
                 failed -> NaqiCard {
                     Text(
@@ -108,6 +121,22 @@ fun JobsScreen(onNewJob: () -> Unit, modifier: Modifier = Modifier) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                     )
+                    // A long job that died past its first segment kept every finished segment on disk.
+                    // Resuming re-runs only what is missing — the whole point of Phase 2.
+                    if (resumable && onResume != null) {
+                        Spacer(Modifier.height(NaqiTokens.space2))
+                        Text(
+                            stringResource(R.string.jobs_resume_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(NaqiTokens.space3))
+                        Button(
+                            onClick = onResume,
+                            shape = RoundedCornerShape(NaqiTokens.radiusButton),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.action_resume)) }
+                    }
                 }
                 else -> NaqiCard {
                     Text(
@@ -138,7 +167,7 @@ fun JobsScreen(onNewJob: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun JobProgressCard(stage: String, progress: Int, onCancel: () -> Unit) {
+private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     val starting = stringResource(R.string.jobs_stage_starting)
     NaqiCard {
@@ -166,8 +195,19 @@ private fun JobProgressCard(stage: String, progress: Int, onCancel: () -> Unit) 
             trackColor = cs.surfaceContainerHighest,
         )
         Spacer(Modifier.height(NaqiTokens.space2))
-        TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.End)) {
-            Text(stringResource(R.string.action_cancel))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // The worker publishes 0 until it has enough throughput to mean the number; show nothing then.
+            if (etaMs > 0) {
+                Text(
+                    stringResource(R.string.jobs_eta_remaining, durationText(etaMs)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
         }
     }
 }

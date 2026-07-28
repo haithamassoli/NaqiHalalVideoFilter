@@ -23,6 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
 import com.haithamassoli.naqi.model.FilterOps
+import com.haithamassoli.naqi.spike.MuxerLimitSpike
+import com.haithamassoli.naqi.spike.SegmentConcatSpike
 import com.haithamassoli.naqi.ui.NaqiApp
 import com.haithamassoli.naqi.ui.theme.NaqiTheme
 import com.haithamassoli.naqi.work.JobController
@@ -112,6 +114,22 @@ class MainActivity : ComponentActivity() {
             JobController.cancel(this)
             return
         }
+        // Phase-0 spike: writes a >4 GiB mp4 and reads it back. Minutes of blocking I/O, so its own
+        // thread; there is nothing to show on screen, the answer comes out of logcat.
+        if (intent.getBooleanExtra("muxer_limit_probe", false)) {
+            val source = intent.getStringExtra("probe_source")
+                ?: File(filesDir, "movie-test.mp4").absolutePath
+            Thread { MuxerLimitSpike.run(applicationContext, source) }.start()
+            return
+        }
+        // Phase-2 spike: two clipped exports, concatenated and decoded back. Also its own thread —
+        // RenderPipeline blocks on a Transformer export, which must not be driven from onCreate.
+        if (intent.getBooleanExtra("segment_concat_probe", false)) {
+            val source = intent.getStringExtra("probe_source")
+                ?: File(filesDir, "test-video.mp4").absolutePath
+            Thread { SegmentConcatSpike.run(applicationContext, source) }.start()
+            return
+        }
         val path = intent.getStringExtra("autorun_path") ?: return
         val removeMusic = intent.getBooleanExtra("remove_music", false)
         // censor defaults true, except a music-only run (music requested, censor not explicitly passed).
@@ -129,7 +147,12 @@ class MainActivity : ComponentActivity() {
             blurUnknownFaces = intent.getBooleanExtra("blur_unknown", false),
             keepStems = intent.getStringExtra("keep_stems") ?: "vocals",
         )
-        JobController.start(this, ops, Uri.fromFile(File(path)).toString(), intent.getStringExtra("force_intervals_ms"))
+        JobController.start(
+            this, ops, Uri.fromFile(File(path)).toString(),
+            intent.getStringExtra("force_intervals_ms"),
+            // `--el segment_ms 60000` forces the Phase 2 segmented route on a short clip.
+            intent.getLongExtra("segment_ms", 0L),
+        )
     }
 }
 

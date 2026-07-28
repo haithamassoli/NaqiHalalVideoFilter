@@ -42,6 +42,14 @@ class DemucsSeparator(
     private val totalFrames: Long,
     private val infer: (wav: FloatArray, spec: FloatArray) -> Pair<FloatArray, FloatArray>,
     private val onChunk: (done: Int, total: Int) -> Unit,
+    /**
+     * Frames an interrupted earlier run already wrote to the PCM scratch (`long-film-plan.md` Phase 2).
+     * Their inference is skipped and they are not re-emitted; everything from [resumeFrames] on is
+     * bit-identical to an uninterrupted run, provided the same input is fed again.
+     *
+     * Declared before [emit] so [emit] stays the trailing parameter its callers pass as a lambda.
+     */
+    private val resumeFrames: Long = 0L,
     private val emit: (interleaved: FloatArray, frames: Int) -> Unit,
 ) {
     private val keep = if (keepOther) intArrayOf(OTHER, VOCALS) else intArrayOf(VOCALS)
@@ -66,6 +74,21 @@ class DemucsSeparator(
 
     private var chunksDone = 0
     private var nextChunkOff = 0L
+
+    /**
+     * Chunks whose inference can be skipped on a resume.
+     *
+     * An emitted frame `e` lives at virtual position `MAX_SHIFT + e`, and chunk `c` covers positions
+     * `[c*STRIDE, c*STRIDE + clen)`. With 25 % overlap, `ceil(SEG/STRIDE) = ceil(1.333) = 2`, so any one
+     * output position is covered by at most TWO chunks — which means exactly ONE chunk before the resume
+     * point has to be re-run to rebuild the overlap-add ring for the first frame we still owe. A
+     * checkpoint is always taken at a chunk boundary, where this is exactly `chunksDone - 1`.
+     *
+     * ponytail: the exactly-minimal form is `floorDiv(MAX_SHIFT + resumeFrames - SEG, STRIDE) + 1`.
+     * Identical at every value a checkpoint can actually hold, and off-boundary this form re-runs at most
+     * one extra chunk (2.6 s of audio), so it is not worth the negative-numerator care.
+     */
+    private val skipChunks = ((MAX_SHIFT + resumeFrames) / STRIDE - 1).coerceAtLeast(0L).toInt()
 
     // Per-chunk scratch, allocated once (hot path — ~44 MB flows through per chunk on device).
     private val stft = Stft(NFFT, HOP)
@@ -100,14 +123,50 @@ class DemucsSeparator(
         }
     }
 
-    /** Process the remaining (short) chunks, flush the tail, and emit exactly [totalFrames] frames. */
+    /**
+     * Frames the emit stream fell short of [totalFrames]. 0 in the normal case; read after [finish] so
+     * the caller can log a tolerated shortfall (this class stays Android-free for its JVM tests, so it
+     * cannot log one itself).
+     */
+    var shortfall = 0L
+        private set
+
+    /** Process the remaining (short) chunks, flush the tail, and emit [totalFrames] frames. */
     fun finish() {
         while (nextChunkOff < shiftedLen) processChunk()
-        check(emitted == totalFrames) { "separator emitted $emitted of $totalFrames frames" }
+        shortfall = totalFrames - emitted
+        // A tolerance rather than an equality (`long-film-plan.md` Phase 1 asked for this), but the honest
+        // note is that the original equality was **structurally unreachable**, not a live trap: [finish]
+        // drives nextChunkOff to shiftedLen unconditionally, [flush] walks flushPos over the whole
+        // [MAX_SHIFT, shiftedLen) window, and shiftedLen - MAX_SHIFT == totalFrames by construction — so
+        // `emitted` lands on totalFrames even if the stream pass feeds nothing at all (short input just
+        // reads as zeros past writePos). Resume does not change that either: it suppresses the emit CALL,
+        // never the counter. The invariant that can actually catch a short stream pass is the PCM temp's
+        // length, asserted in [AudioPipeline.removeMusic]; this stays as cheap insurance against a future
+        // edit that makes the walk conditional.
+        check(shortfall in 0..MAX_SHORTFALL_FRAMES) { "separator emitted $emitted of $totalFrames frames" }
     }
 
+    /**
+     * Advance the chunk grid by one. On a resume the DSP is skipped for the first [skipChunks] chunks, but
+     * the four bookkeeping lines still run: `flushPos` and `emitted` have to walk the skipped span or the
+     * resume point drifts and the whole chunk grid moves. The flush's cell zeroing is harmless over a
+     * skipped span (nothing was accumulated there), and its window is always the NEXT chunk's start, so it
+     * can never erase a cell the first inferred chunk writes.
+     */
     private fun processChunk() {
-        val off = nextChunkOff
+        if (chunksDone >= skipChunks) inferChunk(nextChunkOff)
+        nextChunkOff += STRIDE
+        chunksDone++
+        flush(min(nextChunkOff, shiftedLen)) // samples below the next chunk's start are final
+        // Skipped chunks must not report progress: on a film resumed near the end that would fire hundreds
+        // of times in a second, spam the per-chunk log, call thermalYield with nothing hot, and — worst —
+        // poison JobStats.etaMs, which extrapolates from elapsed-vs-percent. One call at the transition
+        // hands the UI the correct resumed percentage.
+        if (chunksDone >= skipChunks) onChunk(chunksDone, totalChunks)
+    }
+
+    private fun inferChunk(off: Long) {
         val clen = min(SEG.toLong(), shiftedLen - off).toInt()
         val delta = SEG - clen // > 0 only for tail chunks
         val readStart = off - delta / 2 // TensorChunk.padded: real left context, zeros out of range
@@ -152,11 +211,6 @@ class DemucsSeparator(
             outR[cell] += g * (waveR[read + j] + tr)
             wsum[cell] += g
         }
-
-        nextChunkOff += STRIDE
-        chunksDone++
-        flush(min(nextChunkOff, shiftedLen)) // samples below the next chunk's start are final
-        onChunk(chunksDone, totalChunks)
     }
 
     /** Emit finalized virtual positions [flushPos, limit) ∩ [MAX_SHIFT, MAX_SHIFT+totalFrames), zeroing cells. */
@@ -165,10 +219,16 @@ class DemucsSeparator(
         while (flushPos < limit) {
             val cell = (flushPos % OUT_CAP).toInt()
             if (flushPos >= MAX_SHIFT && emitted < totalFrames) {
-                val w = wsum[cell] // > 0: every emitted position is covered by ≥1 chunk
-                emitBuf[2 * n] = softclip((outL[cell] / w) * std + mean)
-                emitBuf[2 * n + 1] = softclip((outR[cell] / w) * std + mean)
-                n++
+                // The discard for a resume lives HERE, not in the sink: over a skipped span nothing was
+                // accumulated, so wsum is 0 and the divide below would be 0f/0f = NaN. Skipping the whole
+                // computation also avoids millions of pointless divide+softclip pairs and keeps the sink a
+                // dumb append. `emitted` still advances — it is the grid position, not a write count.
+                if (emitted >= resumeFrames) {
+                    val w = wsum[cell] // > 0: every emitted position is covered by ≥1 chunk
+                    emitBuf[2 * n] = softclip((outL[cell] / w) * std + mean)
+                    emitBuf[2 * n + 1] = softclip((outR[cell] / w) * std + mean)
+                    n++
+                }
                 emitted++
             }
             outL[cell] = 0f
@@ -216,6 +276,9 @@ class DemucsSeparator(
         private const val VOCALS = 3
         private const val IN_CAP = 2 * SEG          // retains ≥ 1.5×SEG lookback the tail chunks need
         private const val OUT_CAP = SEG + STRIDE    // unflushed span never exceeds one SEGMENT
+
+        /** ~100 ms at 44.1 kHz — a missing tail this short is inaudible; more means something broke. */
+        const val MAX_SHORTFALL_FRAMES = 4_410L
     }
 }
 

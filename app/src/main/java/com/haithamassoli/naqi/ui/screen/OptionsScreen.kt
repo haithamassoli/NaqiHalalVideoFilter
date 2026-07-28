@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -26,6 +27,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,13 +39,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
+import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.Eyebrow
 import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.SelectDot
+import com.haithamassoli.naqi.ui.durationText
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
+import com.haithamassoli.naqi.work.Eta
 import com.haithamassoli.naqi.work.JobController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /**
@@ -61,6 +70,27 @@ fun OptionsScreen(
     val context = LocalContext.current
     var advanced by remember { mutableStateOf(false) }
 
+    // Probing opens MediaExtractor + MediaMetadataRetriever, so it never runs in composition. 0 means
+    // "no estimate" — either still probing or the probe threw — and a failure here is deliberately
+    // silent: an unreadable source is Preflight's story to tell when the job starts, and a broken
+    // probe must never stand between the user and Start.
+    var durationMs by remember(inputUri) { mutableStateOf(0L) }
+    LaunchedEffect(inputUri) {
+        durationMs = withContext(Dispatchers.IO) {
+            runCatching { FrameSampler.probe(context, inputUri).durationMs }.getOrDefault(0L)
+        }
+    }
+    // Cheap enough to recompute on recomposition, and it must follow ops: the shape sets the factor.
+    val etaMs = Eta.estimateMs(durationMs, ops)
+    var confirming by remember { mutableStateOf(false) }
+
+    // Naqi runs one job at a time and the unique work policy is KEEP, so starting a second one would
+    // silently do nothing. Say so and disable Start instead of accepting a tap that goes nowhere.
+    val workInfos by remember { JobController.observe(context) }.collectAsState(initial = emptyList())
+    val jobRunning = workInfos.firstOrNull()?.state.let {
+        it == WorkInfo.State.RUNNING || it == WorkInfo.State.ENQUEUED
+    }
+
     fun startJob() {
         JobController.start(context, ops, inputUri.toString())
         onStarted()
@@ -74,7 +104,7 @@ fun OptionsScreen(
         startJob() // if denied, publish() fails fast with a surfaced message rather than saving nowhere
     }
 
-    fun onStart() {
+    fun startWithPermissions() {
         // Disjoint by API level: storage is pre-Q only, notifications are API 33+, so at most one is asked.
         val needsStorage = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
             context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
@@ -85,6 +115,13 @@ fun OptionsScreen(
             needsNotif -> notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             else -> startJob()
         }
+    }
+
+    // A long job gets one confirmation, in front of the permission dance so the user isn't asked for
+    // notifications only to then back out. It is a WARNING, not a cap: confirming lands in exactly the
+    // same place a short job's Start does.
+    fun onStart() {
+        if (etaMs > Eta.CONFIRM_THRESHOLD_MS) confirming = true else startWithPermissions()
     }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background, modifier = modifier) { pad ->
@@ -176,14 +213,50 @@ fun OptionsScreen(
 
 
 
+            // Hidden while probing and on a probe failure — see durationMs above.
+            if (etaMs > 0) {
+                Text(
+                    stringResource(R.string.opt_eta_floor, durationText(etaMs)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(NaqiTokens.space3))
+            }
+
+            if (jobRunning) {
+                Text(
+                    stringResource(R.string.opt_job_running),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(NaqiTokens.space3))
+            }
+
             Button(
                 onClick = ::onStart,
+                enabled = !jobRunning,
                 shape = RoundedCornerShape(NaqiTokens.radiusButton),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
             ) { Text(stringResource(R.string.action_start), style = MaterialTheme.typography.labelLarge) }
         }
+    }
+
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text(stringResource(R.string.dlg_long_job_title)) },
+            text = { Text(stringResource(R.string.dlg_long_job_body, durationText(etaMs))) },
+            confirmButton = {
+                TextButton(onClick = { confirming = false; startWithPermissions() }) {
+                    Text(stringResource(R.string.action_start))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirming = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
     }
 }
 

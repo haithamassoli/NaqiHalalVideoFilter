@@ -73,6 +73,12 @@ fun NaqiApp(modifier: Modifier = Modifier) {
             )
         }
 
-        Step.Jobs -> JobsScreen(onNewJob = { step = Step.Pick }, modifier = modifier)
+        // Resuming re-enqueues the SAME (source, options), which lands on the same JobStore key and skips
+        // every segment already finished. Unavailable if the picked video is gone from saved state.
+        Step.Jobs -> JobsScreen(
+            onNewJob = { step = Step.Pick },
+            onResume = pickedUri?.let { uri -> { JobController.start(context, ops, uri.toString()) } },
+            modifier = modifier,
+        )
     }
 }

@@ -1,5 +1,6 @@
 package com.haithamassoli.naqi.ui
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -18,7 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
 
 // The handful of pieces that appear on more than one screen. Anything used once stays private to its screen.
@@ -66,3 +69,24 @@ fun NaqiCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() 
         content = content,
     )
 }
+
+/**
+ * Short wall-clock reading, shared by the up-front estimate (options), the live ETA (jobs) and the
+ * progress notification. Picks one of three whole resource strings instead of gluing a number to a
+ * unit letter, so Arabic keeps its own digits, word order and unit words rather than inheriting
+ * "h"/"min".
+ *
+ * The notification is built off the Compose tree, hence the plain-[Context] entry point; the
+ * composable one is a thin wrapper so there is only ever one set of rules about what "2 h 5 min" means.
+ */
+fun durationText(context: Context, ms: Long): String {
+    val minutes = ms / 60_000
+    return when {
+        minutes < 1 -> context.getString(R.string.dur_under_min)
+        minutes < 60 -> context.getString(R.string.dur_min, minutes)
+        else -> context.getString(R.string.dur_h_min, minutes / 60, minutes % 60)
+    }
+}
+
+@Composable
+fun durationText(ms: Long): String = durationText(LocalContext.current, ms)

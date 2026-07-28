@@ -9,7 +9,14 @@ Android app that filters a locally selected video entirely on-device and saves a
 - Processing: background job (WorkManager + foreground service), progress notification per stage, cancellable.
 
 ## Non-goals (v1)
-Overlay on other apps; streaming sources; real-time playback filtering; DRM content; iOS; cloud processing; male-face blurring; job resume after process death; per-region NSFW blur (superseded by whole-frame decision); Bandit-class dialogue/music/effects model (future upgrade).
+Overlay on other apps; streaming sources; real-time playback filtering; DRM content; iOS; cloud processing; male-face blurring; per-region NSFW blur (superseded by whole-frame decision); Bandit-class dialogue/music/effects model (future upgrade).
+
+**"Job resume after process death" was a non-goal here and is no longer one** — removed 2026-07-28 when the
+`long-film-plan.md` decision gate was answered *films*. It could not both stand and support the 2 h movie
+the streaming requirement below already contemplates: resume is exactly the mechanism a feature-length
+input needs. A long job now checkpoints per segment and survives a SIGKILL, the 6 h foreground-service cap
+and a reboot; see `long-film-plan.md` Phase 2 and `tasks.md` M5 for the device evidence. Short clips are
+unaffected and still run in one pass.
 
 ## User flow
 1. Pick video → 2. Choose ops: `[Remove music] [Censor women] (either or both required)` → 3. Options screen → 4. Start job → notification progress → 5. Done: saved copy + "Open / Share / Delete original?".

@@ -59,15 +59,27 @@ object FrameSampler {
      * The bitmap handed to [onFrame] is valid only for that call and is recycled on return.
      * Honours coroutine cancellation and releases the codec + extractor on any exit.
      */
+    /**
+     * @param startMs/[endMs] restrict the pass to `[startMs, endMs)` for a Phase 2 segment; the defaults
+     *   cover the whole track and reproduce the M1 pass byte for byte. A window seeks to the preceding
+     *   sync sample and discards frames below [startMs], and anchors the sample grid to [startMs] rather
+     *   than to the first decoded frame — so segment N samples exactly the same timestamps whether it runs
+     *   in a fresh job or after a resume, which is what makes a per-segment checkpoint reproducible.
+     */
     suspend fun sample(
         context: Context,
         uri: Uri,
         fps: Float = 10f,
         maxDim: Int = 640,
+        startMs: Long = 0L,
+        endMs: Long = Long.MAX_VALUE,
         onFrame: suspend (bitmap: Bitmap, ptsMs: Long) -> Unit,
     ) {
         val rotation = probe(context, uri).rotationDegrees
         val slotIntervalUs = (1_000_000f / fps).toLong().coerceAtLeast(1L)
+        val windowed = startMs > 0L || endMs != Long.MAX_VALUE
+        val startUs = startMs * 1000
+        val endUs = if (endMs == Long.MAX_VALUE) Long.MAX_VALUE else endMs * 1000
 
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
@@ -75,6 +87,9 @@ object FrameSampler {
             extractor.setDataSource(context, uri, null)
             val trackIndex = videoTrackIndex(extractor)
             extractor.selectTrack(trackIndex)
+            // Decoding has to start at a sync sample at or before the window, and the frames between it
+            // and startMs are decoded but never emitted (they are the reference frames the window needs).
+            if (startMs > 0L) extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
             val format = extractor.getTrackFormat(trackIndex)
             codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, CodecCapabilities.COLOR_FormatYUV420Flexible)
@@ -84,7 +99,9 @@ object FrameSampler {
             val info = MediaCodec.BufferInfo()
             var inputDone = false
             var outputDone = false
-            var nextSlotUs = Long.MIN_VALUE // sentinel until anchored to the first frame's pts
+            // Windowed: the grid is anchored to the window start, so a segment is reproducible.
+            // Unwindowed: anchored to the first decoded frame's pts, exactly as M1 did.
+            var nextSlotUs = if (windowed) startUs else Long.MIN_VALUE
 
             while (!outputDone) {
                 coroutineContext.ensureActive() // cooperative cancel: throws when the caller cancels
@@ -108,6 +125,12 @@ object FrameSampler {
 
                 val ptsUs = info.presentationTimeUs
                 if (nextSlotUs == Long.MIN_VALUE && info.size > 0) nextSlotUs = ptsUs
+                // Past the window: stop. Decode order is not display order, so this trusts the sample's
+                // own pts rather than assuming the stream reached the end.
+                if (info.size > 0 && ptsUs >= endUs) {
+                    codec.releaseOutputBuffer(outIndex, false)
+                    break
+                }
                 val render = info.size > 0 && ptsUs >= nextSlotUs
                 val bitmap = if (render) {
                     codec.getOutputImage(outIndex)?.let { image ->

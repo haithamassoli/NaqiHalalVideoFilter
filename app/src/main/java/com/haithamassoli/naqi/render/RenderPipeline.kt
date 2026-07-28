@@ -42,10 +42,23 @@ import kotlin.math.min
  * pre-rotated frames or as forwarded metadata (decoder-dependent); [CensorGlEffect] detects which
  * from [meta] (FrameSampler.probe) and maps EDL rects accordingly.
  */
+/**
+ * One slice of the timeline to render on its own (`long-film-plan.md` Phase 2). [index] only names the
+ * output file; [startMs]/[endMs] are absolute source times, and [startMs] doubles as the EDL offset
+ * because a clipped export's timestamps are rebased to 0 (see [CensorGlEffect.drawFrame]).
+ */
+data class RenderSegment(val index: Int, val startMs: Long, val endMs: Long)
+
 object RenderPipeline {
 
     private const val PROGRESS_POLL_MS = 500L
 
+    /**
+     * @param segment null renders the whole timeline exactly as M1 did — audio transmuxed alongside, one
+     *   file, no mux step. Non-null renders just that slice, and **drops audio**: per-segment AAC could
+     *   not be concatenated (encoder frames do not align with arbitrary clip boundaries), so the
+     *   segmented path assembles video only and muxes one continuous audio track at the end.
+     */
     suspend fun renderCensor(
         context: Context,
         inputUri: Uri,
@@ -54,15 +67,34 @@ object RenderPipeline {
         blurAmount: Int,
         grayscale: Boolean,
         meta: VideoMeta,
+        segment: RenderSegment? = null,
         onProgress: (Int) -> Unit,
     ) {
         outputFile.parentFile?.mkdirs()
+        // Derived from the SOURCE, so every segment of one job is encoded at the same bitrate — a
+        // precondition for the concat, which can only carry one track format.
         val bitrate = withContext(Dispatchers.IO) { resolveBitrate(context, inputUri) }
 
-        // Video re-encoded with the censor effect; audio has no processors and is not removed, so
-        // Transformer transmuxes it (no audio re-encode). One sequence carries both tracks.
-        val editedItem = EditedMediaItem.Builder(MediaItem.fromUri(inputUri))
-            .setEffects(Effects(/* audioProcessors = */ emptyList(), listOf<Effect>(CensorGlEffect(edl, blurAmount, grayscale, meta))))
+        val mediaItem = MediaItem.Builder().setUri(inputUri).apply {
+            if (segment != null) {
+                // Frame-accurate on the transcoding path: the decoder starts at the preceding sync
+                // sample and frames whose rebased timestamp is negative are dropped
+                // (media3 1.10.1 ExoAssetLoaderVideoRenderer.java:186).
+                setClipStartPositionMs(segment.startMs)
+                setClipEndPositionMs(segment.endMs)
+            }
+        }.build()
+
+        // Video re-encoded with the censor effect. Whole-timeline: audio has no processors and is not
+        // removed, so Transformer transmuxes it (the M1 no-audio-re-encode fast path).
+        val editedItem = EditedMediaItem.Builder(mediaItem)
+            .setRemoveAudio(segment != null)
+            .setEffects(
+                Effects(
+                    /* audioProcessors = */ emptyList(),
+                    listOf<Effect>(CensorGlEffect(edl, blurAmount, grayscale, meta, segment?.startMs ?: 0L)),
+                ),
+            )
             .build()
         val composition = Composition.Builder(EditedMediaItemSequence.Builder(editedItem).build())
             .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)

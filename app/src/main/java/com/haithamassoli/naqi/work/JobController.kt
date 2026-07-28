@@ -13,8 +13,18 @@ import java.util.UUID
 /** Thin WorkManager facade for the filtering job. */
 object JobController {
 
-    /** @param forceIntervalsMs debug-only "startMs-endMs,startMs-endMs" forced censor spans (E2E hook). */
-    fun start(context: Context, ops: FilterOps, inputUri: String?, forceIntervalsMs: String? = null): UUID {
+    /**
+     * @param forceIntervalsMs debug-only "startMs-endMs,startMs-endMs" forced censor spans (E2E hook).
+     * @param segmentMs debug-only segment-length override; any positive value forces the Phase 2 segmented
+     *   route so it can be exercised on a clip short enough to iterate on.
+     */
+    fun start(
+        context: Context,
+        ops: FilterOps,
+        inputUri: String?,
+        forceIntervalsMs: String? = null,
+        segmentMs: Long = 0L,
+    ): UUID {
         val request = OneTimeWorkRequestBuilder<FilterWorker>()
             .setInputData(
                 workDataOf(
@@ -27,11 +37,16 @@ object JobController {
                     FilterWorker.KEY_BLUR_UNKNOWN to ops.blurUnknownFaces,
                     FilterWorker.KEY_KEEP_STEMS to ops.keepStems,
                     FilterWorker.KEY_FORCE_INTERVALS to forceIntervalsMs,
+                    FilterWorker.KEY_SEGMENT_MS to segmentMs,
                 ),
             )
             .build()
+        // KEEP, not REPLACE (`long-film-plan.md` Phase 1): REPLACE meant one stray tap on Start cancelled
+        // a job that could be four hours in and threw away every temp on the way out. KEEP makes that
+        // tap a no-op. The UI also disables Start while a job runs — this is the half that cannot be
+        // raced, since a tap can land between the flow emitting and the button recomposing.
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(FilterWorker.UNIQUE_WORK, ExistingWorkPolicy.REPLACE, request)
+            .enqueueUniqueWork(FilterWorker.UNIQUE_WORK, ExistingWorkPolicy.KEEP, request)
         return request.id
     }
 

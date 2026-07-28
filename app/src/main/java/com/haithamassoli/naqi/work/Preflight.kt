@@ -22,17 +22,24 @@ import java.io.IOException
  *
  * [messageFor] is the backstop for everything that only fails deep in the pipeline (a codec the
  * device advertises but can't actually start, a disk that fills mid-render).
+ *
+ * Every cause is a **@StringRes id, not a String**. It used to be a String, while `JobsScreen` already
+ * read the key with `getInt` — so `Data.getInt` fell through to its default on every single failure and
+ * the UI showed nothing but "Filtering failed", and the Arabic translations of these eight sentences
+ * (which have existed since the localization pass) were unreachable. Resource ids also re-localize if
+ * the app language changes after a job failed, which is why the id and not the resolved string travels
+ * through `WorkData`.
  */
 internal object Preflight {
 
-    const val DRM = "This video is copy-protected (DRM), so it can’t be filtered."
-    const val UNREADABLE = "This file couldn’t be opened. It may be damaged or in a format this device doesn’t support."
-    const val NO_VIDEO = "This file has no video track."
-    const val NO_AUDIO = "This video has no audio track, so there’s no music to remove."
-    const val LOW_SPACE = "Not enough free space. Filtering needs room for a temporary copy plus about 2 GB."
-    const val UNSUPPORTED_CODEC = "This video uses a codec this device can’t decode."
-    const val OUT_OF_SPACE = "The device ran out of space while saving the filtered copy."
-    const val GENERIC = "Filtering failed."
+    val DRM = R.string.err_drm
+    val UNREADABLE = R.string.err_unreadable
+    val NO_VIDEO = R.string.err_no_video
+    val NO_AUDIO = R.string.err_no_audio
+    val LOW_SPACE = R.string.err_low_space
+    val UNSUPPORTED_CODEC = R.string.err_unsupported_codec
+    val OUT_OF_SPACE = R.string.err_out_of_space
+    val GENERIC = R.string.err_generic
 
     /** Headroom the PRD requires on top of the working copies. */
     private const val SLACK_BYTES = 2L * 1024 * 1024 * 1024
@@ -43,9 +50,20 @@ internal object Preflight {
      *   each write one temp, combined writes a render temp AND a mux temp. The published output
      *   lands on the same filesystem as the cache on every modern device, so it is counted too —
      *   the PRD's "2× source + 2 GB" is exactly the one-temp case.
-     * @return a user-facing message, or null when the job may proceed.
+     * @param extraScratchBytes scratch this shape needs on top of the working copies — Phase 2's
+     *   separated-audio PCM file, which is 176 400 B per second of source (int16 stereo 44.1 kHz) and so
+     *   reaches ~1.6 GB on a 155-min film. It scales with duration, not with source size, so it cannot be
+     *   folded into [tempCopies].
+     * @return the @StringRes id of a user-facing message, or null when the job may proceed.
      */
-    fun check(context: Context, uri: Uri, needsAudio: Boolean, tempCopies: Int): String? {
+    @StringRes
+    fun check(
+        context: Context,
+        uri: Uri,
+        needsAudio: Boolean,
+        tempCopies: Int,
+        extraScratchBytes: Long = 0L,
+    ): Int? {
         val extractor = MediaExtractor()
         var hasVideo = false
         var hasAudio = false
@@ -73,12 +91,22 @@ internal object Preflight {
         if (needsAudio && !hasAudio) return NO_AUDIO
 
         val sourceBytes = sourceSize(context, uri)
-        val required = (tempCopies + 1) * sourceBytes + SLACK_BYTES // +1 = the published copy
-        return if (context.cacheDir.usableSpace >= required) null else LOW_SPACE
+        val required = (tempCopies + 1) * sourceBytes + extraScratchBytes + SLACK_BYTES // +1 = published copy
+        // filesDir, not cacheDir: Phase 1 of long-film-plan.md moved the working temps there ([JobStore]).
+        // Same partition on every modern device, so this is about measuring the volume we actually fill.
+        return if (context.filesDir.usableSpace >= required) null else LOW_SPACE
     }
 
-    /** Map a mid-pipeline failure to its cause. Order matters: the specific cases shadow [GENERIC]. */
-    fun messageFor(t: Throwable): String {
+    /**
+     * Map a mid-pipeline failure to its cause. Order matters: the specific cases shadow [GENERIC].
+     *
+     * An unrecognized cause resolves to [GENERIC] rather than the throwable's own message. That message
+     * used to reach the screen verbatim — untranslated developer text like "separator emitted 3 of 4
+     * frames", which tells the user nothing they can act on. It is still logged with the full stack by
+     * every caller, which is where it belongs.
+     */
+    @StringRes
+    fun messageFor(t: Throwable): Int {
         val text = generateSequence(t) { it.cause }.mapNotNull { it.message }.joinToString(" ").lowercase()
         return when {
             "enospc" in text || "no space left" in text -> OUT_OF_SPACE
@@ -86,7 +114,7 @@ internal object Preflight {
             "codec" in text || "decoder" in text || "encoder" in text -> UNSUPPORTED_CODEC
             t is FileNotFoundException -> UNREADABLE
             t is IOException -> UNREADABLE
-            else -> t.message ?: GENERIC
+            else -> GENERIC
         }
     }
 

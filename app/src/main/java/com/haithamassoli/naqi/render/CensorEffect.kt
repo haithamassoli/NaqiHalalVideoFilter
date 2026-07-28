@@ -46,9 +46,10 @@ class CensorGlEffect(
     private val blurAmount: Int,
     private val grayscale: Boolean,
     private val meta: VideoMeta,
+    private val timeOffsetMs: Long = 0L,
 ) : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram =
-        CensorShaderProgram(edl, blurAmount, grayscale, meta, useHdr)
+        CensorShaderProgram(edl, blurAmount, grayscale, meta, useHdr, timeOffsetMs)
 }
 
 /**
@@ -62,6 +63,7 @@ private class CensorShaderProgram(
     private val grayscale: Boolean,
     private val meta: VideoMeta,
     private val useHdr: Boolean,
+    private val timeOffsetMs: Long,
 ) : BaseGlShaderProgram(useHdr, /* texturePoolCapacity = */ 1) {
 
     private val blurEnabled = blurAmount > 0
@@ -130,7 +132,13 @@ private class CensorShaderProgram(
 
     override fun drawFrame(inputTexId: Int, presentationTimeUs: Long) {
         // EDL/analysis timeline is in ms; Media3 presentation time is in us — convert at this boundary.
-        val tMs = presentationTimeUs / 1000
+        //
+        // [timeOffsetMs] rebases a clipped (Phase 2 segment) export back onto the whole-timeline EDL.
+        // Media3 hands effects CLIP-RELATIVE timestamps: ExoAssetLoaderVideoRenderer computes
+        // `presentationTimeUs = decoderOutput.presentationTimeUs - streamStartPositionUs` (media3 1.10.1
+        // sources, ExoAssetLoaderVideoRenderer.java:185), so a segment starting at 5 min sees its first
+        // frame as 0. Without the offset every segment past the first would censor the wrong moments.
+        val tMs = presentationTimeUs / 1000 + timeOffsetMs
         val full = edl.fullFrameAt(tMs)
         val regions =
             if (full) emptyList() else edl.regionsAt(tMs).map { it.toStoredSpace(mapRotation) }
