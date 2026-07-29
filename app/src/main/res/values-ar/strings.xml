@@ -11,14 +11,15 @@
 
     <!-- Trust-seal pill at the very top; the two halves are joined by a "·" drawn in code. Tight space, keep short. -->
     <string name="pick_seal_on_device">على الجهاز</string>
-    <string name="pick_seal_offline">بلا إنترنت</string>
+    <!-- Was "بلا إنترنت" (Offline) — no longer true now that Naqi downloads shared links. -->
+    <string name="pick_seal_private">خصوصية تامة</string>
 
     <!-- Brand lockup under the droplet mark. BRAND: identical value in every locale, do not translate. -->
     <string name="pick_wordmark_ar">نقي</string>
     <string name="pick_wordmark_latin">Naqi</string>
 
     <!-- Two-line privacy promise under the wordmark; \n is a real line break in the rendered text. -->
-    <string name="pick_tagline">تتم فلترة الفيديو على جهازك.\nلا شيء يغادر هاتفك.</string>
+    <string name="pick_tagline">تتم الفلترة على جهازك.\nلا تغادر مقاطعك هاتفك أبدًا.</string>
 
     <!-- Pick-video card. Title is one line with ellipsis; "Video selected" covers a provider that exposes no name. -->
     <string name="pick_video_none">اختر فيديو</string>
@@ -182,6 +183,12 @@
     <!-- Catch-all. Also the JobsScreen fallback when a FAILED job carried no message. -->
     <string name="err_generic">فشلت الفلترة.</string>
 
+    <!-- Download failures (M4). -->
+    <string name="err_low_space_download">لا توجد مساحة كافية لتنزيل هذا الفيديو. فرّغ بعض المساحة ثم أعد المحاولة.</string>
+    <string name="err_download_unsupported">لا يستطيع نقي التنزيل من هذا الرابط. قد يكون الموقع غير مدعوم أو الفيديو خاصًا.</string>
+    <string name="err_download_network">فشل التنزيل. تحقّق من اتصالك ثم أعد المحاولة.</string>
+    <string name="err_download_generic">فشل التنزيل.</string>
+
     <!-- ============================================================
          Notifications — job foreground service and the done notification.
          The action_* keys here are shared with JobsScreen and must keep these exact names.
@@ -199,6 +206,59 @@
     <string name="stage_rendering">المرحلة ٢ — المعالجة</string>
     <string name="stage_separating">إزالة الموسيقى</string>
     <string name="stage_muxing">اللمسات الأخيرة</string>
+    <string name="stage_downloading">جارٍ التنزيل</string>
+
+    <!-- ============================================================
+         Share sheet (M4)
+         ============================================================ -->
+    <string name="share_loading">جارٍ قراءة تفاصيل الفيديو…</string>
+    <string name="share_info_failed">تعذّرت قراءة هذا الفيديو. قد يكون خاصًا أو محجوبًا في منطقتك أو الموقع غير مدعوم.</string>
+    <string name="share_untitled">فيديو مُشارَك</string>
+    <string name="share_eyebrow_quality">الجودة</string>
+    <string name="share_eyebrow_filters">الفلاتر</string>
+    <string name="share_quality_best">الأفضل</string>
+    <string name="share_quality_720">720p</string>
+    <string name="share_quality_audio">الصوت فقط</string>
+    <string name="action_download">تنزيل</string>
+    <string name="action_filter">فلترة</string>
+    <string name="action_retry">إعادة المحاولة</string>
+    <string name="share_no_url">لم يُعثر على رابط في ما شاركته.</string>
+    <string name="share_already_queued">موجود في القائمة بالفعل.</string>
+
+    <!-- Share queue (M4). -->
+    <string name="queue_eyebrow">القائمة</string>
+    <string name="queue_state_pending_download">في انتظار التنزيل</string>
+    <string name="queue_state_pending_filter">في انتظار الفلترة</string>
+    <string name="queue_state_filtering">جارٍ الفلترة</string>
+    <string name="queue_state_done">تم الحفظ</string>
+    <string name="queue_state_failed">فشل</string>
+    <string name="queue_dismiss">إخفاء</string>
+    <string name="queue_clear_finished">مسح المكتملة</string>
+
+    <!-- ============================================================
+         About / open-source licences (M4). AboutScreen.
+         ============================================================ -->
+    <string name="about_title">عن نقي</string>
+    <!-- %1$s = version name, %2$d = version code. -->
+    <string name="about_version">الإصدار %1$s ‏(%2$d)</string>
+    <!-- BRAND/LEGAL: the licence identifier stays Latin in every locale. -->
+    <string name="about_license">مرخّص بموجب GPL-3.0-or-later.</string>
+    <string name="about_open">عن التطبيق والتراخيص</string>
+    <string name="about_open_desc">الإصدار وإشعارات المصادر المفتوحة وتحديث أداة التنزيل.</string>
+
+    <string name="about_eyebrow_downloader">أداة التنزيل</string>
+    <string name="about_eyebrow_licenses">المصادر المفتوحة</string>
+    <string name="about_ytdlp_version">yt-dlp ‏%1$s</string>
+    <string name="about_ytdlp_unknown">لم يُحدَّث بعد</string>
+    <string name="about_ytdlp_desc">تُغيّر المواقع طريقة تقديم الفيديو كل بضعة أسابيع. يتحقّق نقي من وجود أداة تنزيل أحدث مرة كل أسبوع؛ حدّثها من هنا إذا توقّف رابط عن العمل.</string>
+    <string name="about_update">التحقّق من وجود تحديث</string>
+    <string name="about_updating">جارٍ التحديث…</string>
+    <string name="about_update_ok">أداة التنزيل محدّثة.</string>
+    <string name="about_update_failed">تعذّر التحديث. تحقّق من اتصالك ثم أعد المحاولة.</string>
+    <string name="about_notice_missing">إشعارات المصادر المفتوحة غير متوفّرة في هذه النسخة.</string>
+
+    <!-- Ongoing notification while a download runs; the second line is the video title. -->
+    <string name="download_notif_title">جارٍ تنزيل الفيديو</string>
     <string name="done_notif_title">تم حفظ النسخة المُفلترة</string>
     <string name="action_open">فتح</string>
     <string name="action_share">مشاركة</string>

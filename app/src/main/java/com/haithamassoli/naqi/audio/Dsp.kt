@@ -81,15 +81,9 @@ object Fft {
         init {
             var log = 0
             while ((1 shl log) < n) log++
-            for (i in 0 until n) {
-                var x = i
-                var r = 0
-                for (b in 0 until log) {
-                    r = (r shl 1) or (x and 1)
-                    x = x shr 1
-                }
-                rev[i] = r
-            }
+            // Integer.reverse flips all 32 bits; shifting right by (32-log) keeps the low `log` of them,
+            // which is exactly the log-bit reversal. n is a power of two, so log is its exact width.
+            for (i in 0 until n) rev[i] = Integer.reverse(i) ushr (32 - log)
             for (k in 0 until n / 2) {
                 val ang = -2.0 * PI * k / n
                 cosTable[k] = cos(ang)
@@ -224,7 +218,7 @@ class Stft(val nfft: Int = 4096, val hop: Int = 1024) {
 
     // Per-T buffers + precomputed OLA envelope. Inner class so the envelope can read the shared window.
     private inner class Scratch(val t: Int) {
-        val le = (t + hop - 1) / hop
+        val le = le(t)
         val padL = hop / 2 * 3
         val padR = padL + le * hop - t
         val paddedSeg = t + padL + padR                        // = 2*padL + le*hop = (le+3)*hop

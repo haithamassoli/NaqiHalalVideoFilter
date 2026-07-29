@@ -28,25 +28,51 @@ object Eta {
 
     // Factors are wall clock ÷ source duration. Two significant figures: the inputs are one real
     // measurement and a pile of estimates, so a third digit would be invented precision.
+    //
+    // **They are asymptotes, not per-clip truth.** Every one of them is linear-in-duration, but the job
+    // also pays a fixed cost that does not scale: loading an 88 MB htdemucs graph and standing up the ORT
+    // sessions. Measured 2026-07-29 on an S23, music removal alone:
+    //
+    //   81.9 s source   separate 93.6 s   1.14x   <- fixed cost dominates
+    //   634 s source    separate 390 s    0.62x
+    //   5 min source    (M2/M3)           0.68x
+    //
+    // So a clip under ~2 min is quoted low — a 1-minute video estimated at 1 minute really takes two.
+    // Deliberately not corrected for: adding a constant term would distort the long jobs these numbers
+    // exist to warn about, and being 30 s out on a 1-minute clip is not a warning anyone needs. The
+    // confirm threshold is 30 min, which is far inside the range where the linear factors hold.
 
     /**
-     * **Measured** by the Phase-0 soak (2026-07-27, S23, 155.4 min film): analyze 70.5 + vote 2.7 +
-     * render 9.7 = 82.9 min ⇒ 0.53. Kept at 0.54 — the difference is inside the render extrapolation's
-     * own error, and rounding up is the cheap direction. The two estimates this replaced happened to
-     * total the same number while being individually wrong by 2× and 3× in opposite directions.
+     * **Re-measured 2026-07-29** (S23, `wm3.mp4`, 192.9 s, censor-only, unsegmented): analyze 36.9 s +
+     * vote 0.001 s + render 13.5 s + publish 0.4 s = 51.1 s ⇒ **0.265**. Set to 0.28, rounding up for
+     * the concat a segmented film adds and to keep this a floor.
+     *
+     * The 0.54 this replaces was itself a real Phase-0 soak measurement (2026-07-27, 155.4 min film:
+     * analyze 70.5 + vote 2.7 + render 9.7 = 82.9 min ⇒ 0.53) — it was not wrong, it was **stale**.
+     * `perf-plan.md` item 1.3 landed the day after and cut analyze by 61 %, which is where essentially
+     * the whole 2× came from; deriving 0.54 forward through that win independently gives 0.257, within
+     * 3 % of what was measured here. Two routes, one answer.
+     *
+     * Honest caveat: this measurement is at 3 minutes and the 61 % was itself only ever measured on
+     * short assets. A feature-length censor run has not been timed since the win, so the film-length
+     * claim is projected, not observed — `long-film-followups.md` item 4 is what closes it.
      */
-    private const val CENSOR = 0.54
+    private const val CENSOR = 0.28
 
     /** The one end-to-end measurement we have: 5-min clip → 3.4 min after the M3 re-export (`tasks.md` M2). */
     private const val MUSIC = 0.68
 
     /**
-     * ~2.5 h per 2 h source — separate + analyze + render + mux (`long-film-plan.md` evidence table)
-     * = 1.25, corroborated by the other two factors summing to 1.22. Rounded up rather than down
-     * because combined is the shape already sitting on the 6 h foreground-service cap: an under-count
-     * is the expensive direction to be wrong in.
+     * The other two factors sum to 0.96 after the 2026-07-29 [CENSOR] recalibration; rounded up to 1.0.
+     *
+     * That sum is the right model here because combined runs the two pipelines back to back rather than
+     * overlapped — analyze, render, separate, mux, in sequence. The previous 1.3 came from the
+     * `long-film-plan.md` evidence table and was corroborated by the then-current factors summing to
+     * 1.22; the same corroboration now lands at 0.96, and the same "round up, an under-count is the
+     * expensive direction" rule applies — combined is the shape already sitting on the 6 h
+     * foreground-service cap.
      */
-    private const val COMBINED = 1.3
+    private const val COMBINED = 1.0
 
     /**
      * Wall clock this job will take **at least**, in ms, or 0 when there is nothing honest to say.
