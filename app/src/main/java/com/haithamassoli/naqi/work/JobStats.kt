@@ -1,7 +1,6 @@
 package com.haithamassoli.naqi.work
 
 import android.content.Context
-import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
@@ -40,7 +39,6 @@ class JobStats(private val context: Context) {
 
     /** Sample the one number that is a level rather than a high-water mark. */
     fun tick() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
         val status = context.getSystemService(PowerManager::class.java)?.currentThermalStatus ?: return
         if (status > maxThermal) maxThermal = status
     }

@@ -3,7 +3,6 @@ package com.haithamassoli.naqi.audio
 import android.content.Context
 import android.media.MediaExtractor
 import android.net.Uri
-import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import kotlinx.coroutines.CancellationException
@@ -38,10 +37,10 @@ object AudioPipeline {
      * PRD "Thermal: chunked work yields between segments; no hard fail on throttle, just slower."
      * Called between htdemucs chunks — the only natural seam, since one chunk is an uninterruptible
      * ONNX run. Blocking sleep is the point: the CPU must go idle for the SoC to shed heat, and this
-     * thread has nothing else to do. Pre-Q has no thermal API, so those devices just run hot.
+     * thread has nothing else to do.
      */
     private fun thermalYield(context: Context, isCancelled: () -> Boolean) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || isCancelled()) return
+        if (isCancelled()) return
         val pm = context.getSystemService(PowerManager::class.java) ?: return
         val pause = when (pm.currentThermalStatus) {
             PowerManager.THERMAL_STATUS_NONE, PowerManager.THERMAL_STATUS_LIGHT -> return

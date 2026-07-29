@@ -31,8 +31,25 @@ android {
         }
     }
 
+    // Release signing reads four properties from ~/.gradle/gradle.properties (naqiStoreFile,
+    // naqiStorePassword, naqiKeyAlias, naqiKeyPassword) so no secret ever lands in the repo.
+    // Absent → no signingConfig is attached and assembleRelease produces an unsigned APK, which is
+    // the honest outcome: a build that silently fell back to the debug key would be worse.
+    val storeFilePath = project.findProperty("naqiStoreFile") as String?
+    if (storeFilePath != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(storeFilePath)
+                storePassword = project.property("naqiStorePassword") as String
+                keyAlias = project.property("naqiKeyAlias") as String
+                keyPassword = project.property("naqiKeyPassword") as String
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             optimization {
                 enable = false
             }

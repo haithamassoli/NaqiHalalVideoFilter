@@ -99,22 +99,13 @@ fun OptionsScreen(
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         startJob() // start whether granted or not; without it the job runs but its notification is hidden
     }
-    // Pre-Q, saving into public Movies/Naqi needs WRITE_EXTERNAL_STORAGE; a Worker can't request it, so ask here.
-    val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        startJob() // if denied, publish() fails fast with a surfaced message rather than saving nowhere
-    }
 
+    // Notifications are the only runtime permission left: publishing into Movies/Naqi is scoped
+    // MediaStore at minSdk 29, which needs none.
     fun startWithPermissions() {
-        // Disjoint by API level: storage is pre-Q only, notifications are API 33+, so at most one is asked.
-        val needsStorage = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
         val needsNotif = Build.VERSION.SDK_INT >= 33 &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        when {
-            needsStorage -> storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            needsNotif -> notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-            else -> startJob()
-        }
+        if (needsNotif) notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS) else startJob()
     }
 
     // A long job gets one confirmation, in front of the permission dance so the user isn't asked for

@@ -10,11 +10,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Runtime permission on API 33+; still requested at runtime before starting a job. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Pre-Q only: saving the filtered copy into public Movies/Naqi needs legacy write access (also
-         requested at runtime). API 29+ uses scoped MediaStore and needs no permission, so cap at 28. -->
-    <uses-permission
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
+    <!-- No storage permission: minSdk 29 means every install uses scoped MediaStore, and an app's own
+         contributions to Movies/Naqi need no permission to write or read back. -->
 
     <!-- android:localeConfig lists the locales we ship (English default, Arabic). It is what
          surfaces Naqi in the Android 13+ per-app language picker (Settings > Apps > Naqi >

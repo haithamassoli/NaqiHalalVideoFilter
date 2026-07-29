@@ -4,7 +4,6 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.compose.foundation.clickable
@@ -50,7 +49,6 @@ import com.haithamassoli.naqi.work.FilterWorker
 import com.haithamassoli.naqi.work.JobController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 private const val MIME_MP4 = "video/mp4"
 
@@ -264,29 +262,22 @@ private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit) {
 
 private data class LibraryItem(val name: String, val bytes: Long, val uri: Uri?)
 
-/** Newest first. Reads MediaStore on API 29+ (own contributions need no permission), the public dir below. */
+/** Newest first, straight out of MediaStore — our own contributions need no permission to read back. */
 private fun loadLibrary(context: Context): List<LibraryItem> = runCatching {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        context.contentResolver.query(
-            collection,
-            arrayOf(MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME, MediaStore.Video.Media.SIZE),
-            "${MediaStore.Video.Media.RELATIVE_PATH} LIKE ?",
-            arrayOf("${Environment.DIRECTORY_MOVIES}/Naqi/%"),
-            "${MediaStore.Video.Media.DATE_ADDED} DESC",
-        )?.use { c ->
-            buildList {
-                while (c.moveToNext()) {
-                    add(LibraryItem(c.getString(1), c.getLong(2), ContentUris.withAppendedId(collection, c.getLong(0))))
-                }
+    val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+    context.contentResolver.query(
+        collection,
+        arrayOf(MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME, MediaStore.Video.Media.SIZE),
+        "${MediaStore.Video.Media.RELATIVE_PATH} LIKE ?",
+        arrayOf("${Environment.DIRECTORY_MOVIES}/Naqi/%"),
+        "${MediaStore.Video.Media.DATE_ADDED} DESC",
+    )?.use { c ->
+        buildList {
+            while (c.moveToNext()) {
+                add(LibraryItem(c.getString(1), c.getLong(2), ContentUris.withAppendedId(collection, c.getLong(0))))
             }
-        }.orEmpty()
-    } else {
-        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "Naqi")
-            .listFiles().orEmpty()
-            .sortedByDescending { it.lastModified() }
-            .map { LibraryItem(it.name, it.length(), shareableUri(context, Uri.fromFile(it))) }
-    }
+        }
+    }.orEmpty()
 }.getOrDefault(emptyList())
 
 /**
