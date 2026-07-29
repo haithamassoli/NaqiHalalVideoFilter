@@ -347,3 +347,153 @@ combined. It is also the only one that is not lazy:
 - **The combined shape was never re-measured** after these changes — only censor-only and music-only.
   `runCombined`/`runSegmented` share the same `analyze` code so the win should carry, but the
   progress-band arithmetic and the ETA reweighting under a 2.5× faster analyze are untested.
+
+---
+
+## Round 2 (2026-07-29) — Phase 5: split the convert across cores — **IMPLEMENTED, MEASURED, REVERTED**
+
+> ### VERDICT 2026-07-29: the premise was wrong. The convert is not the bottleneck; the gate is.
+>
+> The row split was built exactly as specified, verified bit-identical, and **moved analyze wall by 0 %**.
+> It is reverted. What killed it is not the implementation — that works — but the number the plan was
+> built on. **The convert is 16–19 ms/frame, not the ~41 this section assumed.**
+>
+> Phase 5 added its own instrumentation to find this out: `convert=` in `FrameSampler`'s `sample:` line,
+> a direct read on the producer that 1.2 could only ever get by subtraction (and after 1.3b, not even
+> that — see 1.2's own open caveat). **That log line is kept.** It is the number that decides whether
+> anyone should ever optimize this loop again.
+>
+> `test-video.mp4`, S23, 128 sampled frames, 2 runs per W:
+>
+> | W | `convert=` | per frame | analyze wall |
+> |---|---|---|---|
+> | **1** | 2 504 / 2 114 ms | **16–19 ms** | 4 119 / 3 605 ms |
+> | 2 | 1 735 / 1 766 ms | 13 ms | 3 867 / 3 883 ms |
+> | 4 | 1 721 / 1 546 ms | 12–13 ms | 4 001 / 4 006 ms |
+> | 6 | 1 718 / 1 411 ms | 11–13 ms | 4 334 / 3 747 ms |
+>
+> Plus a 12-run round-robin sweep (W ∈ {1,2,4,6} × 3 rounds, thermal-fair ordering): W=1 3 960/3 645,
+> W=2 3 713/3 644, W=4 3 728, W=6 3 772/3 753/3 873.
+>
+> **Read both tables together.** The split does what it was designed to do — convert −24 % at W=2,
+> −32 % at W=6 — and **wall does not move**. Across 20 runs the W-to-W differences are smaller than
+> the run-to-run variance at fixed W (W=1 alone spans 3 605–4 119 ms). No W is distinguishable from W=1.
+>
+> **Why: the loop is consumer-bound, and has been since 1.3a.** At W=1, `gate=1 932` + `detect=1 086`
+> ≈ 3.0 s of a 3.8 s wall — **78 %** — against a convert of 2.3 s that already runs *underneath* it via
+> 1.3b's channel. `wall = max(producer, consumer)`, so even an infinitely fast convert caps the win at
+> ~20 %, and the split only removes ~0.75 s of a cost that was already hidden. Scaling is poor for the
+> same reason 5.3 warned about: ORT runs the gate on 6 threads (item 3.1) across 8 cores, so the bands
+> have no idle cores to take — 6 workers buy 1.5×, not 6×.
+>
+> **Where the ~41 ms came from.** 1.2 derived it as `wall − detect − gate` on the *pre-1.3* serial loop,
+> so it swallowed the decode, the pipeline serialisation 1.3 later removed, and (per 1.2's open caveat)
+> `onFaces`/NudeNet. It was never a measurement of the convert. This round replaces it with one.
+>
+> **Kept from this round** (the parts that cost nothing and earn their keep):
+> - `FrameSampler.convertRows(...)` stays extracted, with its `[rowStart, rowEnd)` band parameters. Two
+>   ints, and re-adding the fan-out becomes a six-line change if the gate ever gets cheap enough.
+> - `ConvertRowsTest` — 4 pure-JVM tests, no Robolectric. Pins N-band ≡ 1-band across all four rotations,
+>   a downscaled case and `outH < workers`, **and** the BT.601 arithmetic and rotation indexing, which
+>   had no test at all since M1. It caught nothing here; it is cheap insurance on a loop nobody reads.
+> - `convert=` / `frames=` instrumentation in `sample`.
+>
+> **Reverted:** the `coroutineScope` fan-out, `launch(Dispatchers.Default)` per band, `CONVERT_WORKERS`,
+> and `toUprightBitmap`'s `suspend`.
+>
+> **What this means for the next round.** The top remaining lever in this file is no longer the convert.
+> It is **the NSFW gate** — ~1.9 s of a 3.8 s analyze on this asset, 5 fps × ~46 000 inferences on a
+> film. "NNAPI / QNN for the image models" is in *Deliberately not doing* on the grounds that "the payoff
+> is real, but not before Phase 1 says the gate is the cost". **Phase 1 now says the gate is the cost.**
+> `maxDim` 640 → 480 also gets more attractive, because it shrinks the gate's input tensor as well as
+> the convert — but it is still a quality-trading dial and still ships alone.
+>
+> **Not verified, by instruction:** no feature-length run, and no rendered-pixel diff on
+> `women-music-3min-video.mp4`. The latter was the 5.4 gate; it is moot for a reverted change, but see
+> 5.4 below for what would still have to be checked if the fan-out is ever re-added.
+
+### Original plan follows
+
+After 1.3b the analyze loop is producer-bound on `FrameSampler.toUprightBitmap` — a single-threaded
+Kotlin per-pixel walk, ~41 ms/frame *including* decode (1.4b showed the decode half is noise). The
+`ponytail:` comment at `FrameSampler.kt:101` names this as the next lever. Rows of the output are
+independent, so the loop splits across cores with no algorithm change: **the pixels must come out
+bit-identical to serial**, which makes half the quality gate a pure equality check.
+
+**Not frame-pipelining:** converting N frames concurrently would need N live codec `Image`s, and output
+buffers must be released promptly or the decoder stalls. Row-splitting one frame keeps the
+one-`Image`-at-a-time lifetime and is the small diff.
+
+**Exit:** analyze wall on `test-video.mp4` and `women-music-3min-video.mp4`, ≥25 % faster, gate metrics
+byte-identical, rendered-pixel diff clean. Hypothesis, not promise: producer floor 41 → ~15 ms/frame,
+wall shifts to the consumer (detect+gate+`onFaces`), so the win saturates near the consumer's cost —
+if 4 workers disappoint, the ceiling is memory bandwidth, and the escalation is libyuv, not more threads.
+
+### 5.1 Extract `convertRows` + determinism test
+
+- [x] **DONE and KEPT.** `FrameSampler.convertRows(...)`, primitives only. Production is now exactly the
+  "serial behaviour" case — one call spanning `[0, outH)`.
+- [x] **DONE and KEPT.** `ConvertRowsTest`, 4 tests, pure JVM. Planes use `rowStride > width`, chroma
+  `pixelStride 2` with U and V **aliased into one buffer** at bases `b`/`b+1` (the semi-planar layout a
+  real decoder hands over), an odd source width, and a non-zero base. Asserts byte-equality of 1 vs
+  2/4/6 bands across all four rotations, a downscaled case, and `outH(3) < workers(8)`. The fourth test
+  pins the BT.601 maths — it is the one that outlives the revert, and writing it caught that
+  `(1815 * -38) shr 10` floors to −68, so blue is 13 and not the 14 a truncating divide gives.
+
+### 5.2 Parallelize
+
+- [x] **BUILT, THEN REVERTED.** Exactly as specified, plus one refinement: the parent walked band 0
+  itself rather than parking on the join, so W bands used W threads and not W+1. Reverted for 0 % wall.
+- [x] **Verified before it was reverted, and worth keeping on record.** Nine adversarial review agents
+  across four lenses (concurrency/memory, band arithmetic, extraction fidelity vs HEAD, test quality)
+  produced **zero findings that survived refutation**. Band coverage was re-derived independently:
+  `bandRows = ceil(outH/W)`, `bands = ceil(outH/bandRows)` gives contiguous, disjoint, complete coverage
+  of `[0, outH)` for every `W ≥ 1` including `outH < W`, with no division by zero (`outH ≥ 1` is
+  guaranteed by the `maxOf(1, …)` on `dispW`/`dispH`). Concurrent absolute `ByteBuffer.get(int)` on a
+  direct buffer is safe, and the U/V plane aliasing does not break it.
+- [ ] **The one gap, stated plainly:** `ConvertRowsTest` drives the bands **sequentially**, so
+  bit-identity is proven but thread-safety is only argued. Nothing ever executed the `launch` fan-out
+  under test. If it is re-added, that gap comes back with it.
+
+### 5.3 Sweep W and ship
+
+- [x] **SWEPT — NO WINNER TO SHIP.** W ∈ {1, 2, 4, 6}, round-robin × 3 so thermal drift hit every W
+  equally, plus a second 2-runs-per-W pass carrying `convert=`. Tables in the verdict box. The warning
+  in this item is precisely what happened, in its strongest form: **every** W won on convert time and
+  **none** won on wall time. Wall was the only number that voted, and it voted no.
+
+### 5.4 Quality gate — pixels, not counts
+
+- [x] **PASSED.** `gateFirings=50 intervalCount=1 intervals=[300..12818] censorFaceTracks=0` on
+  `test-video.mp4` in **all 21 runs** — every W, both instrumented and not, and on the reverted build.
+  Byte-identical, exactly as 5.1 predicts.
+- [x] **Confirmed as predicted, and confirmed useless as a signal.** `tracks` moved 8/9/11/13 across
+  runs at *identical* W, so it is wall-clock noise even with the build held constant — finding #1
+  again, now with a within-build control.
+- [ ] **NOT RUN: the rendered-pixel diff on `women-music-3min-video.mp4`.** Skipped by instruction
+  (no long-video testing) and moot for a reverted change — but it is the item that would still be
+  load-bearing if the fan-out is ever re-added, because bit-identical bitmaps do **not** rule out a
+  fail-open: a faster analyze re-segments ML Kit's face tracks (finding #1), and that is the mechanism
+  that produced the uncensored face at 13.56 s in Phase 2. Note `test-video.mp4` cannot substitute —
+  `peakLiveCrops=0` on it, so it never exercises the face-censor path at all.
+
+### Not doing in this round
+
+- **libyuv / NDK** — the trigger written here was "only if the sweep shows the row split saturating well
+  above ~15 ms/frame". It saturates at 11–13 ms/frame, so by this file's own test the trigger does not
+  fire. The stronger reason is the verdict box: the convert is not what analyze is waiting on.
+- **`maxDim` 640 → 480** — still the top *quality-trading* lever, still ships alone (attribution rule).
+  Its value went **up**, not down: it shrinks the gate's input as well as the convert, and the gate is
+  now the measured bottleneck.
+- **Hoisting the per-frame `sxMap`/`syMap` allocations** — two ~640-int arrays per frame, noise.
+
+### Opened by Round 2
+
+- **The gate is the bottleneck and nothing in this file is aimed at it.** ~1.9 s of a 3.8 s analyze.
+  NNAPI/QNN moves out of *Deliberately not doing* on its own stated condition; a cheaper gate cadence,
+  a smaller gate input, or a quantised gate model are all now above anything left in Phase 5.
+- **Any per-frame cost model in this file that predates 1.3 is suspect.** The ~41 ms/frame convert was
+  a residual, not a measurement, and it was wrong by ~2.3×. `convert=` exists now; use it.
+- **The convert probe's first script silently returned eight empty rows** — `set -e` plus
+  `grep -q … && break` as the last command of a poll loop kills the script. Four sweep cells were lost
+  the same way. Use `if …; then break; fi` in device poll loops.

@@ -9,11 +9,13 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.util.Log
 import com.haithamassoli.naqi.media.requireTrackIndex
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import java.nio.ByteBuffer
 import kotlin.coroutines.coroutineContext
 import kotlin.math.roundToInt
 
@@ -30,6 +32,7 @@ import kotlin.math.roundToInt
  */
 object FrameSampler {
 
+    private const val TAG = "FrameSampler"
     private const val TIMEOUT_US = 10_000L
 
     // perf-plan 1.3b. [RING] must stay above the frames the consumer side can be holding — [QUEUE]
@@ -98,8 +101,10 @@ object FrameSampler {
         // the next. maxDim² holds any output (the convert downscales only). Nothing recycles the rotation:
         // it dies with the pass, and a sweep could only race a reader still going — ML Kit's Task, when
         // onFrame throws before awaiting it.
-        // ponytail: one decode coroutine, so the floor is now the single-threaded convert, ~41 ms/frame on
-        // an S23. Splitting THAT across cores is the next lever, and a much bigger change than this one.
+        // ponytail: one decode coroutine, one convert thread. perf-plan Phase 5 measured this loop at
+        // 16-19 ms/frame, NOT the ~41 the plan assumed, and splitting it across cores moved analyze wall
+        // by 0 % — the pass is consumer-bound on the NSFW gate. Do not optimize here again without first
+        // making the gate cheaper; `convert=` in the log below is the number that says so.
         val ring = arrayOfNulls<Bitmap>(RING)
         val scratch = IntArray(maxDim * maxDim)
         coroutineScope {
@@ -111,6 +116,12 @@ object FrameSampler {
             launch { try { for ((bmp, ptsMs) in frames) onFrame(bmp, ptsMs) } finally { frames.cancel() } }
 
             var slot = 0
+            // perf-plan Phase 5, and the reason it was rejected. 1.2 could only get decode+convert as a
+            // residual, and after 1.3b even that stopped working (wall became max(producer, consumer)),
+            // so the convert's real cost was never measured — it was assumed at ~41 ms/frame and is
+            // actually 16-19. Keep this: it is the only direct read on the producer side.
+            var convertNs = 0L
+            var converted = 0
             val extractor = MediaExtractor()
             var codec: MediaCodec? = null
             try {
@@ -168,10 +179,12 @@ object FrameSampler {
                     }
                     val render = info.size > 0 && ptsUs >= nextSlotUs
                     val bitmap = if (render) {
+                        val t0 = System.nanoTime()
                         codec.getOutputImage(outIndex)?.let { image ->
                             try { toUprightBitmap(image, rotation, maxDim, ring[slot], scratch) }
                             finally { image.close() }
                         }?.also { ring[slot] = it } // first RING frames fill the rotation, the rest reuse it
+                            .also { convertNs += System.nanoTime() - t0; converted++ }
                     } else null
                     if (render) {
                         nextSlotUs += slotIntervalUs
@@ -186,6 +199,8 @@ object FrameSampler {
                     if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outputDone = true
                 }
             } finally {
+                if (converted > 0) Log.i(TAG, "sample: frames=$converted " +
+                    "convert=${convertNs / 1_000_000}ms (${convertNs / 1_000_000 / converted}ms/frame)")
                 frames.close() // ends the consumer's loop on ANY exit, cancel included
                 codec?.let {
                     runCatching { it.stop() } // stop() throws if the codec already errored; release regardless
@@ -223,6 +238,8 @@ object FrameSampler {
      *
      * Writes through the caller's [pixels] store into [reuse] when that bitmap already has the output
      * shape, so a pass allocates [RING] bitmaps instead of one per frame; a mismatch allocates one.
+     *
+     * The pixel walk itself lives in [convertRows].
      */
     private fun toUprightBitmap(image: Image, rotation: Int, maxDim: Int, reuse: Bitmap?, pixels: IntArray): Bitmap {
         val crop = image.cropRect
@@ -246,7 +263,45 @@ object FrameSampler {
         val uBuf = uP.buffer; val uRow = uP.rowStride; val uPix = uP.pixelStride; val uBase = uBuf.position()
         val vBuf = vP.buffer; val vRow = vP.rowStride; val vPix = vP.pixelStride; val vBase = vBuf.position()
 
-        for (oy in 0 until outH) {
+        // ponytail: ONE band, the whole image. perf-plan Phase 5 built the row fan-out here
+        // (coroutineScope + one launch per band on Dispatchers.Default) and it was REVERTED on a measured
+        // number — it cut `convert=` 24-32 % and moved analyze wall by 0 %, because the pass is
+        // consumer-bound on the NSFW gate, not producer-bound on this loop. The band parameters below are
+        // kept: they cost two ints, ConvertRowsTest proves the rows really are independent, and that makes
+        // re-adding the fan-out a six-line change if the gate ever gets cheap enough for it to matter.
+        convertRows(
+            yBuf, yRow, yPix, yBase, uBuf, uRow, uPix, uBase, vBuf, vRow, vPix, vBase,
+            rotation, sxMap, syMap, outW, pixels, 0, outH,
+        )
+        // createBitmap(pixels, ...) would allocate AND return an immutable bitmap; the rotation needs a
+        // mutable one it can refill, and setPixels copies, so the store above is free to be reused.
+        val out = reuse?.takeIf { it.width == outW && it.height == outH }
+            ?: Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+        out.setPixels(pixels, 0, outW, 0, 0, outW, outH)
+        return out
+    }
+
+    /**
+     * The pixel walk of [toUprightBitmap], over one contiguous band of output rows `[rowStart, rowEnd)`.
+     * The only caller passes `[0, outH)`; the band split survives its reverted fan-out (see the call
+     * site) because it is what `ConvertRowsTest` uses to prove the rows are genuinely independent —
+     * N bands are **bit-identical** to one.
+     *
+     * Takes primitives only, no [Image], so that test needs no Robolectric. Every buffer read is
+     * ABSOLUTE (`get(index)`, never `get()`), so a band never touches a buffer's position — which is
+     * what would keep concurrent bands safe. [yBase]/[uBase]/[vBase] are the caller's `position()`s, and
+     * `sxMap.size`/`syMap.size` are the unrotated display width/height the rotation cases index against.
+     */
+    internal fun convertRows(
+        yBuf: ByteBuffer, yRow: Int, yPix: Int, yBase: Int,
+        uBuf: ByteBuffer, uRow: Int, uPix: Int, uBase: Int,
+        vBuf: ByteBuffer, vRow: Int, vPix: Int, vBase: Int,
+        rotation: Int, sxMap: IntArray, syMap: IntArray,
+        outW: Int, pixels: IntArray, rowStart: Int, rowEnd: Int,
+    ) {
+        val dispW = sxMap.size
+        val dispH = syMap.size
+        for (oy in rowStart until rowEnd) {
             val row = oy * outW
             for (ox in 0 until outW) {
                 val dx: Int
@@ -270,11 +325,5 @@ object FrameSampler {
                 pixels[row + ox] = -0x1000000 or (r shl 16) or (g shl 8) or b // opaque ARGB
             }
         }
-        // createBitmap(pixels, ...) would allocate AND return an immutable bitmap; the rotation needs a
-        // mutable one it can refill, and setPixels copies, so the store above is free to be reused.
-        val out = reuse?.takeIf { it.width == outW && it.height == outH }
-            ?: Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
-        out.setPixels(pixels, 0, outW, 0, 0, outW, outH)
-        return out
     }
 }
