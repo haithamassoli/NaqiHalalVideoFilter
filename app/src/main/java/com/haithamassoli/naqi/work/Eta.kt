@@ -28,6 +28,19 @@ object Eta {
 
     // Factors are wall clock ÷ source duration. Two significant figures: the inputs are one real
     // measurement and a pile of estimates, so a third digit would be invented precision.
+    //
+    // **They are asymptotes, not per-clip truth.** Every one of them is linear-in-duration, but the job
+    // also pays a fixed cost that does not scale: loading an 88 MB htdemucs graph and standing up the ORT
+    // sessions. Measured 2026-07-29 on an S23, music removal alone:
+    //
+    //   81.9 s source   separate 93.6 s   1.14x   <- fixed cost dominates
+    //   634 s source    separate 390 s    0.62x
+    //   5 min source    (M2/M3)           0.68x
+    //
+    // So a clip under ~2 min is quoted low — a 1-minute video estimated at 1 minute really takes two.
+    // Deliberately not corrected for: adding a constant term would distort the long jobs these numbers
+    // exist to warn about, and being 30 s out on a 1-minute clip is not a warning anyone needs. The
+    // confirm threshold is 30 min, which is far inside the range where the linear factors hold.
 
     /**
      * **Re-measured 2026-07-29** (S23, `wm3.mp4`, 192.9 s, censor-only, unsegmented): analyze 36.9 s +

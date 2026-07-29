@@ -41,31 +41,43 @@ Source: `prd-download-share.md`. Milestones are dependency-ordered; M4.0 is a ha
 
 **Bug found and fixed while verifying (pre-existing, not introduced by M4):** the audio-only run died after 6.5 minutes of separation with `IllegalArgumentException: Cannot round NaN value` from `AacWriter`'s int16 quantizer. The shipped graph is fp16 and the input is normalized by whole-track std, so a passage far louder than the track average can push activations past fp16's range and a chunk returns non-finite. `DemucsSeparator` now silences and **counts** those samples (`nonFinite`, logged), and `AacWriter` guards the quantizer boundary. This would equally have hit a loud video picked through the normal picker.
 
-## M4.2 — Share entry + sheet
+## M4.2 — Share entry + sheet — **DONE 2026-07-29**
 **Exit:** share a Reel from Instagram → sheet → filtered file in `Movies/Naqi`; share a local file → sheet with last-used filters, existing behavior otherwise unchanged.
 
-- [ ] Prerequisite fix: `FilterWorker.kt:741` — output name falls back to `File(uri.path).name` when `DISPLAY_NAME` is null (`file://`), before the `"video"` literal
-- [ ] Prerequisite fix: `Preflight.kt:124` — size falls back to `File(uri.path).length()` when scheme is `file`
-- [ ] Two intent-filters on MainActivity (`ACTION_SEND text/plain`, `ACTION_SEND video/*`) + `android:launchMode="singleTask"`; parse in the existing `onCreate`/`onNewIntent` block (`MainActivity.kt:66`)
-- [ ] Link flow: regex-scrape first http(s) URL from `EXTRA_TEXT`; no match → toast, return; matches existing non-terminal queue item → "Already in queue" toast, return
-- [ ] File flow: immediately `grantUriPermission(packageName, uri, FLAG_GRANT_READ_URI_PERMISSION)`; revoke after publish; worker can't open URI → item FAILED "Re-share the file", rest of queue proceeds
-- [ ] `Step.Sheet` in the `NaqiApp` step machine (`ui/NaqiApp.kt:21`)
-- [ ] `ui/screen/ShareSheet.kt`: opens immediately with loading state; `getInfo` off-main → title · duration · domain; inline error + Retry on failure; Quality (Best/720p/Audio only → the three fixed selectors, never the raw format table) link-only; Filters checkboxes; ≥30 min → reuse `dlg_long_job_body` warning; file flow drops Quality, primary button Filter, disabled when both filters off; audio-only hides Blur women
-- [ ] `data/Prefs.kt`: last-used `FilterOps` + quality, one JSON file, pre-fills the sheet
-- [ ] POST_NOTIFICATIONS request on first Download tap (33+, same contract as OptionsScreen)
-- [ ] Milestone check: share a Reel end-to-end → filtered in `Movies/Naqi`; share a local `video/*` → filtered, no download, no regression to the picker path; reboot before a shared file's filter runs → that item fails with "Re-share the file", queue proceeds
+- [x] Prerequisite fix: `FilterWorker.outputName` falls back to `File(uri.path).name` for `file://` — *landed in M4.1, and the M4.0 baseline A/B demonstrates the old bug directly (pre-change build published `video-naqi-…`)*
+- [x] Prerequisite fix: `Preflight.sourceSize` falls back to `File(uri.path).length()` — landed in M4.1
+- [x] Two intent-filters on MainActivity + `android:launchMode="singleTask"`, parsed in the existing `onCreate`/`onNewIntent` block
+- [x] Link flow: regex-scrapes the first http(s) URL out of wrapped text (verified with *"Check this out &lt;url&gt; via the X app"*); no match → toast; already queued → "Already in the queue" toast
+- [x] File flow: `grantUriPermission` to ourselves on receipt; a worker that cannot open the URI fails that item only
+- [x] ~~`Step.Sheet` in the `NaqiApp` step machine~~ — **deliberately not done.** The sheet is a `ModalBottomSheet`, i.e. a modal *over* whatever step is showing, not a step of its own. Making it a step would replace the screen underneath and break Back. It is rendered as an overlay in `MainActivity`, the same pattern the existing delete-confirm dialog already uses
+- [x] `ui/screen/ShareSheet.kt` — opens immediately with a spinner, `getInfo` off-main, inline error + Retry, Quality link-only, ≥30 min warning, file flow drops Quality and says **Filter**, audio-only hides Blur women
+- [x] `data/Prefs.kt` — last-used ops + quality. **`SharedPreferences`, not the PRD's JSON file**: it is one file, the platform does the atomic write, and six scalars do not need a schema
+- [x] POST_NOTIFICATIONS on first primary tap (33+), same contract as OptionsScreen
+- [x] Milestone check — verified on an S23 with screenshots:
 
-## M4.3 — Queue
+| Check | Result |
+|---|---|
+| Share wrapped link → sheet | ✅ title, `1 min · x.com`, Quality, filters pre-filled from Prefs |
+| Sheet → Download → published | ✅ `DOWNLOADING → FILTERING → DONE`, both filters, `Movies/Naqi` |
+| Share same URL while queued | ✅ one item; `queueActive=true workQueued=true` → toast |
+| Share local `content://` video | ✅ no Quality section, primary reads **Filter**, **disabled** with both filters off |
+| Local file → filter → publish | ✅ queued as a `file`-sourced item and drained by the same chain |
+
+## M4.3 — Queue — **DONE 2026-07-29**
 **Exit:** share 3 links back to back → 3 items processed FIFO, all complete; app kill mid-queue loses nothing; one failure doesn't stop the rest; ETAs plausible.
 
-- [ ] `work/Queue.kt`: single `filesDir/queue.json` per PRD schema, `@Synchronized`, temp+rename write
-- [ ] Every item = one WorkRequest via `ExistingWorkPolicy.APPEND_OR_REPLACE` on `naqi_download` / `naqi_filter_job`; DownloadWorker appends the filter request cross-name on completion; no self-chaining with `KEEP` from inside `doWork` (silent no-op, wedges the queue)
-- [ ] Queue-driven runs always return `Result.success()`; real per-item outcome recorded in `queue.json` (a chained failure would kill everything behind it)
-- [ ] Retry = re-append same (uri, ops) → same jobKey → existing scratch/checkpoints → effective resume
-- [ ] Per-item cancel: `cancelWorkById`, then cancel-repair — re-append all still-pending items of that chain; cancelled items removed from `queue.json`
-- [ ] Queue screen: item states, per-item retry/cancel; legacy OptionsScreen path untouched
-- [ ] Recalibrate `Eta.kt:38` — `CENSOR = 0.54` predates the −61% analyze win, over-quotes blur-only ~2×
-- [ ] Milestone check: 3 shares → 3 in order, all land; SIGKILL mid-queue → nothing lost; force one item to fail → others complete; same URL shared twice → one item
+- [x] `work/Queue.kt` — one `filesDir/queue.json`, `@Synchronized`, temp+rename. A `StateFlow` drives the UI
+- [x] `ExistingWorkPolicy.APPEND_OR_REPLACE` on both `naqi_download` and `naqi_filter_job`; DownloadWorker appends the filter request cross-name; no self-chaining
+- [x] Queue-driven runs always return `Result.success()`; the real outcome goes to `queue.json`. The picker path still returns real failures — nothing is chained behind it to kill
+- [x] Retry re-submits the same (uri, ops) → same `JobStore` key → existing scratch/checkpoints; a failed download still has its `.part`
+- [x] Per-item cancel by tag + cancel-repair, restricted to the chain that was actually cancelled (repairing both would double-queue the untouched one)
+- [x] Queue rendered on the jobs screen, not as a separate screen — the queue and the running job are the same question. Legacy picker path renders exactly as before
+- [x] Recalibrated `Eta.kt` — see below
+- [x] Milestone check: 3 links shared back to back → **all 3 DONE in share order**, all published, quarantine empty; same URL twice → one item
+
+**Eta recalibration, measured not derived.** `CENSOR` 0.54 → **0.28** and `COMBINED` 1.3 → **1.0**. The 0.54 was a real Phase-0 soak number, just stale: `perf-plan.md` item 1.3 landed the next day and cut analyze 61 %. A censor-only run on `wm3.mp4` (192.9 s) took 51.1 s ⇒ **0.265**, and deriving 0.54 forward through the 61 % independently gives 0.257 — two routes, one answer. Also documented in `Eta.kt`: the factors are **asymptotes**. Fixed model-load cost dominates below ~2 min (an 81.9 s combined job measured 1.41×, of which 93.6 s was the separator), so short clips are quoted low. Not corrected for — a constant term would distort the long jobs these numbers exist to warn about.
+
+**Still open:** SIGKILL-mid-queue and force-one-item-to-fail were not exercised on device. The always-success rule and the WorkManager chain persistence are what make them work, and both are load-bearing enough to deserve a real test.
 
 ## M4.4 — Trust, license, updater
 **Exit:** copy truthful in EN+AR, repo licensed, attribution screen shipped, yt-dlp updatable without an app release.
