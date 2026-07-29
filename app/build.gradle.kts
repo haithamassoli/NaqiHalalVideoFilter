@@ -50,8 +50,18 @@ android {
     }
     packaging {
         jniLibs {
-            // Keep native .so uncompressed + page-aligned (required for ONNX Runtime's 16 KB-page libs).
-            useLegacyPackaging = false
+            // TRUE, forced by youtubedl-android: it reads libpython.zip.so out of
+            // applicationInfo.nativeLibraryDir, which holds no real files unless the libs are extracted
+            // at install time. It was false for ONNX Runtime, on the belief that 16 KB-page support
+            // needed in-APK alignment — it does not: 16 KB alignment is a property of the .so's own ELF
+            // LOAD segments, and an extracted lib is mmap'd from the filesystem where APK zip alignment
+            // is irrelevant. See docs/m4-packaging-spike.md. Cost: the libs are stored twice on device.
+            useLegacyPackaging = true
+        }
+        resources {
+            // youtubedl-android pulls in commons-compress + Jackson, which ship the same LICENSE/NOTICE
+            // metadata paths. Nothing in the app reads them; first one wins.
+            excludes += setOf("META-INF/{AL2.0,LGPL2.1,LICENSE*,NOTICE*,DEPENDENCIES}")
         }
     }
 }
@@ -73,6 +83,10 @@ dependencies {
     implementation(libs.media3.effect)
     implementation(libs.media3.common)
     implementation(libs.mlkit.face.detection)
+
+    // M4: yt-dlp + a bundled ffmpeg. GPL-3.0 — linking these relicenses the app (see LICENSE).
+    implementation(libs.youtubedl.android)
+    implementation(libs.youtubedl.ffmpeg)
 
     testImplementation(libs.junit)
     testImplementation(libs.json) // real org.json impl so Edl JSON round-trip tests run on the JVM

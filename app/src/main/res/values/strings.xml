@@ -182,6 +182,13 @@
     <!-- Catch-all. Also the JobsScreen fallback when a FAILED job carried no message. -->
     <string name="err_generic">Filtering failed.</string>
 
+    <!-- Download failures (M4). Kept separate from the filtering taxonomy above: a download fails for
+         reasons filtering never sees, and "this video uses a codec…" would be nonsense for any of them. -->
+    <string name="err_low_space_download">Not enough free space to download this video. Free up some space and try again.</string>
+    <string name="err_download_unsupported">Naqi can\'t download from this link. The site may not be supported, or the video may be private.</string>
+    <string name="err_download_network">Download failed. Check your connection and try again.</string>
+    <string name="err_download_generic">Download failed.</string>
+
     <!-- ============================================================
          Notifications — job foreground service and the done notification.
          The action_* keys here are shared with JobsScreen and must keep these exact names.
@@ -200,6 +207,10 @@
     <string name="stage_rendering">Pass 2 — rendering</string>
     <string name="stage_separating">Removing music</string>
     <string name="stage_muxing">Finishing up</string>
+    <string name="stage_downloading">Downloading</string>
+
+    <!-- Ongoing notification while a download runs; the second line is the video title. -->
+    <string name="download_notif_title">Downloading video</string>
     <string name="done_notif_title">Filtered copy saved</string>
     <string name="action_open">Open</string>
     <string name="action_share">Share</string>

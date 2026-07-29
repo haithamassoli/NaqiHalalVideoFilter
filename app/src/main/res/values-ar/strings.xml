@@ -182,6 +182,12 @@
     <!-- Catch-all. Also the JobsScreen fallback when a FAILED job carried no message. -->
     <string name="err_generic">فشلت الفلترة.</string>
 
+    <!-- Download failures (M4). -->
+    <string name="err_low_space_download">لا توجد مساحة كافية لتنزيل هذا الفيديو. فرّغ بعض المساحة ثم أعد المحاولة.</string>
+    <string name="err_download_unsupported">لا يستطيع نقي التنزيل من هذا الرابط. قد يكون الموقع غير مدعوم أو الفيديو خاصًا.</string>
+    <string name="err_download_network">فشل التنزيل. تحقّق من اتصالك ثم أعد المحاولة.</string>
+    <string name="err_download_generic">فشل التنزيل.</string>
+
     <!-- ============================================================
          Notifications — job foreground service and the done notification.
          The action_* keys here are shared with JobsScreen and must keep these exact names.
@@ -199,6 +205,10 @@
     <string name="stage_rendering">المرحلة ٢ — المعالجة</string>
     <string name="stage_separating">إزالة الموسيقى</string>
     <string name="stage_muxing">اللمسات الأخيرة</string>
+    <string name="stage_downloading">جارٍ التنزيل</string>
+
+    <!-- Ongoing notification while a download runs; the second line is the video title. -->
+    <string name="download_notif_title">جارٍ تنزيل الفيديو</string>
     <string name="done_notif_title">تم حفظ النسخة المُفلترة</string>
     <string name="action_open">فتح</string>
     <string name="action_share">مشاركة</string>

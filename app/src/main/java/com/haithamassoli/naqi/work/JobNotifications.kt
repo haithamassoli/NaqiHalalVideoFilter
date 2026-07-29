@@ -25,6 +25,9 @@ internal object JobNotifications {
     /** Separate id: the ongoing FGS notification is torn down when the worker returns. */
     private const val DONE_NOTIF_ID = 1002
 
+    /** Downloads run concurrently with filtering, so they need a notification of their own. */
+    private const val DOWNLOAD_NOTIF_ID = 1003
+
     /** Extras on the MainActivity intent behind the "Delete original" action. */
     const val EXTRA_DELETE_ORIGINAL = "delete_original_uri"
     const val EXTRA_DELETE_NAME = "delete_original_name"
@@ -81,6 +84,39 @@ internal object JobNotifications {
     }
 
     /**
+     * The download's own ongoing notification.
+     *
+     * Its own id, because a download and a filter job run at the same time by design and one would
+     * otherwise overwrite the other's notification. (The PRD asked for 1002; that was already the
+     * "Saved" notification's id, so downloads took the next one.)
+     *
+     * `dataSync`, never `mediaProcessing`: on API 35+ the two foreground-service types draw from
+     * separate 6 h/24 h budgets, so a download does not spend the filter pipeline's allowance.
+     */
+    fun downloadForegroundInfo(context: Context, workId: UUID, title: String, progress: Int): ForegroundInfo {
+        ensureChannel(context)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentTitle(context.getString(R.string.download_notif_title))
+            .setContentText(title)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setOngoing(true)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                context.getString(R.string.action_cancel),
+                WorkManager.getInstance(context).createCancelPendingIntent(workId),
+            )
+        if (progress in 1..100) builder.setProgress(100, progress, false) else builder.setProgress(0, 0, true)
+
+        val notification = builder.build()
+        return if (Build.VERSION.SDK_INT >= 34) {
+            ForegroundInfo(DOWNLOAD_NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(DOWNLOAD_NOTIF_ID, notification)
+        }
+    }
+
+    /**
      * "Saved" notification with the PRD's three actions. Posted by the worker on success, after the
      * ongoing FGS notification is gone.
      *
@@ -92,7 +128,13 @@ internal object JobNotifications {
      * No-ops without POST_NOTIFICATIONS (API 33+) — the job still succeeded, the user just sees the
      * result in the app instead.
      */
-    fun done(context: Context, displayName: String, outputUri: String?, sourceUri: String?) {
+    fun done(
+        context: Context,
+        displayName: String,
+        outputUri: String?,
+        sourceUri: String?,
+        mime: String = MIME_MP4,
+    ) {
         ensureChannel(context)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(context.getString(R.string.done_notif_title))
@@ -106,14 +148,14 @@ internal object JobNotifications {
         val output = outputUri?.takeIf { it.isNotBlank() }?.toUri()?.takeIf { it.scheme == "content" }
         if (output != null) {
             val view = Intent(Intent.ACTION_VIEW)
-                .setDataAndType(output, MIME_MP4)
+                .setDataAndType(output, mime)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             builder.setContentIntent(activity(context, 0, view))
             builder.addAction(0, context.getString(R.string.action_open), activity(context, 0, view))
 
             val share = Intent.createChooser(
                 Intent(Intent.ACTION_SEND)
-                    .setType(MIME_MP4)
+                    .setType(mime)
                     .putExtra(Intent.EXTRA_STREAM, output)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
                 context.getString(R.string.action_share),

@@ -24,6 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
+import kotlinx.coroutines.launch
+import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.spike.SegmentConcatSpike
 import com.haithamassoli.naqi.ui.NaqiApp
@@ -125,7 +127,6 @@ class MainActivity : ComponentActivity() {
             Thread { SegmentConcatSpike.run(applicationContext, source) }.start()
             return
         }
-        val path = intent.getStringExtra("autorun_path") ?: return
         val removeMusic = intent.getBooleanExtra("remove_music", false)
         // censor defaults true, except a music-only run (music requested, censor not explicitly passed).
         val censorWomen = if (intent.hasExtra("censor_women")) {
@@ -142,6 +143,31 @@ class MainActivity : ComponentActivity() {
             blurUnknownFaces = intent.getBooleanExtra("blur_unknown", false),
             keepStems = intent.getStringExtra("keep_stems") ?: "vocals",
         )
+
+        // `--ez ytdlp_update true` forces the yt-dlp self-update from adb.
+        if (intent.getBooleanExtra("ytdlp_update", false)) {
+            kotlinx.coroutines.MainScope().launch {
+                val status = runCatching { Downloader.update(this@MainActivity) }
+                Toast.makeText(this@MainActivity, "yt-dlp: ${status.getOrNull() ?: status.exceptionOrNull()}", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+
+        // M4.1 debug entry point, ahead of any UI: `-e download_url <url> [-e quality AUDIO]` runs the
+        // whole download → quarantine → filter → publish chain from adb. The share sheet (M4.2) ends up
+        // calling exactly this, so what this exercises is the real path, not a parallel one.
+        val downloadUrl = intent.getStringExtra("download_url")
+        if (downloadUrl != null) {
+            JobController.download(
+                this, downloadUrl,
+                Downloader.Quality.of(intent.getStringExtra("quality")),
+                ops,
+                intent.getStringExtra("title"),
+            )
+            return
+        }
+
+        val path = intent.getStringExtra("autorun_path") ?: return
         JobController.start(
             this, ops, Uri.fromFile(File(path)).toString(),
             intent.getStringExtra("force_intervals_ms"),

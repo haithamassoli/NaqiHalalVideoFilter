@@ -1,13 +1,9 @@
 package com.haithamassoli.naqi.work
 
-import android.content.ContentValues
 import android.content.Context
 import android.media.MediaExtractor
-import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.core.net.toUri
@@ -28,8 +24,10 @@ import com.haithamassoli.naqi.audio.ConcatPart
 import com.haithamassoli.naqi.audio.Remux
 import com.haithamassoli.naqi.audio.TrackSource
 import com.haithamassoli.naqi.audio.concatAudio
+import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.edl.Edl
 import com.haithamassoli.naqi.edl.FaceTrackEdl
+import com.haithamassoli.naqi.media.firstTrackIndex
 import com.haithamassoli.naqi.media.requireTrackIndex
 import com.haithamassoli.naqi.ml.Infer
 import com.haithamassoli.naqi.render.RenderPipeline
@@ -123,7 +121,15 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         // exactly the M1/M2 route it always did. Probed before Preflight because the plan changes how much
         // scratch the job needs.
         val durationMs = runCatching { FrameSampler.probe(applicationContext, inputUri).durationMs }.getOrDefault(0L)
-        val plan = planFor(inputUri, durationMs, inputData.getLong(KEY_SEGMENT_MS, 0L))
+
+        // The fifth job shape: an "Audio only" download has no video track at all. Every other shape
+        // assumes one — music removal *copies* it sample-for-sample — so this is detected rather than
+        // flagged: the source itself is the only thing that can be trusted about what tracks it has, and
+        // a flag threaded from the download would be one more thing to keep in sync with reality.
+        val audioOnly = removeMusic && !hasVideoTrack(inputUri)
+        if (audioOnly) Log.i(TAG, "audio-only job: no video track, publishing to Music/Naqi")
+
+        val plan = if (audioOnly) emptyList() else planFor(inputUri, durationMs, inputData.getLong(KEY_SEGMENT_MS, 0L))
         val segmented = censorWomen && plan.isNotEmpty()
         // The censor-only concat copies the SOURCE audio track sample-for-sample, and framework MediaMuxer
         // carries only AAC/AMR — which rejects the AC-3/E-AC-3/DTS a film ships AND the Opus/Vorbis in every
@@ -151,6 +157,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         Preflight.check(
             applicationContext, inputUri,
             needsAudio = removeMusic,
+            allowNoVideo = audioOnly,
             tempCopies = when {
                 segmented -> 2
                 removeMusic && censorWomen -> 2
@@ -166,10 +173,63 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         )?.let { return Result.failure(workDataOf(KEY_OUTPUT_MESSAGE to it)) }
 
         return when {
+            audioOnly -> runAudioOnly(inputUri, durationMs)
             segmented -> runSegmented(inputUri, plan, removeMusic, audioPlan, durationMs)
             removeMusic && censorWomen -> runCombined(inputUri)
             removeMusic -> runMusicOnly(inputUri, durationMs)
             else -> runCensorOnly(inputUri) // M1's unsegmented path
+        }
+    }
+
+    /** True when the source carries a video track; false for an "Audio only" download's `.m4a`. */
+    private fun hasVideoTrack(uri: Uri): Boolean {
+        val ext = MediaExtractor()
+        return try {
+            ext.setDataSource(applicationContext, uri, null)
+            ext.firstTrackIndex("video/") != null
+        } catch (_: Throwable) {
+            true // undecidable: assume video, and let Preflight produce the real per-cause message
+        } finally {
+            runCatching { ext.release() }
+        }
+    }
+
+    /**
+     * Audio-only: [AudioPipeline.removeMusic] already emits an `.m4a`, so there is nothing to render and
+     * nothing to mux — separate over the whole 1..99 band and publish into `Music/Naqi`.
+     *
+     * Same resumable-scratch rule as [runMusicOnly]: only a user cancel throws the work away, because a
+     * system stop is exactly what Phase 2's checkpointing exists to survive.
+     */
+    private suspend fun runAudioOnly(inputUri: Uri, durationMs: Long): Result {
+        setForeground(foregroundInfo(stage(R.string.stage_separating), 1))
+
+        val audioTemp = File(workDir, "audio.m4a")
+        val resumable = durationMs >= Eta.CONFIRM_THRESHOLD_MS
+        try {
+            val sep = stage(R.string.stage_separating)
+            stats.stage("separate")
+            AudioPipeline.removeMusic(
+                applicationContext, inputUri, keepStems, audioTemp,
+                onProgress = { p -> reportBand(sep, p, 1, 98) },  // 0..100 -> 1..99
+                isCancelled = { isStopped },
+                jobDir = if (resumable) workDir else null,
+            )
+
+            val displayName = outputName(inputUri, ext = "m4a")
+            stats.stage("publish")
+            val outputUri = Publish.audio(applicationContext, audioTemp, displayName) { isStopped }
+            JobStore.delete(applicationContext, jobKey)
+            return succeed(displayName, outputUri, inputUri, Publish.MIME_M4A)
+        } catch (c: CancellationException) {
+            if (!resumable || userCancelled()) runCatching { JobStore.delete(applicationContext, jobKey) }
+            throw c
+        } catch (t: Throwable) {
+            Log.e(TAG, "audio-only job failed", t)
+            if (!resumable) runCatching { JobStore.delete(applicationContext, jobKey) }
+            return Result.failure(workDataOf(KEY_OUTPUT_MESSAGE to Preflight.messageFor(t)))
+        } finally {
+            stats.finish("shape=audio resumable=$resumable")
         }
     }
 
@@ -687,64 +747,51 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         }
     }
 
-    /**
-     * Copy the temp into `Movies/Naqi` and return its uri. The blocking copy has no suspension point,
-     * so a cancel that arrives mid-copy only surfaces after it: [isStopped] is re-checked before the
-     * output is finalized, and any failure or cancel deletes the half-written row/file — a cancelled or
-     * failed job must never leave output in `Movies/`.
-     */
-    private fun publish(tempFile: File, displayName: String): Uri {
-        val ctx = applicationContext
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val resolver = ctx.contentResolver
-            val values = ContentValues().apply {
-                put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
-                put(MediaStore.Video.Media.MIME_TYPE, MIME_MP4)
-                put(MediaStore.Video.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/Naqi")
-                put(MediaStore.Video.Media.IS_PENDING, 1)
-            }
-            val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-            val item = resolver.insert(collection, values) ?: error("MediaStore insert failed")
-            try {
-                (resolver.openOutputStream(item) ?: error("MediaStore openOutputStream failed"))
-                    .use { out -> tempFile.inputStream().use { it.copyTo(out) } }
-                if (isStopped) throw CancellationException("cancelled during publish")
-                values.clear()
-                values.put(MediaStore.Video.Media.IS_PENDING, 0)
-                resolver.update(item, values, null, null)
-                return item
-            } catch (t: Throwable) {
-                runCatching { resolver.delete(item, null, null) } // drop the un-finalized (still-pending) row
-                throw t
-            }
-        }
-        // API 26-28: write into the public Movies/Naqi dir (needs WRITE_EXTERNAL_STORAGE) and hand it to the scanner.
-        val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "Naqi").apply { mkdirs() }
-        val dest = File(dir, displayName)
-        try {
-            tempFile.inputStream().use { input -> dest.outputStream().use { input.copyTo(it) } }
-            if (isStopped) throw CancellationException("cancelled during publish")
-            MediaScannerConnection.scanFile(ctx, arrayOf(dest.absolutePath), arrayOf(MIME_MP4), null)
-            return Uri.fromFile(dest)
-        } catch (t: Throwable) {
-            dest.delete() // remove the partial/complete copy before the scanner ever sees it
-            throw t
-        }
-    }
+    /** Copy the temp into `Movies/Naqi` and return its uri — see [Publish] for the cancellation contract. */
+    private fun publish(tempFile: File, displayName: String): Uri =
+        Publish.video(applicationContext, tempFile, displayName) { isStopped }
 
-    /** Success path for every shape: post the done notification, then report the output to the UI. */
-    private fun succeed(displayName: String, outputUri: Uri, inputUri: Uri): Result {
-        JobNotifications.done(applicationContext, displayName, outputUri.toString(), inputUri.toString())
+    /**
+     * Success path for every shape: post the done notification, then report the output to the UI.
+     *
+     * A quarantined download is deleted here and never offered as a "Delete original" target. It is not
+     * the user's file — they never had it — and the PRD's promise is that the unfiltered original stops
+     * existing the moment the filtered one is safely published. Ordered deliberately: the delete runs
+     * only after [Publish] has finalized the output.
+     */
+    private fun succeed(
+        displayName: String,
+        outputUri: Uri,
+        inputUri: Uri,
+        mime: String = Publish.MIME_MP4,
+    ): Result {
+        val quarantined = Downloader.isQuarantined(applicationContext, inputUri)
+        if (quarantined) Downloader.discard(applicationContext, inputUri)
+        JobNotifications.done(
+            applicationContext, displayName, outputUri.toString(),
+            inputUri.toString().takeUnless { quarantined }, mime,
+        )
         return Result.success(workDataOf(KEY_OUTPUT_NAME to displayName, KEY_OUTPUT_URI to outputUri.toString()))
     }
 
-    /** `<sourceNameNoExt>-naqi-<epochMillis>.mp4`; source name queried, falling back to "video". */
-    private fun outputName(uri: Uri): String {
-        val source = applicationContext.contentResolver
-            .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-            ?.use { if (it.moveToFirst()) it.getString(0) else null }
+    /**
+     * `<sourceNameNoExt>-naqi-<epochMillis>.<ext>`; source name queried, falling back to the file's own
+     * name and only then to the literal "video".
+     *
+     * The `file://` fallback is what makes a downloaded video keep its title. There is no provider
+     * behind `file://`, so `DISPLAY_NAME` returns null and every quarantined download would have been
+     * published as `video-naqi-<ts>.mp4` — the title yt-dlp was asked to name the file after, thrown
+     * away one step before the user sees it.
+     */
+    private fun outputName(uri: Uri, ext: String = "mp4"): String {
+        val source = runCatching {
+            applicationContext.contentResolver
+                .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { if (it.moveToFirst()) it.getString(0) else null }
+        }.getOrNull()
+            ?: uri.takeIf { it.scheme == "file" }?.path?.let { File(it).name }
             ?: "video"
-        return "${source.substringBeforeLast('.')}-naqi-${System.currentTimeMillis()}.mp4"
+        return "${source.substringBeforeLast('.')}-naqi-${System.currentTimeMillis()}.$ext"
     }
 
     private suspend fun report(stage: String, pct: Int) {

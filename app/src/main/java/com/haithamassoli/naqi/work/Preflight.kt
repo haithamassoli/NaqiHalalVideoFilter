@@ -7,6 +7,7 @@ import android.provider.OpenableColumns
 import androidx.annotation.StringRes
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.media.firstTrackIndex
+import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 
@@ -37,6 +38,7 @@ internal object Preflight {
     val NO_VIDEO = R.string.err_no_video
     val NO_AUDIO = R.string.err_no_audio
     val LOW_SPACE = R.string.err_low_space
+    val LOW_SPACE_DOWNLOAD = R.string.err_low_space_download
     val UNSUPPORTED_CODEC = R.string.err_unsupported_codec
     val OUT_OF_SPACE = R.string.err_out_of_space
     val GENERIC = R.string.err_generic
@@ -45,7 +47,32 @@ internal object Preflight {
     private const val SLACK_BYTES = 2L * 1024 * 1024 * 1024
 
     /**
+     * Free space this job needs, in bytes: one working copy per temp the shape writes, plus the
+     * published copy, plus scratch, plus the PRD's headroom. Public so the download precheck can ask
+     * the same question about a file that does not exist yet ("will this fit once fetched?").
+     */
+    fun requiredBytes(sourceBytes: Long, tempCopies: Int, extraScratchBytes: Long = 0L): Long =
+        (tempCopies + 1) * sourceBytes + extraScratchBytes + SLACK_BYTES // +1 = published copy
+
+    /**
+     * Would a source of [sourceBytes] fit? Used before a download starts, where there is no file to
+     * open yet — so it is only the space half of [check], deliberately.
+     *
+     * A download is one copy more than a pick: the quarantined original AND everything filtering it
+     * needs, which is the copy nobody budgets for today (PRD §Storage).
+     */
+    @StringRes
+    fun checkSpaceForDownload(context: Context, sourceBytes: Long, tempCopies: Int): Int? {
+        if (sourceBytes <= 0L) return null // size unknown — DownloadWorker aborts mid-flight instead
+        val required = requiredBytes(sourceBytes, tempCopies + 1)
+        return if (context.noBackupFilesDir.usableSpace >= required) null else LOW_SPACE_DOWNLOAD
+    }
+
+    /**
      * @param needsAudio music removal was requested — a missing audio track is then fatal, not fine.
+     * @param allowNoVideo this is an audio-only job (an `.m4a` from a link downloaded as Audio only).
+     *   Every other shape assumes a video track — music removal *copies* it sample-for-sample — so the
+     *   default stays "no video track is fatal" and only the audio shape opts out.
      * @param tempCopies working copies the job writes before publishing: censor-only and music-only
      *   each write one temp, combined writes a render temp AND a mux temp. The published output
      *   lands on the same filesystem as the cache on every modern device, so it is counted too —
@@ -63,6 +90,7 @@ internal object Preflight {
         needsAudio: Boolean,
         tempCopies: Int,
         extraScratchBytes: Long = 0L,
+        allowNoVideo: Boolean = false,
     ): Int? {
         val extractor = MediaExtractor()
         var hasVideo = false
@@ -84,11 +112,11 @@ internal object Preflight {
             runCatching { extractor.release() }
         }
 
-        if (!hasVideo) return NO_VIDEO
+        if (!hasVideo && !allowNoVideo) return NO_VIDEO
         if (needsAudio && !hasAudio) return NO_AUDIO
 
         val sourceBytes = sourceSize(context, uri)
-        val required = (tempCopies + 1) * sourceBytes + extraScratchBytes + SLACK_BYTES // +1 = published copy
+        val required = requiredBytes(sourceBytes, tempCopies, extraScratchBytes)
         // filesDir, not cacheDir: Phase 1 of long-film-plan.md moved the working temps there ([JobStore]).
         // Same partition on every modern device, so this is about measuring the volume we actually fill.
         return if (context.filesDir.usableSpace >= required) null else LOW_SPACE
@@ -121,9 +149,17 @@ internal object Preflight {
         }
     }
 
-    /** Source size in bytes; 0 when the provider won't say (then only the 2 GB slack is required). */
+    /**
+     * Source size in bytes; 0 when nothing will say (then only the 2 GB slack is required).
+     *
+     * `file://` has no provider behind it, so `OpenableColumns.SIZE` returns null and the whole space
+     * check silently degraded to the bare slack — harmless while only the debug autorun produced
+     * `file://` sources, and wrong the moment downloads land in quarantine and every filter job reads
+     * one. Ask the filesystem instead.
+     */
     private fun sourceSize(context: Context, uri: Uri): Long =
         runCatching {
+            if (uri.scheme == "file") return uri.path?.let { File(it).length() } ?: 0L
             context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
                 ?.use { if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else 0L } ?: 0L
         }.getOrDefault(0L)
