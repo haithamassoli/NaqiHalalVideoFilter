@@ -15,19 +15,31 @@ Source: `prd-download-share.md`. Milestones are dependency-ordered; M4.0 is a ha
 
 **Gate finding that changed the plan:** the bundled yt-dlp (`2025.11.12`) fails *every* YouTube link today — YouTube's n-challenge defeats it. `updateYoutubeDL(STABLE)` fixes it (`→ 2026.07.04`). The runtime updater is a **functional prerequisite, not M4.4 polish**, and was pulled forward into `Downloader.update()`.
 
-## M4.1 — Download core
+## M4.1 — Download core — **DONE 2026-07-29**
 **Exit:** a debug intent with a URL downloads to quarantine and publishes to `Movies/Naqi`, correctly title-named, verified against YouTube/TikTok/Instagram/X; audio-only jobs produce `.m4a` in `Music/Naqi`.
 
-- [ ] `download/Downloader.kt`: `getInfo(url)`, `download(url, selector, destDir, onProgress)`; owns `YoutubeDL.init()`
-- [ ] `download/DownloadWorker.kt`: CoroutineWorker, unique work `naqi_download`, notification id 1002, FGS type `dataSync`, constraint `NetworkType.CONNECTED`
-- [ ] Quarantine: download to `noBackupFilesDir/naqi-downloads/`; filename = sanitized truncated title via yt-dlp output template (id suffix on collision) so the existing naming seam yields `<title>-naqi-<ts>.mp4` unchanged
-- [ ] Free-space precheck: `filesize_approx × (tempCopies + 2) + 2 GB` before enqueue, specific refusal message; `filesize_approx` null → skip precheck, DownloadWorker aborts early once yt-dlp reports total bytes
-- [ ] Failed download keeps `.part`; retry resumes it (yt-dlp native behavior — verify, don't build)
-- [ ] Orphaned quarantine files swept on the existing 7-day rule (`JobStore.kt:61`)
-- [ ] Extract `publish()` from `FilterWorker.kt:696` so DownloadWorker can publish directly when all filters are off
-- [ ] Audio-only job shape: Preflight accepts `NO_VIDEO` for audio items → separator → AAC encode → `.m4a` via new `MediaStore.Audio` publish variant to `Music/Naqi`
-- [ ] Debug intent (URL + selector extras) → download → publish, no UI
-- [ ] Milestone check: one real download from each of YouTube, TikTok, Instagram, X; audio-only with Remove music on → `.m4a` with vocals intact
+- [x] `download/Downloader.kt`: `getInfo(url)`, `download(url, selector, destDir, onProgress)`; owns `YoutubeDL.init()` + `FFmpeg.init()`, plus `update()` (see the M4.0 finding — without it every YouTube link fails)
+- [x] `download/DownloadWorker.kt`: CoroutineWorker, unique work `naqi_download`, FGS type `dataSync`, constraint `NetworkType.CONNECTED`. **Notification id 1003, not the PRD's 1002** — 1002 was already the "Saved" notification
+- [x] Quarantine: `noBackupFilesDir/naqi-downloads/<urlKey>/`, filename `%(title).80B.%(ext)s`. One directory per URL rather than the PRD's "id suffix on collision": collisions become impossible by construction, and a retry finds its own `.part`
+- [x] Free-space precheck `filesize_approx × (tempCopies + 2) + 2 GB`, checked in the sheet *and* in the worker; `filesize_approx` null → mid-download abort on a headroom test
+- [x] Failed download keeps `.part` (yt-dlp native; the worker deliberately does not delete on cancel)
+- [x] Orphaned quarantine dirs swept on the same 7-day rule as `naqi-work`
+- [x] `publish()` extracted → `work/Publish.kt`, with `video()` and `audio()` variants
+- [x] Audio-only job shape: `Preflight(allowNoVideo)` → `runAudioOnly` → `.m4a` to `Music/Naqi`. Detected from the source's tracks, not a flag
+- [x] Debug intent (`-e download_url`, `-e quality`, `--ez ytdlp_update`)
+- [x] Milestone check — **3 of 4 platforms verified on an S23:**
+
+| Source | Result |
+|---|---|
+| YouTube | ✅ 102 MB, `Big Buck Bunny 60fps 4K …-naqi-<ts>.mp4` |
+| X | ✅ 9.9 MB, `NASA - We're thinking about it.-naqi-<ts>.mp4` |
+| Instagram | ✅ 1.3 MB, `Video by nasa-naqi-<ts>.mp4` (worked logged-out; no cookies needed) |
+| TikTok | ❌ **unverified** — two independent causes, neither ours |
+| audio-only + Remove music | ✅ routes to `runAudioOnly`, publishes `.m4a` to `Music/Naqi` |
+
+**TikTok, honestly:** `_ssl.c:993: The handshake operation timed out`, reproducible, plus `[TikTok] The extractor is attempting impersonation, but no impersonate target is available`. TikTok is unreachable from this network (independently confirmed from the host machine), **and** yt-dlp needs TLS impersonation (`curl_cffi`) for TikTok that youtubedl-android does not bundle. Re-test from another network before assuming it works; if the impersonation warning persists, it is a library limitation, not a Naqi defect.
+
+**Bug found and fixed while verifying (pre-existing, not introduced by M4):** the audio-only run died after 6.5 minutes of separation with `IllegalArgumentException: Cannot round NaN value` from `AacWriter`'s int16 quantizer. The shipped graph is fp16 and the input is normalized by whole-track std, so a passage far louder than the track average can push activations past fp16's range and a chunk returns non-finite. `DemucsSeparator` now silences and **counts** those samples (`nonFinite`, logged), and `AacWriter` guards the quantizer boundary. This would equally have hit a loud video picked through the normal picker.
 
 ## M4.2 — Share entry + sheet
 **Exit:** share a Reel from Instagram → sheet → filtered file in `Movies/Naqi`; share a local file → sheet with last-used filters, existing behavior otherwise unchanged.

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
@@ -103,6 +104,26 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
     /** `filesDir/naqi-work/<jobKey>/` — see [JobStore] for why not `cacheDir`. */
     private val workDir by lazy { JobStore.dir(applicationContext, jobKey) }
 
+    /** Non-null when this run came from the share queue rather than the picker or the debug intent. */
+    private val queueId = inputData.getString(KEY_QUEUE_ID)
+
+    private fun queued(transform: (Queue.Item) -> Queue.Item) {
+        queueId?.let { Queue.update(applicationContext, it, transform) }
+    }
+
+    /**
+     * **A queue-driven run never returns failure.** WorkManager fails every request chained behind a
+     * failed one, so one unfilterable item would take the rest of the queue with it. The real outcome
+     * is recorded in `queue.json`; the chain only learns that this request finished. The picker path
+     * (unique work KEEP, one job at a time) keeps real failures — that is what `JobsScreen` reads, and
+     * nothing is chained behind it to kill.
+     */
+    private fun fail(@StringRes message: Int, resumable: Boolean = false): Result {
+        queued { it.copy(state = Queue.State.FAILED, error = message) }
+        val data = workDataOf(KEY_OUTPUT_MESSAGE to message, KEY_RESUMABLE to resumable)
+        return if (queueId != null) Result.success(data) else Result.failure(data)
+    }
+
     override suspend fun doWork(): Result {
         val removeMusic = inputData.getBoolean(KEY_REMOVE_MUSIC, false)
         val censorWomen = inputData.getBoolean(KEY_CENSOR_WOMEN, false)
@@ -170,8 +191,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             // rather than branched so a later edit does not have to re-prove that exclusivity.
             extraScratchBytes = (if (resumableAudio || (segmented && removeMusic)) durationMs / 1000 * 176_400 else 0L) +
                 (if (audioPlan == ConcatAudio.TRANSCODE) durationMs / 1000 * 24_000 else 0L),
-        )?.let { return Result.failure(workDataOf(KEY_OUTPUT_MESSAGE to it)) }
+        )?.let { return fail(it) }
 
+        queued { it.copy(state = Queue.State.FILTERING) }
         return when {
             audioOnly -> runAudioOnly(inputUri, durationMs)
             segmented -> runSegmented(inputUri, plan, removeMusic, audioPlan, durationMs)
@@ -227,7 +249,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         } catch (t: Throwable) {
             Log.e(TAG, "audio-only job failed", t)
             if (!resumable) runCatching { JobStore.delete(applicationContext, jobKey) }
-            return Result.failure(workDataOf(KEY_OUTPUT_MESSAGE to Preflight.messageFor(t)))
+            return fail(Preflight.messageFor(t))
         } finally {
             stats.finish("shape=audio resumable=$resumable")
         }
@@ -331,12 +353,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         } catch (t: Throwable) {
             Log.e(TAG, "segmented job failed", t)
             // Work dir deliberately kept, and the UI is told so — this is what Resume resumes from.
-            return Result.failure(
-                workDataOf(
-                    KEY_OUTPUT_MESSAGE to Preflight.messageFor(t),
-                    KEY_RESUMABLE to true,
-                ),
-            )
+            return fail(Preflight.messageFor(t), resumable = true)
         } finally {
             stats.finish("shape=segmented segments=${plan.size}")
             runCatching { Infer.close() }
@@ -563,7 +580,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             throw c // WorkManager cancellation — never swallow it
         } catch (t: Throwable) {
             Log.e(TAG, "censor job failed", t)
-            return Result.failure(workDataOf(KEY_OUTPUT_MESSAGE to Preflight.messageFor(t)))
+            return fail(Preflight.messageFor(t))
         } finally {
             stats.finish("shape=censor ${faceTracker.retention()}")
             runCatching { faceTracker.closeDetector() }
@@ -609,7 +626,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         } catch (t: Throwable) {
             Log.e(TAG, "music job failed", t)
             if (!resumable) runCatching { JobStore.delete(applicationContext, jobKey) }
-            return Result.failure(workDataOf(KEY_OUTPUT_MESSAGE to Preflight.messageFor(t)))
+            return fail(Preflight.messageFor(t))
         } finally {
             stats.finish("shape=music resumable=$resumable")
             runCatching { if (muxTemp.exists()) muxTemp.delete() }
@@ -649,7 +666,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             throw c
         } catch (t: Throwable) {
             Log.e(TAG, "combined job failed", t)
-            return Result.failure(workDataOf(KEY_OUTPUT_MESSAGE to Preflight.messageFor(t)))
+            return fail(Preflight.messageFor(t))
         } finally {
             stats.finish("shape=combined ${faceTracker.retention()}")
             runCatching { faceTracker.closeDetector() }
@@ -767,6 +784,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
     ): Result {
         val quarantined = Downloader.isQuarantined(applicationContext, inputUri)
         if (quarantined) Downloader.discard(applicationContext, inputUri)
+        queued { it.copy(state = Queue.State.DONE, outputUri = outputUri.toString()) }
         JobNotifications.done(
             applicationContext, displayName, outputUri.toString(),
             inputUri.toString().takeUnless { quarantined }, mime,
@@ -841,6 +859,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
          */
         const val KEY_RESUMABLE = "resumable"
         const val UNIQUE_WORK = "naqi_filter_job"
+
+        /** Ties this run to its [Queue] item. Absent = the picker/debug path, which keeps real failures. */
+        const val KEY_QUEUE_ID = "queue_id"
 
         private const val TAG = "FilterWorker"
         private const val MIME_MP4 = "video/mp4"

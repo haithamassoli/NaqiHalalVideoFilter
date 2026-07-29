@@ -35,13 +35,16 @@ fun NaqiApp(modifier: Modifier = Modifier) {
     var pickedName by rememberSaveable { mutableStateOf<String?>(null) }
     var ops by rememberSaveable { mutableStateOf(FilterOps()) }
 
-    // Process death loses even saved state, so re-attach to a live job on a cold start.
+    // Process death loses even saved state, so re-attach to a live job on a cold start. Downloads are
+    // watched too, not just filter jobs: a share that only queued a download would otherwise leave the
+    // user staring at the pick screen with no sign that anything happened.
     val context = LocalContext.current
     val jobs by remember { JobController.observe(context) }.collectAsState(initial = emptyList())
+    val downloads by remember { JobController.observeDownloads(context) }.collectAsState(initial = emptyList())
     var attached by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(jobs) {
+    LaunchedEffect(jobs, downloads) {
         if (attached) return@LaunchedEffect
-        if (jobs.any { !it.state.isFinished }) {
+        if ((jobs + downloads).any { !it.state.isFinished }) {
             step = Step.Jobs
             attached = true
         }

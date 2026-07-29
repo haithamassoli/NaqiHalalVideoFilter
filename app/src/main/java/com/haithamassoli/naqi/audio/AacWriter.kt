@@ -137,7 +137,13 @@ class AacWriter(tempM4a: File, private val firstPtsUs: Long) : AutoCloseable {
             if (pcm16.size < floats * 2) pcm16 = ByteArray(floats * 2)
             var bi = 0
             for (i in 0 until floats) {
-                val s = (fb.get(i) * 32767f).roundToInt().coerceIn(-32768, 32767)
+                // NaN has no int16 image and `roundToInt` throws on it rather than saturating, which
+                // turned one corrupt sample out of the separator into a lost multi-minute job. The
+                // separator now sanitizes its own output ([DemucsSeparator.nonFinite]); this stays as the
+                // boundary guard, because this is where float stops being representable and every other
+                // producer of this buffer would hit the same edge.
+                val v = fb.get(i)
+                val s = if (v.isFinite()) (v * 32767f).roundToInt().coerceIn(-32768, 32767) else 0
                 pcm16[bi++] = (s and 0xFF).toByte()
                 pcm16[bi++] = ((s shr 8) and 0xFF).toByte()
             }

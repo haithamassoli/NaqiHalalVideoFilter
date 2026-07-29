@@ -112,6 +112,10 @@ fun JobsScreen(
             TextButton(onClick = onNewJob) { Text(stringResource(R.string.jobs_new_job)) }
             Spacer(Modifier.height(NaqiTokens.space2))
 
+            // Shared items first: they are the queue the user is waiting on. Absent entirely when
+            // nothing was ever shared, so the picker path looks exactly as it did.
+            QueueSection()
+
             when {
                 running -> JobProgressCard(stageText, progress, etaMs) { JobController.cancel(context) }
                 succeeded -> SavedCard(outputName, savedUri, context)

@@ -207,6 +207,33 @@
     <string name="stage_muxing">اللمسات الأخيرة</string>
     <string name="stage_downloading">جارٍ التنزيل</string>
 
+    <!-- ============================================================
+         Share sheet (M4)
+         ============================================================ -->
+    <string name="share_loading">جارٍ قراءة تفاصيل الفيديو…</string>
+    <string name="share_info_failed">تعذّرت قراءة هذا الفيديو. قد يكون خاصًا أو محجوبًا في منطقتك أو الموقع غير مدعوم.</string>
+    <string name="share_untitled">فيديو مُشارَك</string>
+    <string name="share_eyebrow_quality">الجودة</string>
+    <string name="share_eyebrow_filters">الفلاتر</string>
+    <string name="share_quality_best">الأفضل</string>
+    <string name="share_quality_720">720p</string>
+    <string name="share_quality_audio">الصوت فقط</string>
+    <string name="action_download">تنزيل</string>
+    <string name="action_filter">فلترة</string>
+    <string name="action_retry">إعادة المحاولة</string>
+    <string name="share_no_url">لم يُعثر على رابط في ما شاركته.</string>
+    <string name="share_already_queued">موجود في القائمة بالفعل.</string>
+
+    <!-- Share queue (M4). -->
+    <string name="queue_eyebrow">القائمة</string>
+    <string name="queue_state_pending_download">في انتظار التنزيل</string>
+    <string name="queue_state_pending_filter">في انتظار الفلترة</string>
+    <string name="queue_state_filtering">جارٍ الفلترة</string>
+    <string name="queue_state_done">تم الحفظ</string>
+    <string name="queue_state_failed">فشل</string>
+    <string name="queue_dismiss">إخفاء</string>
+    <string name="queue_clear_finished">مسح المكتملة</string>
+
     <!-- Ongoing notification while a download runs; the second line is the video title. -->
     <string name="download_notif_title">جارٍ تنزيل الفيديو</string>
     <string name="done_notif_title">تم حفظ النسخة المُفلترة</string>

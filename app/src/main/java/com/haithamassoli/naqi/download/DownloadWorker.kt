@@ -7,6 +7,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import androidx.annotation.StringRes
 import androidx.work.workDataOf
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.model.FilterOps
@@ -15,6 +16,7 @@ import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.JobNotifications
 import com.haithamassoli.naqi.work.Preflight
 import com.haithamassoli.naqi.work.Publish
+import com.haithamassoli.naqi.work.Queue
 import kotlinx.coroutines.CancellationException
 import java.io.File
 
@@ -31,6 +33,25 @@ import java.io.File
  * user asked for no filters at all, which is published here and the quarantine dropped immediately.
  */
 class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+
+    /** Non-null when this run came from the share queue rather than the debug intent. */
+    private val queueId = inputData.getString(KEY_QUEUE_ID)
+
+    private fun queued(transform: (Queue.Item) -> Queue.Item) {
+        queueId?.let { Queue.update(applicationContext, it, transform) }
+    }
+
+    /**
+     * **A queue-driven run never returns failure.** WorkManager fails every request chained behind a
+     * failed one, so a single dead link would take the rest of the queue with it. The real outcome goes
+     * into `queue.json`, where the UI reads it; the chain only ever learns "this request is done".
+     * The legacy debug/manual path keeps real failures, which is what the jobs screen still reads.
+     */
+    private fun fail(@StringRes message: Int): Result {
+        queued { it.copy(state = Queue.State.FAILED, error = message) }
+        val data = workDataOf(FilterWorker.KEY_OUTPUT_MESSAGE to message)
+        return if (queueId != null) Result.success(data) else Result.failure(data)
+    }
 
     override suspend fun doWork(): Result {
         val url = inputData.getString(KEY_URL)?.takeIf { it.isNotBlank() } ?: return Result.failure()
@@ -53,6 +74,18 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         // Reclaim abandoned quarantines before filling the disk with our own, same rule as JobStore.
         runCatching { Downloader.sweep(applicationContext) }
 
+        // Refuse before a single byte is fetched when the size is known. The sheet checks this too, so
+        // the user gets the refusal before the item is even queued; this is the half that still holds
+        // when the queue is drained hours later on a disk that has filled in the meantime.
+        // Size 0 = the extractor wouldn't say, which is common — then onSpaceCheck below is the net.
+        val knownBytes = inputData.getLong(KEY_SIZE_BYTES, 0L)
+        val tempCopies = if (ops.removeMusic && ops.censorWomen) 2 else 1
+        Preflight.checkSpaceForDownload(applicationContext, knownBytes, tempCopies)?.let {
+            Log.w(TAG, "refusing download: $knownBytes bytes will not fit")
+            return fail(it)
+        }
+
+        queued { it.copy(state = Queue.State.DOWNLOADING) }
         setForeground(foregroundInfo(title, 0))
         try {
             val file = Downloader.download(
@@ -88,6 +121,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                     Publish.video(applicationContext, file, name) { isStopped }
                 }
                 Downloader.discard(applicationContext, fileUri)
+                queued { it.copy(state = Queue.State.DONE, outputUri = outputUri.toString()) }
                 JobNotifications.done(
                     applicationContext, name, outputUri.toString(), null,
                     if (audio) Publish.MIME_M4A else Publish.MIME_MP4,
@@ -102,9 +136,11 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
 
             // Cross-name append: the filter chain is a different unique work name, so this never races
             // with our own chain and the queue keeps draining while this job's filter waits its turn.
+            queued { it.copy(state = Queue.State.PENDING_FILTER, sourceUri = fileUri.toString()) }
             JobController.start(
                 applicationContext, ops, fileUri.toString(),
                 policy = ExistingWorkPolicy.APPEND_OR_REPLACE,
+                queueId = queueId,
             )
             return Result.success(workDataOf(KEY_QUARANTINE_PATH to file.absolutePath))
         } catch (c: CancellationException) {
@@ -114,7 +150,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             throw c
         } catch (t: Throwable) {
             Log.e(TAG, "download failed for $url", t)
-            return Result.failure(workDataOf(FilterWorker.KEY_OUTPUT_MESSAGE to messageFor(t)))
+            return fail(messageFor(t))
         }
     }
 
@@ -145,6 +181,12 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         const val KEY_QUALITY = "quality"
         const val KEY_TITLE = "title"
         const val KEY_QUARANTINE_PATH = "quarantine_path"
+
+        /** `filesize_approx` from the sheet's `getInfo`; 0 when the extractor wouldn't say. */
+        const val KEY_SIZE_BYTES = "size_bytes"
+
+        /** Ties this run to its [Queue] item. Absent = the debug intent, which keeps real failures. */
+        const val KEY_QUEUE_ID = "queue_id"
 
         /** Separate name from `naqi_filter_job`, so a download and a filter run concurrently. */
         const val UNIQUE_WORK = "naqi_download"

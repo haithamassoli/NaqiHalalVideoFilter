@@ -103,6 +103,7 @@ object AudioPipeline {
                 separator.finish()
                 // Tolerated by DemucsSeparator.finish, so it would otherwise pass silently.
                 if (separator.shortfall > 0) Log.w(TAG, "separator short by ${separator.shortfall} frames")
+                if (separator.nonFinite > 0) Log.w(TAG, "separator produced ${separator.nonFinite} non-finite samples (silenced)")
                 writer.finish()
                 onProgress(100)
             } finally {
@@ -289,6 +290,7 @@ object AudioPipeline {
                     }
                     separator.finish()
                     if (separator.shortfall > 0) Log.w(TAG, "separator short by ${separator.shortfall} frames")
+                if (separator.nonFinite > 0) Log.w(TAG, "separator produced ${separator.nonFinite} non-finite samples (silenced)")
                 }
             }
             Checkpoint.writeAudio(jobDir, written, stats)
