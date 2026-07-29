@@ -39,10 +39,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.download.Downloader
-import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.Eyebrow
 import com.haithamassoli.naqi.ui.SelectDot
 import com.haithamassoli.naqi.ui.durationText
@@ -154,9 +154,7 @@ fun ShareSheet(
     // Space is checked here rather than only in the worker so the refusal arrives before the item is
     // queued — "it failed four items later" is not a useful thing to tell someone about disk space.
     val spaceError = if (isLink) {
-        Preflight.checkSpaceForDownload(
-            context, sizeBytes, if (effectiveOps.removeMusic && effectiveOps.censorWomen) 2 else 1,
-        ) ?: 0
+        Preflight.checkSpaceForDownload(context, sizeBytes, effectiveOps) ?: 0
     } else {
         0
     }
@@ -293,8 +291,6 @@ private fun subtitle(shared: Shared, durationMs: Long): String? {
     val duration = durationMs.takeIf { it > 0 }?.let { durationText(it) }
     return listOfNotNull(duration, host).takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }
-
-private fun String.toUri(): Uri = Uri.parse(this)
 
 private fun qualityLabel(q: Downloader.Quality) = when (q) {
     Downloader.Quality.BEST -> R.string.share_quality_best

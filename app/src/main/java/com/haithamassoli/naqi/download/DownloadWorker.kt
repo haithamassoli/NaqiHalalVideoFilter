@@ -3,22 +3,20 @@ package com.haithamassoli.naqi.download
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
-import androidx.annotation.StringRes
 import androidx.work.workDataOf
 import com.haithamassoli.naqi.R
-import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.work.FilterWorker
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.JobNotifications
 import com.haithamassoli.naqi.work.Preflight
 import com.haithamassoli.naqi.work.Publish
 import com.haithamassoli.naqi.work.Queue
+import com.haithamassoli.naqi.work.QueuedWorker
+import com.haithamassoli.naqi.work.filterOps
 import kotlinx.coroutines.CancellationException
-import java.io.File
 
 /**
  * Fetch one URL into quarantine, then hand it to the filter pipeline.
@@ -32,42 +30,15 @@ import java.io.File
  * [Downloader.quarantineDir] and only [FilterWorker] publishes it — except for the one case where the
  * user asked for no filters at all, which is published here and the quarantine dropped immediately.
  */
-class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
-
-    /** Non-null when this run came from the share queue rather than the debug intent. */
-    private val queueId = inputData.getString(KEY_QUEUE_ID)
-
-    private fun queued(transform: (Queue.Item) -> Queue.Item) {
-        queueId?.let { Queue.update(applicationContext, it, transform) }
-    }
-
-    /**
-     * **A queue-driven run never returns failure.** WorkManager fails every request chained behind a
-     * failed one, so a single dead link would take the rest of the queue with it. The real outcome goes
-     * into `queue.json`, where the UI reads it; the chain only ever learns "this request is done".
-     * The legacy debug/manual path keeps real failures, which is what the jobs screen still reads.
-     */
-    private fun fail(@StringRes message: Int): Result {
-        queued { it.copy(state = Queue.State.FAILED, error = message) }
-        val data = workDataOf(FilterWorker.KEY_OUTPUT_MESSAGE to message)
-        return if (queueId != null) Result.success(data) else Result.failure(data)
-    }
+class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, params) {
 
     override suspend fun doWork(): Result {
         val url = inputData.getString(KEY_URL)?.takeIf { it.isNotBlank() } ?: return Result.failure()
         val quality = Downloader.Quality.of(inputData.getString(KEY_QUALITY))
-        val ops = FilterOps(
-            removeMusic = inputData.getBoolean(FilterWorker.KEY_REMOVE_MUSIC, false),
-            censorWomen = inputData.getBoolean(FilterWorker.KEY_CENSOR_WOMEN, false) &&
-                // Blur women is meaningless on an audio-only item; the sheet hides it, and this is the
-                // half that cannot be raced by a stale queue entry written before that rule existed.
-                quality != Downloader.Quality.AUDIO,
-            strictness = inputData.getInt(FilterWorker.KEY_STRICTNESS, 50),
-            blurAmount = inputData.getInt(FilterWorker.KEY_BLUR_AMOUNT, 60),
-            grayscale = inputData.getBoolean(FilterWorker.KEY_GRAYSCALE, false),
-            blurUnknownFaces = inputData.getBoolean(FilterWorker.KEY_BLUR_UNKNOWN, false),
-            keepStems = inputData.getString(FilterWorker.KEY_KEEP_STEMS) ?: "vocals",
-        )
+        // Blur women is meaningless on an audio-only item; the sheet hides it, and this is the half that
+        // cannot be raced by a stale queue entry written before that rule existed.
+        val ops = inputData.filterOps()
+            .let { if (quality == Downloader.Quality.AUDIO) it.copy(censorWomen = false) else it }
         val title = inputData.getString(KEY_TITLE)?.takeIf { it.isNotBlank() }
             ?: applicationContext.getString(R.string.stage_downloading)
 
@@ -79,8 +50,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         // when the queue is drained hours later on a disk that has filled in the meantime.
         // Size 0 = the extractor wouldn't say, which is common — then onSpaceCheck below is the net.
         val knownBytes = inputData.getLong(KEY_SIZE_BYTES, 0L)
-        val tempCopies = if (ops.removeMusic && ops.censorWomen) 2 else 1
-        Preflight.checkSpaceForDownload(applicationContext, knownBytes, tempCopies)?.let {
+        Preflight.checkSpaceForDownload(applicationContext, knownBytes, ops)?.let {
             Log.w(TAG, "refusing download: $knownBytes bytes will not fit")
             return fail(it)
         }
@@ -142,7 +112,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 policy = ExistingWorkPolicy.APPEND_OR_REPLACE,
                 queueId = queueId,
             )
-            return Result.success(workDataOf(KEY_QUARANTINE_PATH to file.absolutePath))
+            return Result.success()
         } catch (c: CancellationException) {
             // The .part file is deliberately kept: yt-dlp resumes it byte-for-byte on the next attempt,
             // and a cancelled download is the case most likely to be retried.
@@ -180,13 +150,9 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         const val KEY_URL = "url"
         const val KEY_QUALITY = "quality"
         const val KEY_TITLE = "title"
-        const val KEY_QUARANTINE_PATH = "quarantine_path"
 
         /** `filesize_approx` from the sheet's `getInfo`; 0 when the extractor wouldn't say. */
         const val KEY_SIZE_BYTES = "size_bytes"
-
-        /** Ties this run to its [Queue] item. Absent = the debug intent, which keeps real failures. */
-        const val KEY_QUEUE_ID = "queue_id"
 
         /** Separate name from `naqi_filter_job`, so a download and a filter run concurrently. */
         const val UNIQUE_WORK = "naqi_download"

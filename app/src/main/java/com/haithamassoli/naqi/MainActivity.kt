@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.provider.MediaStore
-import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -29,6 +28,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import com.haithamassoli.naqi.download.Downloader
+import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.spike.SegmentConcatSpike
 import com.haithamassoli.naqi.ui.NaqiApp
@@ -140,10 +140,7 @@ class MainActivity : ComponentActivity() {
         return Shared.Link(url)
     }
 
-    private fun displayNameOf(uri: Uri): String? = runCatching {
-        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-            ?.use { if (it.moveToFirst()) it.getString(0) else null }
-    }.getOrNull() ?: uri.lastPathSegment
+    private fun displayNameOf(uri: Uri): String? = displayName(uri) ?: uri.lastPathSegment
 
     private fun deleteTargetOf(intent: Intent): Pair<Uri, String>? {
         if (intent.action != JobNotifications.ACTION_CONFIRM_DELETE) return null

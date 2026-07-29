@@ -31,11 +31,7 @@ data class VideoMeta(
     val rotationDegrees: Int,
     val durationMs: Long,
     val fps: Float,
-) {
-    /** Dimensions after rotation — the space every [NRect] lives in. */
-    val uprightWidth: Int get() = if (rotationDegrees % 180 == 0) width else height
-    val uprightHeight: Int get() = if (rotationDegrees % 180 == 0) height else width
-}
+)
 
 enum class Gender { FEMALE, MALE, UNKNOWN }
 

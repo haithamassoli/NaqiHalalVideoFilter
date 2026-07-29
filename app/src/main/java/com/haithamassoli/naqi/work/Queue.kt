@@ -81,9 +81,8 @@ internal object Queue {
     }
 
     @Synchronized
-    fun add(context: Context, item: Item): Item {
+    fun add(context: Context, item: Item) {
         write(context, load(context) + item)
-        return item
     }
 
     /** Apply [transform] to one item. No-op if it is already gone (cancelled while a worker ran). */

@@ -4,11 +4,8 @@ import android.content.Context
 import android.media.MediaExtractor
 import android.net.Uri
 import android.os.Build
-import android.provider.OpenableColumns
 import android.util.Log
-import androidx.annotation.StringRes
 import androidx.core.net.toUri
-import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkInfo
 import androidx.work.WorkerParameters
@@ -28,6 +25,7 @@ import com.haithamassoli.naqi.audio.concatAudio
 import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.edl.Edl
 import com.haithamassoli.naqi.edl.FaceTrackEdl
+import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.media.firstTrackIndex
 import com.haithamassoli.naqi.media.requireTrackIndex
 import com.haithamassoli.naqi.ml.Infer
@@ -56,7 +54,7 @@ import java.io.File
  * Cancel/failure delete every temp and any un-published MediaStore row; the ORT sessions and the face
  * detector always close. Cancellation propagates through the suspend calls untouched.
  */
-class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, params) {
 
     /** Soak instrumentation + the live ETA source (`long-film-plan.md` Phase 0). */
     private val stats = JobStats(ctx)
@@ -103,26 +101,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
     /** `filesDir/naqi-work/<jobKey>/` — see [JobStore] for why not `cacheDir`. */
     private val workDir by lazy { JobStore.dir(applicationContext, jobKey) }
-
-    /** Non-null when this run came from the share queue rather than the picker or the debug intent. */
-    private val queueId = inputData.getString(KEY_QUEUE_ID)
-
-    private fun queued(transform: (Queue.Item) -> Queue.Item) {
-        queueId?.let { Queue.update(applicationContext, it, transform) }
-    }
-
-    /**
-     * **A queue-driven run never returns failure.** WorkManager fails every request chained behind a
-     * failed one, so one unfilterable item would take the rest of the queue with it. The real outcome
-     * is recorded in `queue.json`; the chain only learns that this request finished. The picker path
-     * (unique work KEEP, one job at a time) keeps real failures — that is what `JobsScreen` reads, and
-     * nothing is chained behind it to kill.
-     */
-    private fun fail(@StringRes message: Int, resumable: Boolean = false): Result {
-        queued { it.copy(state = Queue.State.FAILED, error = message) }
-        val data = workDataOf(KEY_OUTPUT_MESSAGE to message, KEY_RESUMABLE to resumable)
-        return if (queueId != null) Result.success(data) else Result.failure(data)
-    }
 
     override suspend fun doWork(): Result {
         val removeMusic = inputData.getBoolean(KEY_REMOVE_MUSIC, false)
@@ -195,7 +173,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
         queued { it.copy(state = Queue.State.FILTERING) }
         return when {
-            audioOnly -> runAudioOnly(inputUri, durationMs)
+            audioOnly -> runAudioOnly(inputUri)
             segmented -> runSegmented(inputUri, plan, removeMusic, audioPlan, durationMs)
             removeMusic && censorWomen -> runCombined(inputUri)
             removeMusic -> runMusicOnly(inputUri, durationMs)
@@ -220,14 +198,18 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
      * Audio-only: [AudioPipeline.removeMusic] already emits an `.m4a`, so there is nothing to render and
      * nothing to mux — separate over the whole 1..99 band and publish into `Music/Naqi`.
      *
-     * Same resumable-scratch rule as [runMusicOnly]: only a user cancel throws the work away, because a
-     * system stop is exactly what Phase 2's checkpointing exists to survive.
+     * ponytail: this shape NEVER resumes, and unlike [runMusicOnly] that is not a choice. `durationMs`
+     * comes from [FrameSampler.probe], which opens with `requireTrackIndex("video/")` and therefore throws
+     * on the very `.m4a` that gets us here — doWork's `runCatching { … }.getOrDefault(0L)` then hands this
+     * shape 0 on every run, so the >= 30 min resumable test could never fire. The dead branch is gone
+     * rather than left to look like a live option. To actually give a long podcast a resumable separator,
+     * measure duration off the AUDIO track (MediaMetadataRetriever's METADATA_KEY_DURATION works with no
+     * video track) and pass `workDir` as `jobDir` above that threshold.
      */
-    private suspend fun runAudioOnly(inputUri: Uri, durationMs: Long): Result {
+    private suspend fun runAudioOnly(inputUri: Uri): Result {
         setForeground(foregroundInfo(stage(R.string.stage_separating), 1))
 
         val audioTemp = File(workDir, "audio.m4a")
-        val resumable = durationMs >= Eta.CONFIRM_THRESHOLD_MS
         try {
             val sep = stage(R.string.stage_separating)
             stats.stage("separate")
@@ -235,7 +217,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 applicationContext, inputUri, keepStems, audioTemp,
                 onProgress = { p -> reportBand(sep, p, 1, 98) },  // 0..100 -> 1..99
                 isCancelled = { isStopped },
-                jobDir = if (resumable) workDir else null,
             )
 
             val displayName = outputName(inputUri, ext = "m4a")
@@ -244,14 +225,14 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             JobStore.delete(applicationContext, jobKey)
             return succeed(displayName, outputUri, inputUri, Publish.MIME_M4A)
         } catch (c: CancellationException) {
-            if (!resumable || userCancelled()) runCatching { JobStore.delete(applicationContext, jobKey) }
+            runCatching { JobStore.delete(applicationContext, jobKey) }
             throw c
         } catch (t: Throwable) {
             Log.e(TAG, "audio-only job failed", t)
-            if (!resumable) runCatching { JobStore.delete(applicationContext, jobKey) }
+            runCatching { JobStore.delete(applicationContext, jobKey) }
             return fail(Preflight.messageFor(t))
         } finally {
-            stats.finish("shape=audio resumable=$resumable")
+            stats.finish("shape=audio")
         }
     }
 
@@ -301,8 +282,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 AudioPipeline.transcodeToAac(applicationContext, inputUri, part) { isStopped }
                 check(part.renameTo(audioTemp)) { "could not commit the transcoded audio" }
             }
-            val edl = analyzeSegments(inputUri, plan, strictness, blurUnknownFaces, durationMs, 0, renderBase)
-            renderSegments(inputUri, plan, edl, blurAmount, grayscale, renderBase, renderSpan)
+            val edl = analyzeSegments(inputUri, plan, durationMs, 0, renderBase)
+            renderSegments(inputUri, plan, edl, renderBase, renderSpan)
 
             val audio = when {
                 removeMusic -> {
@@ -443,8 +424,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
     private suspend fun analyzeSegments(
         inputUri: Uri,
         plan: List<RenderSegment>,
-        strictness: Int,
-        blurUnknownFaces: Boolean,
         durationMs: Long,
         progressBase: Int,
         progressSpan: Int,
@@ -516,11 +495,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         }
         // ONE hysteresis pass over the whole timeline — the reason firings are accumulated rather than
         // turned into intervals per segment.
-        var intervals = NsfwGate.intervals(firings, durationMs)
-        if (BuildConfig.DEBUG) {
-            val forced = parseForceIntervals(inputData.getString(KEY_FORCE_INTERVALS))
-            if (forced.isNotEmpty()) intervals = intervals + forced
-        }
+        val intervals = intervalsFor(firings, durationMs)
         Log.i(TAG, "pass1 segmented: gateFirings=${firings.size} intervalCount=${intervals.size} " +
             "censorFaceTracks=${faceTracks.size}")
         return Edl(intervals, faceTracks.sortedBy { it.startMs })
@@ -531,8 +506,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         inputUri: Uri,
         plan: List<RenderSegment>,
         edl: Edl,
-        blurAmount: Int,
-        grayscale: Boolean,
         progressBase: Int,
         progressSpan: Int,
     ) {
@@ -551,10 +524,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             RenderPipeline.renderCensor(
                 applicationContext, inputUri, part, edl, blurAmount, grayscale, meta, segment = seg,
             ) { p ->
-                val overall = progressBase + ((seg.index * 100 + p) * progressSpan / (plan.size * 100))
-                stats.tick()
-                setProgressAsync(workDataOf(KEY_PROGRESS to overall, KEY_STAGE to stage, KEY_ETA_MS to stats.etaMs(overall)))
-                setForegroundAsync(foregroundInfo(stage, overall))
+                reportAsync(stage, progressBase + ((seg.index * 100 + p) * progressSpan / (plan.size * 100)))
             }
             check(part.renameTo(Checkpoint.segmentFile(workDir, seg.index))) {
                 "could not commit segment ${seg.index}"
@@ -570,8 +540,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         val tempFile = File(workDir, "render.mp4")
         val faceTracker = FaceTracker(applicationContext, blurUnknownFaces)
         try {
-            val edl = analyze(inputUri, strictness, faceTracker)
-            render(inputUri, tempFile, edl, blurAmount, grayscale)
+            val edl = analyze(inputUri, faceTracker)
+            render(inputUri, tempFile, edl)
             val displayName = outputName(inputUri)
             stats.stage("publish")
             val outputUri = publish(tempFile, displayName)
@@ -642,8 +612,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         val muxTemp = File(workDir, "mux.mp4")
         val faceTracker = FaceTracker(applicationContext, blurUnknownFaces)
         try {
-            val edl = analyze(inputUri, strictness, faceTracker, progressBase = 0, progressSpan = 25)
-            render(inputUri, renderTemp, edl, blurAmount, grayscale, progressBase = 25, progressSpan = 25)
+            val edl = analyze(inputUri, faceTracker, progressBase = 0, progressSpan = 25)
+            render(inputUri, renderTemp, edl, progressBase = 25, progressSpan = 25)
 
             val sep = stage(R.string.stage_separating)
             stats.stage("separate")
@@ -675,21 +645,28 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         }
     }
 
-    /** Map a 0..100 sub-progress onto [base, base+span] and push it to WorkData + the notification. */
-    private fun reportBand(stage: String, sub: Int, base: Int, span: Int) {
-        val overall = (base + sub * span / 100).coerceIn(0, 100)
+    /**
+     * Push progress to WorkData + the notification WITHOUT awaiting it. Every `onProgress` callback in
+     * this file is non-suspend — they run on the transformer's Looper or on Dispatchers.Default — so they
+     * must use the async variants. [report] is the awaited twin, used only where a suspend context
+     * already exists.
+     */
+    private fun reportAsync(stage: String, overall: Int) {
         stats.tick()
         setProgressAsync(workDataOf(KEY_PROGRESS to overall, KEY_STAGE to stage, KEY_ETA_MS to stats.etaMs(overall)))
         setForegroundAsync(foregroundInfo(stage, overall))
     }
 
+    /** Map a 0..100 sub-progress onto [base, base+span] and push it. */
+    private fun reportBand(stage: String, sub: Int, base: Int, span: Int) =
+        reportAsync(stage, (base + sub * span / 100).coerceIn(0, 100))
 
     /**
      * Pass 1: sample once, run faces and the gate on every sampled frame, build the EDL. [pct]
      * becomes `progressBase + fraction*progressSpan`; the defaults reproduce the M1 0..50 band exactly.
      */
     private suspend fun analyze(
-        uri: Uri, strictness: Int, faceTracker: FaceTracker,
+        uri: Uri, faceTracker: FaceTracker,
         progressBase: Int = 0, progressSpan: Int = 50,
     ): Edl {
         val durationMs = FrameSampler.probe(applicationContext, uri).durationMs.coerceAtLeast(1L)
@@ -722,12 +699,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         }
         val wallMs = (System.nanoTime() - tWall) / 1_000_000 // sampling only; the vote below is its own stage
 
-        var intervals = NsfwGate.intervals(firings, durationMs)
-        // Debug E2E hook: force full-frame spans so SFW test assets still exercise pass 2 censoring.
-        if (BuildConfig.DEBUG) {
-            val forced = parseForceIntervals(inputData.getString(KEY_FORCE_INTERVALS))
-            if (forced.isNotEmpty()) intervals = intervals + forced
-        }
+        val intervals = intervalsFor(firings, durationMs)
         // wall #3 of long-film-plan.md. Tracks now vote and recycle during the pass, so "vote" only
         // covers the handful still live at the end — it is kept as its own stage because the 2.7 min
         // this took on the 155-min soak is the before-number this Phase 1 item exists to move.
@@ -748,7 +720,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
      * `progressBase + p*progressSpan/100`. The defaults reproduce the M1 50..100 band exactly.
      */
     private suspend fun render(
-        uri: Uri, tempFile: File, edl: Edl, blurAmount: Int, grayscale: Boolean,
+        uri: Uri, tempFile: File, edl: Edl,
         progressBase: Int = 50, progressSpan: Int = 50,
     ) {
         val stage = stage(R.string.stage_rendering)
@@ -756,12 +728,19 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         report(stage, progressBase)
         val meta = FrameSampler.probe(applicationContext, uri)
         RenderPipeline.renderCensor(applicationContext, uri, tempFile, edl, blurAmount, grayscale, meta) { p ->
-            val overall = progressBase + p * progressSpan / 100
-            stats.tick()
-            // onProgress is non-suspend (runs on the transformer's Looper) — use the async variants.
-            setProgressAsync(workDataOf(KEY_PROGRESS to overall, KEY_STAGE to stage, KEY_ETA_MS to stats.etaMs(overall)))
-            setForegroundAsync(foregroundInfo(stage, overall))
+            reportBand(stage, p, progressBase, progressSpan)
         }
+    }
+
+    /**
+     * The gate's hysteresis intervals over the whole timeline, plus the debug E2E hook: `force_intervals`
+     * adds full-frame spans so an SFW test asset still exercises pass 2's censoring.
+     */
+    private fun intervalsFor(firings: List<Long>, durationMs: Long): List<LongRange> {
+        val intervals = NsfwGate.intervals(firings, durationMs)
+        if (!BuildConfig.DEBUG) return intervals
+        val forced = parseForceIntervals(inputData.getString(KEY_FORCE_INTERVALS))
+        return if (forced.isEmpty()) intervals else intervals + forced
     }
 
     /** Copy the temp into `Movies/Naqi` and return its uri — see [Publish] for the cancellation contract. */
@@ -802,11 +781,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
      * away one step before the user sees it.
      */
     private fun outputName(uri: Uri, ext: String = "mp4"): String {
-        val source = runCatching {
-            applicationContext.contentResolver
-                .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-                ?.use { if (it.moveToFirst()) it.getString(0) else null }
-        }.getOrNull()
+        val source = applicationContext.displayName(uri)
             ?: uri.takeIf { it.scheme == "file" }?.path?.let { File(it).name }
             ?: "video"
         return "${source.substringBeforeLast('.')}-naqi-${System.currentTimeMillis()}.$ext"
@@ -864,7 +839,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         const val KEY_QUEUE_ID = "queue_id"
 
         private const val TAG = "FilterWorker"
-        private const val MIME_MP4 = "video/mp4"
 
         /** Parse "startMs-endMs,startMs-endMs"; bad segments are skipped. */
         private fun parseForceIntervals(spec: String?): List<LongRange> {

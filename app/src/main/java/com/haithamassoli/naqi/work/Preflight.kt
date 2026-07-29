@@ -7,6 +7,7 @@ import android.provider.OpenableColumns
 import androidx.annotation.StringRes
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.media.firstTrackIndex
+import com.haithamassoli.naqi.model.FilterOps
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -48,11 +49,18 @@ internal object Preflight {
 
     /**
      * Free space this job needs, in bytes: one working copy per temp the shape writes, plus the
-     * published copy, plus scratch, plus the PRD's headroom. Public so the download precheck can ask
-     * the same question about a file that does not exist yet ("will this fit once fetched?").
+     * published copy, plus scratch, plus the PRD's headroom. Shared by [check] and
+     * [checkSpaceForDownload], so a picked source and a not-yet-fetched one are sized by one rule.
      */
-    fun requiredBytes(sourceBytes: Long, tempCopies: Int, extraScratchBytes: Long = 0L): Long =
+    private fun requiredBytes(sourceBytes: Long, tempCopies: Int, extraScratchBytes: Long = 0L): Long =
         (tempCopies + 1) * sourceBytes + extraScratchBytes + SLACK_BYTES // +1 = published copy
+
+    /**
+     * Working copies a shape writes before publishing: combined writes a render temp AND a mux temp,
+     * the single-op shapes write one. Derived here rather than at each call site — it was spelled out
+     * identically in the share sheet's pre-queue check and in the worker's own.
+     */
+    private fun tempCopiesFor(ops: FilterOps): Int = if (ops.removeMusic && ops.censorWomen) 2 else 1
 
     /**
      * Would a source of [sourceBytes] fit? Used before a download starts, where there is no file to
@@ -62,9 +70,9 @@ internal object Preflight {
      * needs, which is the copy nobody budgets for today (PRD §Storage).
      */
     @StringRes
-    fun checkSpaceForDownload(context: Context, sourceBytes: Long, tempCopies: Int): Int? {
+    fun checkSpaceForDownload(context: Context, sourceBytes: Long, ops: FilterOps): Int? {
         if (sourceBytes <= 0L) return null // size unknown — DownloadWorker aborts mid-flight instead
-        val required = requiredBytes(sourceBytes, tempCopies + 1)
+        val required = requiredBytes(sourceBytes, tempCopiesFor(ops) + 1)
         return if (context.noBackupFilesDir.usableSpace >= required) null else LOW_SPACE_DOWNLOAD
     }
 

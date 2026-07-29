@@ -51,28 +51,42 @@ internal object JobNotifications {
      *   and then the line is just the stage. On a feature-length job this notification is the only
      *   thing the user ever sees, so the estimate belongs here first.
      */
+    /**
+     * The ongoing-notification shape both foreground services share: title, one line of text, the cancel
+     * action, and a progress bar that goes indeterminate outside [determinate].
+     */
+    private fun ongoing(
+        context: Context,
+        workId: UUID,
+        title: String,
+        text: String,
+        progress: Int,
+        determinate: IntRange,
+    ) = NotificationCompat.Builder(context, CHANNEL_ID)
+        .setContentTitle(title)
+        .setContentText(text)
+        .setSmallIcon(R.drawable.ic_notification)
+        .setOngoing(true)
+        .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+        .addAction(
+            android.R.drawable.ic_menu_close_clear_cancel,
+            context.getString(R.string.action_cancel),
+            WorkManager.getInstance(context).createCancelPendingIntent(workId),
+        )
+        .apply {
+            if (progress in determinate) setProgress(100, progress, false) else setProgress(0, 0, true)
+        }
+        .build()
+
     fun foregroundInfo(context: Context, workId: UUID, stage: String, progress: Int, etaMs: Long): ForegroundInfo {
         ensureChannel(context)
-        val cancel = WorkManager.getInstance(context).createCancelPendingIntent(workId)
         val text = if (etaMs > 0) {
             context.getString(R.string.job_notif_stage_eta, stage, durationText(context, etaMs))
         } else {
             stage
         }
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle(context.getString(R.string.job_notif_title))
-            .setContentText(text)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setOngoing(true)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                context.getString(R.string.action_cancel),
-                cancel,
-            )
-        if (progress in 0..100) builder.setProgress(100, progress, false) else builder.setProgress(0, 0, true)
-
-        val notification = builder.build()
+        val notification =
+            ongoing(context, workId, context.getString(R.string.job_notif_title), text, progress, 0..100)
         // foregroundServiceType must be a subset of what the manifest declares on SystemForegroundService.
         return when {
             Build.VERSION.SDK_INT >= 35 ->
@@ -95,20 +109,10 @@ internal object JobNotifications {
      */
     fun downloadForegroundInfo(context: Context, workId: UUID, title: String, progress: Int): ForegroundInfo {
         ensureChannel(context)
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle(context.getString(R.string.download_notif_title))
-            .setContentText(title)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setOngoing(true)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                context.getString(R.string.action_cancel),
-                WorkManager.getInstance(context).createCancelPendingIntent(workId),
-            )
-        if (progress in 1..100) builder.setProgress(100, progress, false) else builder.setProgress(0, 0, true)
-
-        val notification = builder.build()
+        // 1..100, not 0..100: yt-dlp sits at 0 while it resolves formats, and a determinate bar frozen at
+        // zero reads as stuck where an indeterminate one reads as working.
+        val notification =
+            ongoing(context, workId, context.getString(R.string.download_notif_title), title, progress, 1..100)
         return if (Build.VERSION.SDK_INT >= 34) {
             ForegroundInfo(DOWNLOAD_NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
@@ -133,7 +137,7 @@ internal object JobNotifications {
         displayName: String,
         outputUri: String?,
         sourceUri: String?,
-        mime: String = MIME_MP4,
+        mime: String,
     ) {
         ensureChannel(context)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -176,7 +180,6 @@ internal object JobNotifications {
     }
 
     const val ACTION_CONFIRM_DELETE = "com.haithamassoli.naqi.CONFIRM_DELETE_ORIGINAL"
-    private const val MIME_MP4 = "video/mp4"
 
     // IMMUTABLE is required on API 31+; each action needs its own request code or they collide.
     private fun activity(context: Context, requestCode: Int, intent: Intent) =

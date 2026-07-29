@@ -36,14 +36,8 @@ object JobController {
             .apply { queueId?.let { addTag(itemTag(it)) } }
             .setInputData(
                 workDataOf(
-                    FilterWorker.KEY_REMOVE_MUSIC to ops.removeMusic,
-                    FilterWorker.KEY_CENSOR_WOMEN to ops.censorWomen,
+                    *ops.pairs(),
                     FilterWorker.KEY_INPUT_URI to inputUri,
-                    FilterWorker.KEY_STRICTNESS to ops.strictness,
-                    FilterWorker.KEY_BLUR_AMOUNT to ops.blurAmount,
-                    FilterWorker.KEY_GRAYSCALE to ops.grayscale,
-                    FilterWorker.KEY_BLUR_UNKNOWN to ops.blurUnknownFaces,
-                    FilterWorker.KEY_KEEP_STEMS to ops.keepStems,
                     FilterWorker.KEY_FORCE_INTERVALS to forceIntervalsMs,
                     FilterWorker.KEY_SEGMENT_MS to segmentMs,
                     FilterWorker.KEY_QUEUE_ID to queueId,
@@ -89,18 +83,12 @@ object JobController {
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setInputData(
                 workDataOf(
+                    *ops.pairs(),
                     DownloadWorker.KEY_URL to url,
                     DownloadWorker.KEY_QUALITY to quality.name,
                     DownloadWorker.KEY_TITLE to title,
                     DownloadWorker.KEY_SIZE_BYTES to sizeBytes,
-                    DownloadWorker.KEY_QUEUE_ID to queueId,
-                    FilterWorker.KEY_REMOVE_MUSIC to ops.removeMusic,
-                    FilterWorker.KEY_CENSOR_WOMEN to ops.censorWomen,
-                    FilterWorker.KEY_STRICTNESS to ops.strictness,
-                    FilterWorker.KEY_BLUR_AMOUNT to ops.blurAmount,
-                    FilterWorker.KEY_GRAYSCALE to ops.grayscale,
-                    FilterWorker.KEY_BLUR_UNKNOWN to ops.blurUnknownFaces,
-                    FilterWorker.KEY_KEEP_STEMS to ops.keepStems,
+                    FilterWorker.KEY_QUEUE_ID to queueId,
                 ),
             )
             .build()
@@ -143,10 +131,9 @@ object JobController {
     // ---------------------------------------------------------------------------------------------
 
     /** Add a shared item to the queue and enqueue the work that will drain it. */
-    internal fun enqueue(context: Context, item: Queue.Item): Queue.Item {
+    internal fun enqueue(context: Context, item: Queue.Item) {
         Queue.add(context, item)
         submit(context, item)
-        return item
     }
 
     /**

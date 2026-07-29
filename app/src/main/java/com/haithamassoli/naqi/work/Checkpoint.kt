@@ -44,8 +44,7 @@ internal object Checkpoint {
      * a long job ([Eta.CONFIRM_THRESHOLD_MS]), so there is exactly one notion of "long" in the product.
      * [forcedSegmentMs] is the debug override: any positive value segments regardless of duration, which is
      * the only way to exercise multi-segment concat and kill/resume on a clip short enough to iterate on.
-     */
-    /**
+     *
      * [cutAtMs] moves each INTERIOR boundary to a point the source can actually be cut at, and it is the
      * whole of `long-film-followups.md` item 2. media3 ends a clipped read at the first sample **in decode
      * order** whose pts reaches the clip end (1.10.1 `ClippingMediaPeriod.java:430`), so on any B-frame

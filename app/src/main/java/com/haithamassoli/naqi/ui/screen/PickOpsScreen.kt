@@ -1,13 +1,12 @@
 package com.haithamassoli.naqi.ui.screen
 
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.provider.OpenableColumns
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.haithamassoli.naqi.R
+import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.ml.ModelSmoke
 import com.haithamassoli.naqi.ml.SmokeReport
 import com.haithamassoli.naqi.model.FilterOps
@@ -83,7 +83,7 @@ fun PickOpsScreen(
             runCatching {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            onPicked(uri, queryDisplayName(context, uri))
+            onPicked(uri, context.displayName(uri))
         }
     }
 
@@ -135,46 +135,22 @@ fun PickOpsScreen(
             // ponytail: system per-app language picker (API 33+); in-app switcher needs appcompat, add when pre-33 users complain.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 Spacer(Modifier.height(NaqiTokens.space4))
-                NaqiCard(
-                    Modifier.clickable {
-                        runCatching {
-                            context.startActivity(
-                                Intent(
-                                    Settings.ACTION_APP_LOCALE_SETTINGS,
-                                    Uri.fromParts("package", context.packageName, null),
-                                ),
-                            )
-                        }
-                    },
-                ) {
-                    Text(
-                        stringResource(R.string.opt_language),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        stringResource(R.string.opt_language_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                MenuCard(R.string.opt_language, R.string.opt_language_desc) {
+                    runCatching {
+                        context.startActivity(
+                            Intent(
+                                Settings.ACTION_APP_LOCALE_SETTINGS,
+                                Uri.fromParts("package", context.packageName, null),
+                            ),
+                        )
+                    }
                 }
             }
 
             // About & licences. Attribution has to be reachable from the app itself, not only from the
             // repository — GPL-3.0 and an AGPL-3.0 model are not obligations a README discharges.
             Spacer(Modifier.height(NaqiTokens.space4))
-            NaqiCard(Modifier.clickable(onClick = onAbout)) {
-                Text(
-                    stringResource(R.string.about_open),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    stringResource(R.string.about_open_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            MenuCard(R.string.about_open, R.string.about_open_desc, onAbout)
 
             Spacer(Modifier.height(NaqiTokens.space4))
             ReassuranceLine()
@@ -182,6 +158,23 @@ fun PickOpsScreen(
             Spacer(Modifier.height(NaqiTokens.space6))
             DiagnosticsFooter(smoke)
         }
+    }
+}
+
+/** A tappable title+description card — the two entries below Start (language, about) are the same shape. */
+@Composable
+private fun MenuCard(@StringRes title: Int, @StringRes desc: Int, onClick: () -> Unit) {
+    NaqiCard(Modifier.clickable(onClick = onClick)) {
+        Text(
+            stringResource(title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            stringResource(desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -379,8 +372,3 @@ private fun DiagnosticsFooter(smoke: SmokeReport?) {
         }
     }
 }
-
-private fun queryDisplayName(context: Context, uri: Uri): String? =
-    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-        if (it.moveToFirst()) it.getString(0) else null
-    }
