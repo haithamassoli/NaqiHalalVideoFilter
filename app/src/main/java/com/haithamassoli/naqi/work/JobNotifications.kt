@@ -25,6 +25,9 @@ internal object JobNotifications {
     /** Separate id: the ongoing FGS notification is torn down when the worker returns. */
     private const val DONE_NOTIF_ID = 1002
 
+    /** Downloads run concurrently with filtering, so they need a notification of their own. */
+    private const val DOWNLOAD_NOTIF_ID = 1003
+
     /** Extras on the MainActivity intent behind the "Delete original" action. */
     const val EXTRA_DELETE_ORIGINAL = "delete_original_uri"
     const val EXTRA_DELETE_NAME = "delete_original_name"
@@ -48,28 +51,42 @@ internal object JobNotifications {
      *   and then the line is just the stage. On a feature-length job this notification is the only
      *   thing the user ever sees, so the estimate belongs here first.
      */
+    /**
+     * The ongoing-notification shape both foreground services share: title, one line of text, the cancel
+     * action, and a progress bar that goes indeterminate outside [determinate].
+     */
+    private fun ongoing(
+        context: Context,
+        workId: UUID,
+        title: String,
+        text: String,
+        progress: Int,
+        determinate: IntRange,
+    ) = NotificationCompat.Builder(context, CHANNEL_ID)
+        .setContentTitle(title)
+        .setContentText(text)
+        .setSmallIcon(R.drawable.ic_notification)
+        .setOngoing(true)
+        .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+        .addAction(
+            android.R.drawable.ic_menu_close_clear_cancel,
+            context.getString(R.string.action_cancel),
+            WorkManager.getInstance(context).createCancelPendingIntent(workId),
+        )
+        .apply {
+            if (progress in determinate) setProgress(100, progress, false) else setProgress(0, 0, true)
+        }
+        .build()
+
     fun foregroundInfo(context: Context, workId: UUID, stage: String, progress: Int, etaMs: Long): ForegroundInfo {
         ensureChannel(context)
-        val cancel = WorkManager.getInstance(context).createCancelPendingIntent(workId)
         val text = if (etaMs > 0) {
             context.getString(R.string.job_notif_stage_eta, stage, durationText(context, etaMs))
         } else {
             stage
         }
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle(context.getString(R.string.job_notif_title))
-            .setContentText(text)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setOngoing(true)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                context.getString(R.string.action_cancel),
-                cancel,
-            )
-        if (progress in 0..100) builder.setProgress(100, progress, false) else builder.setProgress(0, 0, true)
-
-        val notification = builder.build()
+        val notification =
+            ongoing(context, workId, context.getString(R.string.job_notif_title), text, progress, 0..100)
         // foregroundServiceType must be a subset of what the manifest declares on SystemForegroundService.
         return when {
             Build.VERSION.SDK_INT >= 35 ->
@@ -77,6 +94,29 @@ internal object JobNotifications {
             Build.VERSION.SDK_INT >= 34 ->
                 ForegroundInfo(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             else -> ForegroundInfo(NOTIF_ID, notification)
+        }
+    }
+
+    /**
+     * The download's own ongoing notification.
+     *
+     * Its own id, because a download and a filter job run at the same time by design and one would
+     * otherwise overwrite the other's notification. (The PRD asked for 1002; that was already the
+     * "Saved" notification's id, so downloads took the next one.)
+     *
+     * `dataSync`, never `mediaProcessing`: on API 35+ the two foreground-service types draw from
+     * separate 6 h/24 h budgets, so a download does not spend the filter pipeline's allowance.
+     */
+    fun downloadForegroundInfo(context: Context, workId: UUID, title: String, progress: Int): ForegroundInfo {
+        ensureChannel(context)
+        // 1..100, not 0..100: yt-dlp sits at 0 while it resolves formats, and a determinate bar frozen at
+        // zero reads as stuck where an indeterminate one reads as working.
+        val notification =
+            ongoing(context, workId, context.getString(R.string.download_notif_title), title, progress, 1..100)
+        return if (Build.VERSION.SDK_INT >= 34) {
+            ForegroundInfo(DOWNLOAD_NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(DOWNLOAD_NOTIF_ID, notification)
         }
     }
 
@@ -92,7 +132,13 @@ internal object JobNotifications {
      * No-ops without POST_NOTIFICATIONS (API 33+) — the job still succeeded, the user just sees the
      * result in the app instead.
      */
-    fun done(context: Context, displayName: String, outputUri: String?, sourceUri: String?) {
+    fun done(
+        context: Context,
+        displayName: String,
+        outputUri: String?,
+        sourceUri: String?,
+        mime: String,
+    ) {
         ensureChannel(context)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(context.getString(R.string.done_notif_title))
@@ -106,14 +152,14 @@ internal object JobNotifications {
         val output = outputUri?.takeIf { it.isNotBlank() }?.toUri()?.takeIf { it.scheme == "content" }
         if (output != null) {
             val view = Intent(Intent.ACTION_VIEW)
-                .setDataAndType(output, MIME_MP4)
+                .setDataAndType(output, mime)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             builder.setContentIntent(activity(context, 0, view))
             builder.addAction(0, context.getString(R.string.action_open), activity(context, 0, view))
 
             val share = Intent.createChooser(
                 Intent(Intent.ACTION_SEND)
-                    .setType(MIME_MP4)
+                    .setType(mime)
                     .putExtra(Intent.EXTRA_STREAM, output)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
                 context.getString(R.string.action_share),
@@ -134,7 +180,6 @@ internal object JobNotifications {
     }
 
     const val ACTION_CONFIRM_DELETE = "com.haithamassoli.naqi.CONFIRM_DELETE_ORIGINAL"
-    private const val MIME_MP4 = "video/mp4"
 
     // IMMUTABLE is required on API 31+; each action needs its own request code or they collide.
     private fun activity(context: Context, requestCode: Int, intent: Intent) =

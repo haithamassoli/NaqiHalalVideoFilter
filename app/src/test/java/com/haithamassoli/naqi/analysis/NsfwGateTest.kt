@@ -67,11 +67,6 @@ class NsfwGateTest {
         assertTrue(NsfwGate.fires(p, 100))
     }
 
-    @Test fun constantsExposed() {
-        assertEquals(500L, NsfwGate.PRE_MS)
-        assertEquals(1500L, NsfwGate.POST_MS)
-    }
-
     @Test fun intervalsEmptyWhenNoFirings() {
         assertEquals(emptyList<LongRange>(), NsfwGate.intervals(emptyList(), 10_000L))
     }

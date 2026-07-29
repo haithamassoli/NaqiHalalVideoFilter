@@ -29,12 +29,29 @@ class EtaTest {
         assertTrue(Eta.estimateMs(HOUR, both) > Eta.estimateMs(HOUR, music))
     }
 
-    /** The Phase-0 soak asset: 155 min combined has to read as "a few hours", not minutes or a day. */
+    /**
+     * The Phase-0 soak asset: 155 min combined has to read as "a few hours", not minutes or a day.
+     *
+     * The band moved from 3–4 h to 2–3 h with the 2026-07-29 recalibration (`perf-plan.md` item 1.3 cut
+     * analyze 61 %, so `CENSOR` went 0.54 → 0.28 and `COMBINED` 1.3 → 1.0). Still a band and not an
+     * equality, for the reason this file opens with: it pins the property, not the constant.
+     */
     @Test
     fun theSoakFilmLandsInHoursAndNeedsConfirming() {
         val eta = Eta.estimateMs(155 * 60_000L, both)
-        assertTrue(eta in 3 * HOUR..4 * HOUR)
+        assertTrue(eta in 2 * HOUR..3 * HOUR)
         assertTrue(eta > Eta.CONFIRM_THRESHOLD_MS)
+    }
+
+    /**
+     * The recalibration must not silently drift back. A 3-minute censor-only job was measured at 51.1 s
+     * on an S23 (`wm3.mp4`, 192.9 s ⇒ 0.265); anything that quotes it above ~1.2 min has re-introduced
+     * the stale pre-optimization factor.
+     */
+    @Test
+    fun censorOnlyQuotesCloseToTheMeasuredRate() {
+        val eta = Eta.estimateMs(192_911L, censor)
+        assertTrue("quoted ${eta}ms for a 51.1 s job", eta in 51_000L..75_000L)
     }
 
     /** 0 means "no estimate" — anything else here would put a made-up number in front of the user. */

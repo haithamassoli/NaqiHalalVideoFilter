@@ -131,6 +131,28 @@ class DemucsSeparator(
     var shortfall = 0L
         private set
 
+    /**
+     * Samples the model returned as NaN or ±Inf, replaced with silence by [finite]. Read after [finish]
+     * and logged by the caller — a non-zero count means the separated audio has holes in it.
+     *
+     * **Not a theoretical guard.** The shipped graph is `htdemucs_s26_f16.onnx`, i.e. fp16, and the
+     * input is normalized by whole-track std — so a passage far louder than the track average pushes
+     * intermediate activations toward fp16's ~65504 ceiling and a chunk can come back non-finite.
+     * Observed 2026-07-29 on a 10.5-minute source: the run died at the very end, after 6.5 minutes of
+     * separation, with `IllegalArgumentException: Cannot round NaN value` from `AacWriter`'s int16
+     * quantizer. Silence is the only defensible value for a sample that has none, and losing a few
+     * samples must never cost the whole job.
+     */
+    var nonFinite = 0L
+        private set
+
+    /** NaN/±Inf out of inference becomes silence, and is counted. See [nonFinite]. */
+    private fun finite(x: Float): Float {
+        if (x.isFinite()) return x
+        nonFinite++
+        return 0f
+    }
+
     /** Process the remaining (short) chunks, flush the tail, and emit [totalFrames] frames. */
     fun finish() {
         while (nextChunkOff < shiftedLen) processChunk()
@@ -225,8 +247,8 @@ class DemucsSeparator(
                 // dumb append. `emitted` still advances — it is the grid position, not a write count.
                 if (emitted >= resumeFrames) {
                     val w = wsum[cell] // > 0: every emitted position is covered by ≥1 chunk
-                    emitBuf[2 * n] = softclip((outL[cell] / w) * std + mean)
-                    emitBuf[2 * n + 1] = softclip((outR[cell] / w) * std + mean)
+                    emitBuf[2 * n] = finite(softclip((outL[cell] / w) * std + mean))
+                    emitBuf[2 * n + 1] = finite(softclip((outR[cell] / w) * std + mean))
                     n++
                 }
                 emitted++
