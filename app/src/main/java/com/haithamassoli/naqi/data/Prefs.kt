@@ -21,6 +21,10 @@ object Prefs {
     private const val KEY_REMOVE_MUSIC = "remove_music"
     private const val KEY_CENSOR_WOMEN = "censor_women"
     private const val KEY_QUALITY = "quality"
+    private const val KEY_LAST_UPDATE_CHECK = "last_update_check"
+
+    /** Weekly, per the PRD. Long enough not to nag, short enough to beat a broken extractor. */
+    private const val UPDATE_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000
 
     /** Last-used ops. Defaults to both filters on — the reason someone installed Naqi. */
     fun ops(context: Context): FilterOps = with(prefs(context)) {
@@ -39,6 +43,14 @@ object Prefs {
             .putBoolean(KEY_CENSOR_WOMEN, ops.censorWomen)
             .putString(KEY_QUALITY, quality.name)
             .apply()
+    }
+
+    /** Has it been a week since the last yt-dlp update check? */
+    fun updateDue(context: Context): Boolean =
+        System.currentTimeMillis() - prefs(context).getLong(KEY_LAST_UPDATE_CHECK, 0L) > UPDATE_INTERVAL_MS
+
+    fun markUpdateChecked(context: Context) {
+        prefs(context).edit().putLong(KEY_LAST_UPDATE_CHECK, System.currentTimeMillis()).apply()
     }
 
     private fun prefs(context: Context) =

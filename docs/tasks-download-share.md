@@ -79,22 +79,39 @@ Source: `prd-download-share.md`. Milestones are dependency-ordered; M4.0 is a ha
 
 **Still open:** SIGKILL-mid-queue and force-one-item-to-fail were not exercised on device. The always-success rule and the WorkManager chain persistence are what make them work, and both are load-bearing enough to deserve a real test.
 
-## M4.4 — Trust, license, updater
+## M4.4 — Trust, license, updater — **DONE 2026-07-29**
 **Exit:** copy truthful in EN+AR, repo licensed, attribution screen shipped, yt-dlp updatable without an app release.
 
-- [ ] Strings EN+AR: seal chips → `On-device` · `Private` (drop `Offline`); tagline → "Filtering happens on your device. Your videos never leave your phone." (`res/values/strings.xml:13,14,21` + Arabic parallel, rendered by `TrustSeal()`)
-- [ ] `LICENSE` — `GPL-3.0-or-later` at repo root (repo is currently all-rights-reserved world-readable source; forced by linking youtubedl-android)
-- [ ] `NOTICE` + in-app "Open source licenses" screen; doubles as About with yt-dlp version + Update button
-- [ ] yt-dlp update: weekly auto-check on app open + manual button, `UpdateChannel.STABLE`
-- [ ] Store listing (`docs/store-listing.md:109`) + GitHub repo description: replace "No network usage"/"Fully offline" with "Downloads fetch from the source you chose. Nothing is uploaded, no accounts, no analytics."
-- [ ] BLOCKED (pre-existing, inherited): NudeNet v3 AGPL-3.0 — resolve, replace, or accept AGPL before any public release; this file cannot close it but release cannot happen around it
+- [x] Strings EN+AR: seal chips now `On-device · Private` (`Offline` dropped — it became a false claim the moment Naqi fetches a link); tagline → "Filtering happens on your device. Your videos never leave your phone." Verified on device
+- [x] `LICENSE` — full GPL-3.0 text at the repo root. The repo was previously **world-readable source with no licence at all**, i.e. all-rights-reserved
+- [x] `NOTICE` at the repo root + an in-app **About & licenses** screen that renders it. The build copies `NOTICE` into assets (`CopyNoticeTask` + the AGP Variant API) so the file the user reads and the file in the repo cannot drift
+- [x] About screen doubles as the About page: version, licence, live yt-dlp version, **Check for update** button
+- [x] yt-dlp update: manual button + weekly auto-check on app open (`Downloader.updateIfDue`, `UpdateChannel.STABLE`). The clock only advances on success, so a week offline does not silently consume the interval
+- [x] Store listing (`docs/store-listing.md`) — "No network usage" replaced
+- [ ] **GitHub repo description — NOT DONE, needs the owner.** Still reads "Fully offline." `gh repo edit` returns HTTP 404 for this account: read access only. Set it manually to:
+  > On-device Android video filter (Kotlin): stem-based music removal + face/NSFW censoring. Filtering happens on your device; downloads fetch only from the source you chose.
+- [ ] **BLOCKED (pre-existing, inherited): NudeNet v3 is AGPL-3.0.** Not closable here. It is now stated in `NOTICE` under a heading that cannot be missed, and the same review is flagged for the NOASSERTION NSFW gate. **Release is blocked on this**, not on this file.
 
 ## Acceptance sweep (post-M4.4, PRD §Acceptance)
-- [ ] 3-min YouTube link, both filters → filtered `.mp4` in `Movies/Naqi` < 8 min (S23), title-named, zero unfiltered files ever visible to gallery/other apps
-- [ ] 3 links back to back → in order, all complete; kill mid-queue loses nothing; one failure doesn't stop others
-- [ ] Same URL twice → one queue item
-- [ ] Audio-only music video + Remove music → `.m4a` in `Music/Naqi`, vocals intact
-- [ ] Local file share → sheet pre-filled, no download, unchanged otherwise; reboot before filter → "Re-share the file", queue proceeds
-- [ ] Insufficient disk → specific refusal before any bytes fetched
-- [ ] All filters off → published unfiltered, quarantine emptied
-- [ ] Installed size measured and recorded on a real device
+- [x] 3-min link, both filters → title-named `.mp4` in `Movies/Naqi`, zero unfiltered files ever visible. *Measured on an 82 s X link: download + combined filter = 1.9 min of pipeline. The 8-min budget is for a 3-min clip and was not exceeded; a true 3-min source was not run end-to-end through the sheet*
+- [x] 3 links back to back → in order, all complete
+- [x] Same URL twice → one queue item
+- [x] Audio-only + Remove music → `.m4a` in `Music/Naqi` (this is what surfaced the fp16 NaN bug)
+- [x] Local file share → sheet pre-filled, no download, picker path unchanged
+- [x] All filters off → published unfiltered, quarantine emptied
+- [x] Installed size measured on a real device — 196 MB APK, ~391 MB installed
+- [ ] **Kill mid-queue loses nothing** — not exercised on device
+- [ ] **One item failing does not stop the others** — not exercised on device
+- [ ] **Insufficient disk → specific refusal before any bytes fetched** — code paths exist in both the sheet and the worker, neither triggered on a real full disk
+- [ ] **Reboot before a shared file's filter runs → "Re-share the file"** — not exercised
+- [ ] Vocals-intact check on the audio-only output was not listened to
+
+## What is left
+
+Three device tests and one owner action:
+
+1. **SIGKILL mid-queue**, **force one item to fail**, and **reboot before a shared file is filtered**. These are the load-bearing claims of the always-success rule and the WorkManager chain, and they are exactly the kind of thing that is fine in theory and broken in practice.
+2. **Fill the disk** and confirm the refusal arrives before any bytes are fetched.
+3. **GitHub repo description** (above) — needs write access.
+
+And the two that predate this work and gate any release: **NudeNet's AGPL-3.0**, and the absence of an SD 778G-class device to verify any timing claim on.

@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.IntentCompat
 import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.model.FilterOps
@@ -59,6 +60,9 @@ class MainActivity : ComponentActivity() {
         if (BuildConfig.DEBUG) maybeAutorun()
         deleteTarget = deleteTargetOf(intent)
         shared = sharedOf(intent)
+        // Weekly yt-dlp check (PRD M4.4). Off the main thread, failure-tolerant, and no-op six days out
+        // of seven — sites change how they serve video far faster than the app ships.
+        lifecycleScope.launch { Downloader.updateIfDue(this@MainActivity) }
         setContent {
             NaqiTheme {
                 NaqiApp(modifier = Modifier.fillMaxSize())

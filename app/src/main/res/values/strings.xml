@@ -11,14 +11,16 @@
 
     <!-- Trust-seal pill at the very top; the two halves are joined by a "·" drawn in code. Tight space, keep short. -->
     <string name="pick_seal_on_device">On-device</string>
-    <string name="pick_seal_offline">Offline</string>
+    <!-- Was "Offline". Naqi now downloads links the user shares, so "Offline" became a false claim;
+         "Private" says the thing that is still true and is what the seal was ever about. -->
+    <string name="pick_seal_private">Private</string>
 
     <!-- Brand lockup under the droplet mark. BRAND: identical value in every locale, do not translate. -->
     <string name="pick_wordmark_ar">نقي</string>
     <string name="pick_wordmark_latin">Naqi</string>
 
     <!-- Two-line privacy promise under the wordmark; \n is a real line break in the rendered text. -->
-    <string name="pick_tagline">Filter video on your device.\nNothing leaves your phone.</string>
+    <string name="pick_tagline">Filtering happens on your device.\nYour videos never leave your phone.</string>
 
     <!-- Pick-video card. Title is one line with ellipsis; "Video selected" covers a provider that exposes no name. -->
     <string name="pick_video_none">Pick a video</string>
@@ -239,6 +241,30 @@
     <string name="queue_state_failed">Failed</string>
     <string name="queue_dismiss">Dismiss</string>
     <string name="queue_clear_finished">Clear finished</string>
+
+    <!-- ============================================================
+         About / open-source licences (M4). AboutScreen.
+         ============================================================ -->
+    <string name="about_title">About Naqi</string>
+    <!-- %1$s = version name, %2$d = version code. -->
+    <string name="about_version">Version %1$s (%2$d)</string>
+    <string name="about_license">Licensed under GPL-3.0-or-later.</string>
+    <!-- Entry point on the pick screen. -->
+    <string name="about_open">About &amp; licenses</string>
+    <string name="about_open_desc">Version, open-source notices, and the downloader update.</string>
+
+    <!-- Uppercase is literal — Eyebrow() does not uppercase. -->
+    <string name="about_eyebrow_downloader">DOWNLOADER</string>
+    <string name="about_eyebrow_licenses">OPEN SOURCE</string>
+    <!-- %1$s = a yt-dlp version string like 2026.07.04, or about_ytdlp_unknown. -->
+    <string name="about_ytdlp_version">yt-dlp %1$s</string>
+    <string name="about_ytdlp_unknown">not updated yet</string>
+    <string name="about_ytdlp_desc">Sites change how they serve video every few weeks. Naqi checks for a new downloader once a week; update here if a link stops working.</string>
+    <string name="about_update">Check for update</string>
+    <string name="about_updating">Updating…</string>
+    <string name="about_update_ok">Downloader is up to date.</string>
+    <string name="about_update_failed">Couldn\'t update. Check your connection and try again.</string>
+    <string name="about_notice_missing">Open-source notices are unavailable in this build.</string>
 
     <!-- Ongoing notification while a download runs; the second line is the video title. -->
     <string name="download_notif_title">Downloading video</string>

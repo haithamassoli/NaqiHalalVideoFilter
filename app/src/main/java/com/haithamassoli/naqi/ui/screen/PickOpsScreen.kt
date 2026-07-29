@@ -70,6 +70,7 @@ fun PickOpsScreen(
     onPicked: (Uri, String?) -> Unit,
     onOpsChange: (FilterOps) -> Unit,
     onContinue: () -> Unit,
+    onAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -159,6 +160,22 @@ fun PickOpsScreen(
                 }
             }
 
+            // About & licences. Attribution has to be reachable from the app itself, not only from the
+            // repository — GPL-3.0 and an AGPL-3.0 model are not obligations a README discharges.
+            Spacer(Modifier.height(NaqiTokens.space4))
+            NaqiCard(Modifier.clickable(onClick = onAbout)) {
+                Text(
+                    stringResource(R.string.about_open),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    stringResource(R.string.about_open_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             Spacer(Modifier.height(NaqiTokens.space4))
             ReassuranceLine()
 
@@ -183,7 +200,7 @@ private fun TrustSeal() {
         Icon(NaqiIcons.Droplet, contentDescription = null, tint = primary, modifier = Modifier.size(16.dp))
         Text(stringResource(R.string.pick_seal_on_device), style = MaterialTheme.typography.labelMedium, color = primary)
         Text("·", style = MaterialTheme.typography.labelMedium, color = primary.copy(alpha = 0.55f))
-        Text(stringResource(R.string.pick_seal_offline), style = MaterialTheme.typography.labelMedium, color = primary)
+        Text(stringResource(R.string.pick_seal_private), style = MaterialTheme.typography.labelMedium, color = primary)
     }
 }
 

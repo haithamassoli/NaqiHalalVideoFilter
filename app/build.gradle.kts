@@ -66,6 +66,31 @@ android {
     }
 }
 
+// The in-app "Open source licenses" screen reads the repo's own NOTICE file, copied into assets by the
+// build. Deliberately not a second copy pasted into strings.xml: two copies of an attribution list is
+// exactly the kind of thing that silently drifts, and the one the user sees is the one that has to be
+// right. A typed task rather than a bare Copy because AGP's Variant API needs a DirectoryProperty
+// output to wire the task dependency itself.
+abstract class CopyNoticeTask : DefaultTask() {
+    @get:InputFile
+    abstract val notice: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        notice.get().asFile.copyTo(outputDir.get().file("NOTICE").asFile, overwrite = true)
+    }
+}
+
+val copyNotice = tasks.register<CopyNoticeTask>("copyNotice") {
+    notice.set(rootProject.layout.projectDirectory.file("NOTICE"))
+}
+androidComponents.onVariants { variant ->
+    variant.sources.assets?.addGeneratedSourceDirectory(copyNotice, CopyNoticeTask::outputDir)
+}
+
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

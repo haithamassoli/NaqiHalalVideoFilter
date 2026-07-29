@@ -1,0 +1,95 @@
+Naqi — Halal Video Filter
+Copyright (C) 2026 Haitham Assoli
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See the LICENSE file for the full text.
+
+Naqi is licensed GPL-3.0-or-later because it links youtubedl-android, which is
+GPL-3.0. Before the download feature the repository carried no licence at all.
+
+======================================================
+UNRESOLVED LICENCE ISSUE — READ BEFORE ANY PUBLIC RELEASE
+======================================================
+
+  NudeNet v3 320n  (app/src/main/assets/models/nudenet_320n.onnx)
+  Source:  github.com/notAI-tech/NudeNet, v3.4-weights release, used unmodified
+  Licence: AGPL-3.0
+
+  The AGPL's network-use clause is not triggered by an app that performs all
+  inference on the user's own device, but the copyleft obligation itself is
+  real and is stricter than the GPL-3.0 this project now carries.
+
+  This is a PRE-EXISTING issue, flagged since M0 (docs/m0-spikes.md,
+  scripts/fetch-models.sh, docs/tasks.md). It must be resolved, the model must
+  be replaced, or the terms must be knowingly accepted, BEFORE the app is
+  distributed. Shipping is blocked on it, not on this file.
+
+  The NSFW gate (nsfw_mnv2_140_f32.onnx, from GantMan/nsfw_model 1.2.0) is
+  marked NOASSERTION upstream and needs the same review.
+
+======================================================
+THIRD-PARTY COMPONENTS
+======================================================
+
+--- Download engine
+
+yt-dlp — github.com/yt-dlp/yt-dlp
+  The Unlicense (public domain). Shipped as a zipapp inside youtubedl-android
+  and updated at runtime from the project's GitHub releases.
+
+youtubedl-android — github.com/JunkFood02/youtubedl-android
+  GPL-3.0. This is the dependency that determines Naqi's own licence.
+
+FFmpeg / FFprobe — ffmpeg.org
+  Bundled by youtubedl-android:ffmpeg. FFmpeg is LGPL-2.1-or-later, with
+  GPL-2.0-or-later applying to builds configured with --enable-gpl. The exact
+  configuration of the bundled binaries is set by youtubedl-android; consult
+  that project for the build flags before relying on the weaker licence.
+
+CPython — python.org
+  Python Software Foundation License 2.0. Bundled by youtubedl-android as
+  libpython.so + libpython.zip.so to execute the yt-dlp zipapp.
+
+QuickJS — bellard.org/quickjs
+  MIT. Bundled as libqjs.so; used to solve the JavaScript challenges some
+  sites require before serving media URLs.
+
+--- Machine learning
+
+ONNX Runtime — github.com/microsoft/onnxruntime
+  MIT. Runs every model below.
+
+Demucs (htdemucs) — github.com/facebookresearch/demucs
+  MIT. Weights re-exported to ONNX at a 2.6 s segment via
+  github.com/sevagh/demucs.onnx. Used for music removal.
+
+NudeNet v3 320n — github.com/notAI-tech/NudeNet
+  AGPL-3.0. See the unresolved-licence section above.
+
+nsfw_model (MobileNetV2 1.4-224) — github.com/GantMan/nsfw_model
+  NOASSERTION upstream. See the unresolved-licence section above.
+
+ML Kit Face Detection — developers.google.com/ml-kit
+  Google APIs Terms of Service. Face detection only; no data leaves the device.
+
+--- Android / Kotlin
+
+Apache License 2.0:
+  AndroidX Core, Activity, Compose (UI, Material 3, Tooling)
+  AndroidX WorkManager
+  AndroidX Media3 (Transformer, Effect, Common)
+  Kotlin standard library and kotlinx.coroutines — JetBrains
+  Jackson (databind, core, annotations) — FasterXML, via youtubedl-android
+  Apache Commons Compress — via youtubedl-android
+
+--- Test-only
+
+JUnit 4 — Eclipse Public License 1.0
+org.json — Public Domain (JSON.org)
+
+======================================================
+
+The full text of each licence is available from the project pages listed above.
+Naqi's own terms are in LICENSE at the root of this repository.

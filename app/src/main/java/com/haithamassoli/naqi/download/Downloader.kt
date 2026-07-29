@@ -3,6 +3,7 @@ package com.haithamassoli.naqi.download
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.work.JobStore
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
@@ -97,6 +98,20 @@ object Downloader {
     suspend fun getInfo(context: Context, url: String): VideoInfo = withContext(Dispatchers.IO) {
         ensureInit(context)
         YoutubeDL.getInstance().getInfo(url)
+    }
+
+    /**
+     * The weekly auto-check (PRD: "weekly auto-check on app open + manual button").
+     *
+     * Fire-and-forget and deliberately failure-tolerant: this runs on a cold start, the user has not
+     * asked for anything yet, and a failed check must cost them nothing. The clock is only advanced on
+     * success, so a week offline does not silently consume the interval.
+     */
+    suspend fun updateIfDue(context: Context) {
+        if (!Prefs.updateDue(context)) return
+        runCatching { update(context) }
+            .onSuccess { Prefs.markUpdateChecked(context) }
+            .onFailure { Log.w(TAG, "weekly yt-dlp check failed; will retry next launch", it) }
     }
 
     /**

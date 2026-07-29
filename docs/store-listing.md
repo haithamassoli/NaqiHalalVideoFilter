@@ -108,7 +108,7 @@ Everyone (app itself, though processed content varies)
 
 ### Privacy Policy Highlights
 - No data collection
-- No network usage (post model download)
+- Downloads fetch from the source you chose. Nothing is uploaded, no accounts, no analytics
 - No third-party SDKs or analytics
 - All processing on-device
 - No account or authentication required

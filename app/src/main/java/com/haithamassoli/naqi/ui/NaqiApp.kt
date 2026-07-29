@@ -13,12 +13,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.haithamassoli.naqi.model.FilterOps
+import com.haithamassoli.naqi.ui.screen.AboutScreen
 import com.haithamassoli.naqi.ui.screen.JobsScreen
 import com.haithamassoli.naqi.ui.screen.OptionsScreen
 import com.haithamassoli.naqi.ui.screen.PickOpsScreen
 import com.haithamassoli.naqi.work.JobController
 
-private enum class Step { Pick, Options, Jobs }
+private enum class Step { Pick, Options, Jobs, About }
 
 /**
  * The whole app: three linear steps over one piece of shared state (the picked video + its [FilterOps]).
@@ -54,6 +55,8 @@ fun NaqiApp(modifier: Modifier = Modifier) {
     BackHandler(enabled = step != Step.Pick) { step = Step.Pick }
 
     when (step) {
+        Step.About -> AboutScreen(onBack = { step = Step.Pick }, modifier = modifier)
+
         Step.Pick -> PickOpsScreen(
             pickedUri = pickedUri,
             pickedName = pickedName,
@@ -61,6 +64,7 @@ fun NaqiApp(modifier: Modifier = Modifier) {
             onPicked = { uri, name -> pickedUri = uri; pickedName = name },
             onOpsChange = { ops = it },
             onContinue = { step = Step.Options },
+            onAbout = { step = Step.About },
             modifier = modifier,
         )
 
