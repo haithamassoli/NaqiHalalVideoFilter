@@ -13,9 +13,9 @@ android {
 
     defaultConfig {
         applicationId = "com.haithamassoli.naqi"
-        minSdk = 26
+        minSdk = 29
         targetSdk = 36
-        versionCode = 2
+        versionCode = 3
         versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
