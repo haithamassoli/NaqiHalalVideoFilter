@@ -35,7 +35,7 @@ there are no analytics SDKs, and no account is required.
 
 ## Install
 
-Grab the APK from [Releases](https://github.com/haithamassoli-plus-connect/NaqiHalalVideoFilter/releases).
+Grab the APK from [Releases](https://github.com/haithamassoli/NaqiHalalVideoFilter/releases).
 
 **Requirements:** Android 10 (API 29) or newer, **arm64-v8a** only. Free space of roughly
 2× the video size. The APK is large because the ONNX models ship inside it.
