@@ -9,7 +9,7 @@ Android app that filters a locally selected video entirely on-device and saves a
 - Processing: background job (WorkManager + foreground service), progress notification per stage, cancellable.
 
 ## Non-goals (v1)
-Overlay on other apps; streaming sources; real-time playback filtering; DRM content; iOS; cloud processing; male-face blurring; per-region NSFW blur (superseded by whole-frame decision); Bandit-class dialogue/music/effects model (future upgrade).
+Overlay on other apps; streaming sources; real-time playback filtering; DRM content; iOS; cloud processing; male-face blurring; per-region NSFW blur as the DEFAULT (superseded by whole-frame decision — since shipped as an opt-in Advanced toggle that fails safe back to whole-frame, see `analysis.NsfwRegions`); Bandit-class dialogue/music/effects model (future upgrade).
 
 **"Job resume after process death" was a non-goal here and is no longer one** — removed 2026-07-28 when the
 `long-film-plan.md` decision gate was answered *films*. It could not both stand and support the 2 h movie
@@ -107,4 +107,4 @@ Kotlin, Jetpack Compose (3 screens: pick/ops, options, jobs/library). minSdk 26,
 3. M3: options UI, model downloader, acceptance test set, tuning.
 
 ## Future
-Bandit-v2-class dialogue/music/effects model when a mobile port is viable; per-region NSFW blur; job resume; NudeNet 640m accuracy option; male-face toggle.
+Bandit-v2-class dialogue/music/effects model when a mobile port is viable; per-region NSFW blur promoted from opt-in to default (blocked on a QA box hit-rate); job resume; NudeNet 640m accuracy option; male-face toggle.

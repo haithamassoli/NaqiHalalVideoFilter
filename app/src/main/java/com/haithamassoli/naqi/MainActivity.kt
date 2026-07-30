@@ -209,6 +209,7 @@ class MainActivity : ComponentActivity() {
             blurAmount = intent.getIntExtra("blur", 60),
             grayscale = intent.getBooleanExtra("grayscale", false),
             blurUnknownFaces = intent.getBooleanExtra("blur_unknown", false),
+            perRegionNsfw = intent.getBooleanExtra("per_region", false),
             keepStems = intent.getStringExtra("keep_stems") ?: "vocals",
         )
 

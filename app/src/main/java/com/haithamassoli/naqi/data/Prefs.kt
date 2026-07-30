@@ -18,6 +18,10 @@ object Prefs {
 
     private const val FILE = "naqi_share_prefs"
 
+    // ponytail: `perRegionNsfw` is deliberately NOT here, so a video shared into the app always renders
+    // whole-frame regardless of that toggle. That matches `blurUnknownFaces`, which [ops] already does
+    // not restore (it rebuilds FilterOps from removeMusic + censorWomen only). Wire all five advanced
+    // fields at once, or none.
     private const val KEY_REMOVE_MUSIC = "remove_music"
     private const val KEY_CENSOR_WOMEN = "censor_women"
     private const val KEY_QUALITY = "quality"

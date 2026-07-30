@@ -96,6 +96,11 @@
     <string name="action_show">Show</string>
     <string name="opt_blur_unknown_faces_title">Blur unknown faces</string>
     <string name="opt_blur_unknown_faces_desc">Censors faces whose gender never resolves. Off by default: it blurs men too.</string>
+    <!-- Per-region NSFW: a PRD non-goal shipped opt-in. Worded to promise no more than the pipeline
+         does — it only narrows the blur inside a long continuously-flagged run, and any doubt falls
+         back to the whole frame. -->
+    <string name="opt_per_region_title">Blur only the detected areas</string>
+    <string name="opt_per_region_desc">In a long flagged scene, blurs the body areas Naqi can locate instead of the whole picture. Falls back to the whole frame whenever it is unsure.</string>
 
     <!-- Language picker (API 33+). Opens system per-app language settings. -->
     <string name="opt_language">Language</string>

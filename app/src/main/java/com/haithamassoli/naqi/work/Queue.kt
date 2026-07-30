@@ -143,6 +143,7 @@ internal object Queue {
                 put("blurAmount", i.ops.blurAmount)
                 put("grayscale", i.ops.grayscale)
                 put("blurUnknownFaces", i.ops.blurUnknownFaces)
+                put("perRegionNsfw", i.ops.perRegionNsfw)
                 put("keepStems", i.ops.keepStems)
             },
         )
@@ -168,6 +169,7 @@ internal object Queue {
                 blurAmount = ops.optInt("blurAmount", 60),
                 grayscale = ops.optBoolean("grayscale", false),
                 blurUnknownFaces = ops.optBoolean("blurUnknownFaces", false),
+                perRegionNsfw = ops.optBoolean("perRegionNsfw", false),
                 keepStems = ops.optString("keepStems").ifBlank { "vocals" },
             ),
         )

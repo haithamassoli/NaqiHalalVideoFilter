@@ -12,6 +12,11 @@ data class FaceTrackEdl(val startMs: Long, val endMs: Long, val keyframes: List<
  * renderer. [fullFrameAt] and [regionsAt] run once per rendered frame, so both stay allocation-light.
  * Precedence: an active censor interval blanks the whole frame and suppresses face regions.
  * Serializes via org.json (Android platform; JVM tests add the dep). All times are MILLIseconds.
+ *
+ * ponytail: [faceTracks] also carries per-region NSFW spans when `perRegionNsfw` is on (see
+ * `analysis.NsfwRegions`). Neither the JSON nor the renderer can tell the two apart, and neither
+ * needs to — reusing this field is what buys zero schema change and zero checkpoint migration.
+ * Split it only if some future feature must treat them differently.
  */
 data class Edl(val censorIntervalsMs: List<LongRange>, val faceTracks: List<FaceTrackEdl>) {
 

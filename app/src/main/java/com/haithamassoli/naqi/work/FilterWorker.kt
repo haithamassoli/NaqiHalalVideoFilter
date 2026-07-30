@@ -1,6 +1,7 @@
 package com.haithamassoli.naqi.work
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.media.MediaExtractor
 import android.net.Uri
 import android.os.Build
@@ -16,6 +17,9 @@ import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.analysis.FaceTracker
 import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.analysis.NsfwGate
+import com.haithamassoli.naqi.analysis.NsfwRegions
+import com.haithamassoli.naqi.analysis.RegionBox
+import com.haithamassoli.naqi.analysis.RegionSample
 import com.haithamassoli.naqi.audio.AudioPipeline
 import com.haithamassoli.naqi.audio.ConcatAudio
 import com.haithamassoli.naqi.audio.ConcatPart
@@ -66,7 +70,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     private val blurAmount = inputData.getInt(KEY_BLUR_AMOUNT, 60)
     private val grayscale = inputData.getBoolean(KEY_GRAYSCALE, false)
     private val blurUnknownFaces = inputData.getBoolean(KEY_BLUR_UNKNOWN, false)
+    private val perRegionNsfw = inputData.getBoolean(KEY_PER_REGION_NSFW, false)
     private val keepStems = inputData.getString(KEY_KEEP_STEMS) ?: "vocals"
+
+    /** Cumulative NudeNet localization ns. Its own accumulator so `gate=` keeps meaning the M2 gate only. */
+    private var tRegion = 0L
 
     /**
      * Key for this job's working directory. Derived from the source and every option that changes the
@@ -95,7 +103,13 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // describes a DIFFERENT time window under the same index. Resuming into it would fold analysis
             // into the wrong span and have Remux.concat place rendered frames at the wrong absolute time —
             // silently. Bumping this orphans that directory instead, and the 7-day sweep collects it.
-            "plan2",
+            //
+            // Per-region rides the same string rather than a 10th keyOf part: `firingsMs` in an-NNN.json
+            // means "every firing" with the flag off and "the firings per-region could not cover" with it
+            // on, so the two modes must not share a directory — but a new part would re-digest and orphan
+            // every flag-off job too ([JobStore.keyOf] is length-delimited over ALL parts). This way
+            // flag-off keys stay byte-identical.
+            if (inputData.getBoolean(KEY_PER_REGION_NSFW, false)) "plan2-pr" else "plan2",
         )
     }
 
@@ -448,6 +462,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 continue
             }
             val segFirings = ArrayList<Long>()
+            val segSamples = ArrayList<RegionSample>()   // per-region only; empty when the flag is off
+            val region0 = tRegion
             // Fresh per segment: this is what bounds FaceTracker's growth by construction, on top of the
             // per-track eviction Phase 1 added.
             val tracker = FaceTracker(applicationContext, blurUnknownFaces)
@@ -462,12 +478,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                     // gate now OVERLAP — tDetect times the await (the part that still blocks), and detect+gate
                     // can exceed wall. Awaiting inside the callback is what keeps the bitmap alive for both.
                     val task = tracker.detect(bitmap)
-                    if (index % 2 == 0) {
-                        val t1 = System.nanoTime()
-                        val probs = Infer.nsfw(applicationContext, bitmap)
-                        tGate += System.nanoTime() - t1
-                        if (NsfwGate.fires(probs, strictness)) segFirings += ptsMs
-                    }
+                    if (index % 2 == 0) tGate += gateFrame(bitmap, ptsMs, segFirings, segSamples)
                     val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
                     tracker.onFaces(faces, bitmap, ptsMs)
                     index++
@@ -481,14 +492,25 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 // consumer side only — a pass where detect+gate is under wall is one the decoder is pacing.
                 val wallMs = (System.nanoTime() - tWall) / 1_000_000
                 val segTracks = tracker.finish()
+                // Both halves of the per-region decision go into the SAME atomic checkpoint: the reduced
+                // firing list and the spans it traded them for. Persisting one without the other is how a
+                // resumed film would come back with its NSFW shots un-blurred.
+                val nsfw = NsfwRegions.plan(segFirings, segSamples, segTracks)
                 // The checkpoint goes in only once BOTH halves of this segment's analysis exist, and it is
                 // written atomically — so a file under its final name always means a complete segment.
-                Checkpoint.writeAnalysis(workDir, seg.index, segFirings, Edl(emptyList(), segTracks))
-                firings += segFirings
+                Checkpoint.writeAnalysis(
+                    workDir, seg.index, nsfw.fallbackFiringsMs,
+                    Edl(emptyList(), (segTracks + nsfw.tracks).sortedBy { it.startMs }),
+                )
+                firings += nsfw.fallbackFiringsMs
                 faceTracks += segTracks
+                faceTracks += nsfw.tracks
                 Log.i(TAG, "analyze seg-${seg.index} [${seg.startMs}..${seg.endMs}): " +
-                    "firings=${segFirings.size} censorTracks=${segTracks.size} ${tracker.retention()} " +
-                    "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms")
+                    "firings=${segFirings.size} fallback=${nsfw.fallbackFiringsMs.size} " +
+                    "nudenet=${segSamples.size} covered=${segSamples.count { it.boxes.isNotEmpty() }} " +
+                    "nsfwSpans=${nsfw.tracks.size} censorTracks=${segTracks.size} ${tracker.retention()} " +
+                    "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms " +
+                    "region=${(tRegion - region0) / 1_000_000}ms")
             } finally {
                 runCatching { tracker.closeDetector() }
             }
@@ -673,18 +695,14 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         val stage = stage(R.string.stage_analyzing)
         stats.stage("analyze")
         val firings = ArrayList<Long>()
+        val samples = ArrayList<RegionSample>()   // per-region only; empty when the flag is off
         var index = 0
         var lastPct = -1
         var tDetect = 0L; var tGate = 0L; val tWall = System.nanoTime()
         FrameSampler.sample(applicationContext, uri, fps = 10f, maxDim = 640) { bitmap, ptsMs ->
             // Same overlapped sequence as analyzeSegments — see the comment there (perf-plan 1.3a).
             val task = faceTracker.detect(bitmap)
-            if (index % 2 == 0) {
-                val t1 = System.nanoTime()
-                val probs = Infer.nsfw(applicationContext, bitmap)
-                tGate += System.nanoTime() - t1
-                if (NsfwGate.fires(probs, strictness)) firings += ptsMs
-            }
+            if (index % 2 == 0) tGate += gateFrame(bitmap, ptsMs, firings, samples)
             val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
             faceTracker.onFaces(faces, bitmap, ptsMs)
             index++
@@ -699,20 +717,77 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         }
         val wallMs = (System.nanoTime() - tWall) / 1_000_000 // sampling only; the vote below is its own stage
 
-        val intervals = intervalsFor(firings, durationMs)
         // wall #3 of long-film-plan.md. Tracks now vote and recycle during the pass, so "vote" only
         // covers the handful still live at the end — it is kept as its own stage because the 2.7 min
         // this took on the 155-min soak is the before-number this Phase 1 item exists to move.
         stats.stage("vote")
         val faceTracks = faceTracker.finish()
+        // plan() then intervalsFor(), in that order and after finish(): the plan needs the face spans to
+        // know whether adding an NSFW rect could push a moment past CensorEffect's 8 shader slots (where
+        // the largest-kept rule would drop the small critical box in favour of a big padded face), and it
+        // is what decides which firings still need whole-frame coverage.
+        val nsfw = NsfwRegions.plan(firings, samples, faceTracks)
+        val intervals = intervalsFor(nsfw.fallbackFiringsMs, durationMs)
         // Counts on their own line: a feature-length film produces hundreds of intervals, and logcat
         // truncates a message at ~4 kB — on the first 155-min soak that silently ate the face counts
         // off the end of the combined line, which were the whole point of logging it.
-        Log.i(TAG, "pass1: gateFirings=${firings.size} intervalCount=${intervals.size} " +
+        Log.i(TAG, "pass1: gateFirings=${firings.size} fallback=${nsfw.fallbackFiringsMs.size} " +
+            "nudenet=${samples.size} covered=${samples.count { it.boxes.isNotEmpty() }} " +
+            "nsfwSpans=${nsfw.tracks.size} intervalCount=${intervals.size} " +
             "censorFaceTracks=${faceTracks.size} ${faceTracker.retention()} " +
-            "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms")
+            "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms " +
+            "region=${tRegion / 1_000_000}ms")
         Log.i(TAG, "pass1 intervals=$intervals")
-        return Edl(intervals, faceTracks)
+        // sortedBy is a stable no-op when nsfw.tracks is empty (finish() already returns sorted), so the
+        // flag-off EDL — and its JSON — stays byte-identical to M1's.
+        return Edl(intervals, (faceTracks + nsfw.tracks).sortedBy { it.startMs })
+    }
+
+    /**
+     * The gate on one sampled frame, for both analysis paths. Returns the ns spent in [Infer.nsfw] so
+     * each caller's `gate=` stays comparable to the M2 numbers; NudeNet time goes to [tRegion].
+     *
+     * The firing is appended UNCONDITIONALLY. [NsfwRegions.plan] is only allowed to REMOVE one, so a
+     * fired frame can never fall out of both lists by omission — which is the whole fail-safe. Every
+     * degradation (flag off, ORT throw, no box, only faces, nothing trusted) simply yields no usable
+     * sample, and the firing keeps its full whole-frame hysteresis.
+     *
+     * Must stay INSIDE the sampler callback: [bitmap] is one of [FrameSampler]'s RING of 4 reused
+     * bitmaps and is valid for this call only — deferring the inference would silently analyze pixels
+     * the decoder has already overwritten, with no crash and no log. [Infer.nudenet] does not recycle
+     * its input, and this runs before the ML Kit await, so the three readers are all read-only.
+     *
+     * ponytail: [Infer.nudenet] allocates a maxDim-square ARGB pad bitmap (~1.6 MB at 640) plus a
+     * 320-square copy on every call, ~5x/s on a dense NSFW stretch, inside the callback that already
+     * holds a ring bitmap. Cache a reusable pad bitmap in [Infer] if this shows up as GC pressure — not
+     * worth editing shared M1 inference code for a non-default feature yet.
+     */
+    private fun gateFrame(
+        bitmap: Bitmap,
+        ptsMs: Long,
+        firings: MutableList<Long>,
+        samples: MutableList<RegionSample>,
+    ): Long {
+        val t1 = System.nanoTime()
+        val probs = Infer.nsfw(applicationContext, bitmap)
+        val ns = System.nanoTime() - t1 // the M2 boundary exactly: inference only, not fires()
+        if (!NsfwGate.fires(probs, strictness)) return ns
+        firings += ptsMs
+        if (!perRegionNsfw) return ns
+        val t2 = System.nanoTime()
+        // runCatching is load-bearing beyond the fail-safe: a throw out of the onFrame callback cancels
+        // FrameSampler's decode loop and kills the entire analyze pass.
+        val boxes = runCatching {
+            Infer.nudenet(applicationContext, bitmap)
+                .filter { NsfwRegions.censorable(it.classIndex, it.score) }
+                .map { RegionBox(it.classIndex, it.score, it.rect) }
+        }.getOrElse {
+            Log.w(TAG, "nudenet failed at ${ptsMs}ms; this firing stays whole-frame", it)
+            emptyList()
+        }
+        tRegion += System.nanoTime() - t2
+        samples += RegionSample(ptsMs, boxes)
+        return ns
     }
 
     /**
@@ -810,6 +885,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         const val KEY_BLUR_AMOUNT = "blur_amount"
         const val KEY_GRAYSCALE = "grayscale"
         const val KEY_BLUR_UNKNOWN = "blur_unknown_faces"
+        const val KEY_PER_REGION_NSFW = "per_region_nsfw"
         const val KEY_KEEP_STEMS = "keep_stems"
         const val KEY_FORCE_INTERVALS = "force_intervals"
 

@@ -208,6 +208,13 @@ fun OptionsScreen(
                             checked = ops.blurUnknownFaces,
                             onCheckedChange = { onOpsChange(ops.copy(blurUnknownFaces = it)) },
                         )
+                        NaqiRowDivider()
+                        ToggleTile(
+                            title = stringResource(R.string.opt_per_region_title),
+                            desc = stringResource(R.string.opt_per_region_desc),
+                            checked = ops.perRegionNsfw,
+                            onCheckedChange = { onOpsChange(ops.copy(perRegionNsfw = it)) },
+                        )
                     }
                 }
                 Spacer(Modifier.height(NaqiTokens.space5))

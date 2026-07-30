@@ -85,6 +85,9 @@
     <string name="action_show">إظهار</string>
     <string name="opt_blur_unknown_faces_title">تمويه الوجوه غير المُصنَّفة</string>
     <string name="opt_blur_unknown_faces_desc">يحجب الوجوه التي يتعذّر تحديد جنسها. مُعطَّل افتراضيًا لأنه يُموّه الرجال أيضًا.</string>
+    <!-- تمويه لكل منطقة: هدف غير مشمول في المستند، يُشغَّل اختياريًا ويعود تلقائيًا إلى تمويه الإطار كامل. -->
+    <string name="opt_per_region_title">تمويه المناطق المكتشفة فقط</string>
+    <string name="opt_per_region_desc">في المشاهد المحجوبة الطويلة، يموّه مناطق الجسم التي يستطيع تحديدها بدلاً من الصورة كاملة، ويعود إلى تمويه الإطار كامل عند أي شك.</string>
 
     <!-- Language picker (API 33+). Opens system per-app language settings. -->
     <string name="opt_language">اللغة</string>
