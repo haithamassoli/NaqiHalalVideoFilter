@@ -6,7 +6,6 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,13 +23,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,29 +38,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.media.displayName
-import com.haithamassoli.naqi.ml.ModelSmoke
-import com.haithamassoli.naqi.ml.SmokeReport
 import com.haithamassoli.naqi.model.FilterOps
-import com.haithamassoli.naqi.ui.Eyebrow
+import com.haithamassoli.naqi.ui.NaqiBottomAction
 import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.NaqiIcons
-import com.haithamassoli.naqi.ui.SelectDot
+import com.haithamassoli.naqi.ui.NaqiRowDivider
+import com.haithamassoli.naqi.ui.NaqiTopBar
+import com.haithamassoli.naqi.ui.NoteLine
+import com.haithamassoli.naqi.ui.SectionHeader
+import com.haithamassoli.naqi.ui.ToggleTile
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * Step 1: choose the video and which operations to run. Tuning for those operations lives on the
  * options screen, so nothing here writes anything but [FilterOps.removeMusic]/[FilterOps.censorWomen].
+ *
+ * Everything that is not one of those two decisions was pushed off the screen: language and about into
+ * the overflow menu, the model smoke report into [AboutScreen]. What is left fits on a phone without
+ * scrolling, and Continue is pinned so it never has to be scrolled to.
  */
 @Composable
 fun PickOpsScreen(
@@ -74,9 +76,6 @@ fun PickOpsScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var smoke by remember { mutableStateOf<SmokeReport?>(null) }
-
-    LaunchedEffect(Unit) { smoke = withContext(Dispatchers.Default) { ModelSmoke.run(context) } }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -87,55 +86,83 @@ fun PickOpsScreen(
         }
     }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background, modifier = modifier) { pad ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            NaqiTopBar(
+                title = stringResource(R.string.app_name),
+                actions = { OverflowMenu(onAbout = onAbout) },
+            )
+        },
+        bottomBar = {
+            NaqiBottomAction(
+                label = stringResource(R.string.action_continue),
+                // Both are required: a job without a video has nothing to filter, one without an op nothing to do.
+                enabled = pickedUri != null && ops.any,
+                onClick = onContinue,
+                above = { NoteLine(NaqiIcons.Check, stringResource(R.string.pick_reassurance)) },
+            )
+        },
+        modifier = modifier,
+    ) { pad ->
         Column(
             Modifier
                 .padding(pad)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = NaqiTokens.gutter)
-                .padding(top = NaqiTokens.space5, bottom = NaqiTokens.space7),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(top = NaqiTokens.space2, bottom = NaqiTokens.space5),
         ) {
             TrustSeal()
-            Spacer(Modifier.height(NaqiTokens.space6))
-            Wordmark()
-            Spacer(Modifier.height(NaqiTokens.space6))
+            Spacer(Modifier.height(NaqiTokens.space5))
 
             PickVideoCard(picked = pickedUri != null, fileName = pickedName) { picker.launch(arrayOf("video/*")) }
             Spacer(Modifier.height(NaqiTokens.space5))
 
-            Eyebrow(stringResource(R.string.pick_eyebrow_choose))
-            Spacer(Modifier.height(NaqiTokens.space3))
-            OperationCard(
-                icon = NaqiIcons.MusicOff,
-                title = stringResource(R.string.pick_op_music_title),
-                desc = stringResource(R.string.pick_op_music_desc),
-                selected = ops.removeMusic,
-            ) { onOpsChange(ops.copy(removeMusic = !ops.removeMusic)) }
-            Spacer(Modifier.height(NaqiTokens.space3))
-            OperationCard(
-                icon = NaqiIcons.Shield,
-                title = stringResource(R.string.pick_op_women_title),
-                desc = stringResource(R.string.pick_op_women_desc),
-                selected = ops.censorWomen,
-            ) { onOpsChange(ops.copy(censorWomen = !ops.censorWomen)) }
+            SectionHeader(stringResource(R.string.pick_eyebrow_choose))
+            // One card, two rows: the pair is a single decision about what this run does.
+            NaqiCard(contentPadding = 0.dp) {
+                ToggleTile(
+                    title = stringResource(R.string.pick_op_music_title),
+                    desc = stringResource(R.string.pick_op_music_desc),
+                    icon = NaqiIcons.MusicOff,
+                    checked = ops.removeMusic,
+                    onCheckedChange = { onOpsChange(ops.copy(removeMusic = it)) },
+                )
+                NaqiRowDivider()
+                ToggleTile(
+                    title = stringResource(R.string.pick_op_women_title),
+                    desc = stringResource(R.string.pick_op_women_desc),
+                    icon = NaqiIcons.Shield,
+                    checked = ops.censorWomen,
+                    onCheckedChange = { onOpsChange(ops.copy(censorWomen = it)) },
+                )
+            }
+        }
+    }
+}
 
-            Spacer(Modifier.height(NaqiTokens.space5))
-            Button(
-                onClick = onContinue,
-                // Both are required: a job without a video has nothing to filter, one without an op nothing to do.
-                enabled = pickedUri != null && ops.any,
-                shape = RoundedCornerShape(NaqiTokens.radiusButton),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-            ) { Text(stringResource(R.string.action_continue), style = MaterialTheme.typography.labelLarge) }
+/**
+ * Language and about. Both are things a user opens once and never again, so they cost an icon rather
+ * than two full-width cards on the busiest screen.
+ *
+ * ponytail: system per-app language picker (API 33+); an in-app switcher needs appcompat, add when
+ * pre-33 users complain.
+ */
+@Composable
+private fun OverflowMenu(onAbout: () -> Unit) {
+    val context = LocalContext.current
+    var open by remember { mutableStateOf(false) }
 
-            // ponytail: system per-app language picker (API 33+); in-app switcher needs appcompat, add when pre-33 users complain.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                Spacer(Modifier.height(NaqiTokens.space4))
-                MenuCard(R.string.opt_language, R.string.opt_language_desc) {
+    IconButton(onClick = { open = true }) {
+        Icon(NaqiIcons.More, contentDescription = stringResource(R.string.action_more))
+    }
+    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.opt_language)) },
+                onClick = {
+                    open = false
                     runCatching {
                         context.startActivity(
                             Intent(
@@ -144,36 +171,14 @@ fun PickOpsScreen(
                             ),
                         )
                     }
-                }
-            }
-
-            // About & licences. Attribution has to be reachable from the app itself, not only from the
-            // repository — GPL-3.0 and an AGPL-3.0 model are not obligations a README discharges.
-            Spacer(Modifier.height(NaqiTokens.space4))
-            MenuCard(R.string.about_open, R.string.about_open_desc, onAbout)
-
-            Spacer(Modifier.height(NaqiTokens.space4))
-            ReassuranceLine()
-
-            Spacer(Modifier.height(NaqiTokens.space6))
-            DiagnosticsFooter(smoke)
+                },
+            )
         }
-    }
-}
-
-/** A tappable title+description card — the two entries below Start (language, about) are the same shape. */
-@Composable
-private fun MenuCard(@StringRes title: Int, @StringRes desc: Int, onClick: () -> Unit) {
-    NaqiCard(Modifier.clickable(onClick = onClick)) {
-        Text(
-            stringResource(title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            stringResource(desc),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // Attribution has to be reachable from the app itself, not only from the repository — GPL-3.0
+        // and an AGPL-3.0 model are not obligations a README discharges.
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.about_open)) },
+            onClick = { open = false; onAbout() },
         )
     }
 }
@@ -181,194 +186,108 @@ private fun MenuCard(@StringRes title: Int, @StringRes desc: Int, onClick: () ->
 @Composable
 private fun TrustSeal() {
     val primary = MaterialTheme.colorScheme.primary
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(NaqiTokens.space2),
-        modifier = Modifier
-            .clip(RoundedCornerShape(NaqiTokens.radiusPill))
-            .background(primary.copy(alpha = 0.08f))
-            .border(1.dp, primary.copy(alpha = 0.22f), RoundedCornerShape(NaqiTokens.radiusPill))
-            .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space2),
-    ) {
-        Icon(NaqiIcons.Droplet, contentDescription = null, tint = primary, modifier = Modifier.size(16.dp))
-        Text(stringResource(R.string.pick_seal_on_device), style = MaterialTheme.typography.labelMedium, color = primary)
-        Text("·", style = MaterialTheme.typography.labelMedium, color = primary.copy(alpha = 0.55f))
-        Text(stringResource(R.string.pick_seal_private), style = MaterialTheme.typography.labelMedium, color = primary)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NaqiTokens.space2),
+            modifier = Modifier
+                .clip(RoundedCornerShape(NaqiTokens.radiusPill))
+                .background(primary.copy(alpha = 0.08f))
+                .border(1.dp, primary.copy(alpha = 0.22f), RoundedCornerShape(NaqiTokens.radiusPill))
+                .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space2),
+        ) {
+            Icon(NaqiIcons.Droplet, contentDescription = null, tint = primary, modifier = Modifier.size(16.dp))
+            Text(
+                stringResource(R.string.pick_seal_on_device),
+                style = MaterialTheme.typography.labelMedium,
+                color = primary,
+            )
+            Text("·", style = MaterialTheme.typography.labelMedium, color = primary.copy(alpha = 0.55f))
+            Text(
+                stringResource(R.string.pick_seal_private),
+                style = MaterialTheme.typography.labelMedium,
+                color = primary,
+            )
+        }
     }
 }
 
+/** The one thing this screen exists for: a wide, unmistakable target that also reports what is picked. */
 @Composable
-private fun Wordmark() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun PickVideoCard(picked: Boolean, fileName: String?, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(NaqiTokens.radiusCard))
+            .background(if (picked) cs.primary.copy(alpha = 0.07f) else cs.surfaceContainer)
+            .border(1.5.dp, if (picked) cs.primary else cs.outlineVariant, RoundedCornerShape(NaqiTokens.radiusCard))
+            .clickable(onClick = onClick)
+            .padding(NaqiTokens.space4),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(NaqiTokens.radiusButton))
+                .background(if (picked) cs.primary else cs.surfaceContainerHighest),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (picked) NaqiIcons.Check else NaqiIcons.Video,
+                contentDescription = null,
+                tint = if (picked) cs.onPrimary else cs.onSurfaceVariant,
+                modifier = Modifier.size(26.dp),
+            )
+        }
+        Spacer(Modifier.width(NaqiTokens.space4))
+        Column(Modifier.weight(1f)) {
+            Text(
+                // A provider may not expose a display name; the video is still picked, so don't look unpicked.
+                fileName ?: stringResource(if (picked) R.string.pick_video_selected else R.string.pick_video_none),
+                style = MaterialTheme.typography.titleMedium,
+                color = cs.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                stringResource(if (picked) R.string.pick_video_change else R.string.pick_video_formats),
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** The brand lockup, shown once on the about screen rather than above every visit to the pick screen. */
+@Composable
+internal fun Wordmark() {
+    Column(
+        Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         // The mark is the bowl of ن holding a droplet — it rhymes with the نـ of the wordmark below,
         // so the two read as one lockup rather than a logo parked above a title.
         Icon(
             painterResource(R.drawable.ic_naqi_mark),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(60.dp),
+            modifier = Modifier.size(56.dp),
         )
-        Spacer(Modifier.height(NaqiTokens.space3))
+        Spacer(Modifier.height(NaqiTokens.space2))
         Text(
             stringResource(R.string.pick_wordmark_ar),
-            style = MaterialTheme.typography.displayMedium,
+            style = MaterialTheme.typography.displaySmall,
             color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
             softWrap = false,
         )
+        // The ن of نقي drops a dot below its baseline; without this the Latin line sits in it.
         Spacer(Modifier.height(NaqiTokens.space2))
         Text(
             stringResource(R.string.pick_wordmark_latin),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(NaqiTokens.space3))
-        Text(
-            stringResource(R.string.pick_tagline),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun PickVideoCard(picked: Boolean, fileName: String?, onClick: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(NaqiTokens.radiusCard))
-            .background(cs.surfaceContainer)
-            .border(1.5.dp, if (picked) cs.primary else cs.outlineVariant, RoundedCornerShape(NaqiTokens.radiusCard))
-            .clickable(onClick = onClick)
-            .padding(NaqiTokens.space5),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(
-            if (picked) NaqiIcons.Check else NaqiIcons.Video,
-            contentDescription = null,
-            tint = cs.primary,
-            modifier = Modifier.size(30.dp),
-        )
-        Spacer(Modifier.height(NaqiTokens.space2))
-        Text(
-            // A provider may not expose a display name; the video is still picked, so don't look unpicked.
-            fileName ?: stringResource(if (picked) R.string.pick_video_selected else R.string.pick_video_none),
             style = MaterialTheme.typography.titleMedium,
-            color = cs.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(NaqiTokens.space1))
-        Text(
-            stringResource(if (picked) R.string.pick_video_change else R.string.pick_video_formats),
-            style = MaterialTheme.typography.bodySmall,
-            color = cs.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun OperationCard(
-    icon: ImageVector,
-    title: String,
-    desc: String,
-    selected: Boolean,
-    onToggle: () -> Unit,
-) {
-    val cs = MaterialTheme.colorScheme
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(NaqiTokens.radiusCard))
-            .background(if (selected) cs.primaryContainer else cs.surfaceContainer)
-            .border(
-                if (selected) 1.5.dp else 1.dp,
-                if (selected) cs.primary else cs.outlineVariant,
-                RoundedCornerShape(NaqiTokens.radiusCard),
-            )
-            .clickable(onClick = onToggle)
-            .padding(NaqiTokens.space4),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(NaqiTokens.radiusButton))
-                .background(if (selected) cs.primary.copy(alpha = 0.14f) else cs.surfaceContainerHighest),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, null, tint = if (selected) cs.primary else cs.onSurfaceVariant, modifier = Modifier.size(24.dp))
-        }
-        Spacer(Modifier.width(NaqiTokens.space3))
-        Column(Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                color = if (selected) cs.onPrimaryContainer else cs.onSurface,
-            )
-            Text(
-                desc,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (selected) cs.onPrimaryContainer.copy(alpha = 0.82f) else cs.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.width(NaqiTokens.space3))
-        SelectDot(selected)
-    }
-}
-
-@Composable
-private fun ReassuranceLine() {
-    val cs = MaterialTheme.colorScheme
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NaqiTokens.space1)) {
-        Icon(NaqiIcons.Check, null, tint = cs.primary, modifier = Modifier.size(15.dp))
-        Text(
-            stringResource(R.string.pick_reassurance),
-            style = MaterialTheme.typography.bodySmall,
-            color = cs.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun DiagnosticsFooter(smoke: SmokeReport?) {
-    val cs = MaterialTheme.colorScheme
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(NaqiTokens.radiusButton))
-            .background(cs.surfaceContainerLow)
-            .padding(NaqiTokens.space3),
-    ) {
-        Text(stringResource(R.string.pick_diag_title), style = MaterialTheme.typography.labelSmall, color = cs.onSurfaceVariant)
-        Spacer(Modifier.height(NaqiTokens.space1))
-        if (smoke == null) {
-            Text(stringResource(R.string.pick_diag_running), style = MaterialTheme.typography.bodySmall, color = cs.onSurface)
-        } else {
-            Text(
-                stringResource(R.string.pick_diag_eps, smoke.providers.joinToString(", ").ifEmpty { "—" }),
-                style = MaterialTheme.typography.bodySmall,
-                color = cs.onSurface,
-            )
-            smoke.models.forEach { r ->
-                val (mark, color) = when {
-                    r.ok -> "✓" to cs.onSurface
-                    !r.bundled -> "–" to cs.onSurfaceVariant
-                    else -> "✗" to cs.error
-                }
-                Text(
-                    stringResource(
-                        R.string.pick_diag_model_line,
-                        mark,
-                        r.model.assetName.removeSuffix(".onnx"),
-                        r.detail,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = color,
-                )
-            }
-        }
     }
 }

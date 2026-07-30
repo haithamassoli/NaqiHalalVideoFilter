@@ -37,6 +37,9 @@
     <string name="pick_op_women_title">حجب النساء</string>
     <string name="pick_op_women_desc">تُموّه وجوه النساء والمشاهد المُخالفة.</string>
 
+    <!-- Overflow menu on the pick screen; content description of the "⋮" button. -->
+    <string name="action_more">المزيد</string>
+
     <!-- Primary CTA: advances to the options screen. -->
     <string name="action_continue">متابعة</string>
 
@@ -55,8 +58,8 @@
          Options — step 2, OptionsScreen
          ============================================================ -->
 
-    <!-- Top-left back affordance; the arrow is part of the label and is mirrored to → for RTL. -->
-    <string name="action_back">→ رجوع</string>
+    <!-- Content description of the top-bar back arrow; the glyph itself auto-mirrors, so it is not in the text. -->
+    <string name="action_back">رجوع</string>
     <string name="opt_title">الخيارات</string>
 
     <!-- Censor-women section. Arabic has no case; a short phrase replaces the English caps. -->
@@ -70,8 +73,7 @@
 
     <!-- Remove-music section. Arabic has no case; a short phrase replaces the English caps. -->
     <string name="opt_section_remove_music">إزالة الموسيقى</string>
-    <!-- Keep-stems card. The wire values "vocals"/"vocals_other" are NOT localizable and are not resources. -->
-    <string name="opt_keep_label">ما يُحتفظ به</string>
+    <!-- Keep-stems rows. The wire values "vocals"/"vocals_other" are NOT localizable and are not resources. -->
     <string name="opt_keep_vocals_title">الأصوات البشرية فقط</string>
     <string name="opt_keep_vocals_desc">يُبقي الحوار والغناء؛ ويحذف الموسيقى والمؤثرات الصوتية.</string>
     <string name="opt_keep_vocals_other_title">الأصوات البشرية + المؤثرات</string>
@@ -86,7 +88,6 @@
 
     <!-- Language picker (API 33+). Opens system per-app language settings. -->
     <string name="opt_language">اللغة</string>
-    <string name="opt_language_desc">اختر بين الإنجليزية أو العربية لهذا التطبيق.</string>
 
     <!-- Primary CTA: enqueues the filtering job. -->
     <string name="action_start">بدء</string>
@@ -120,8 +121,11 @@
          Also reuses action_cancel, action_open and action_share (see Notifications).
          ============================================================ -->
 
-    <!-- Resets the flow back to step 1; the arrow is part of the label and is mirrored to → for RTL. -->
-    <string name="jobs_new_job">→ فلترة فيديو آخر</string>
+    <!-- Bottom-bar action that resets the flow back to step 1. -->
+    <string name="jobs_new_job">فلترة فيديو آخر</string>
+
+    <!-- Top-bar title of step 3: the queue, the running job and the library. -->
+    <string name="jobs_title">النشاط</string>
 
     <!-- Empty state inside the job card when nothing is running, succeeded or failed. -->
     <!-- Phase 2 resume: shown on a failed long job whose finished segments are still on disk. -->
@@ -244,7 +248,6 @@
     <!-- BRAND/LEGAL: the licence identifier stays Latin in every locale. -->
     <string name="about_license">مرخّص بموجب GPL-3.0-or-later.</string>
     <string name="about_open">عن التطبيق والتراخيص</string>
-    <string name="about_open_desc">الإصدار وإشعارات المصادر المفتوحة وتحديث أداة التنزيل.</string>
 
     <string name="about_eyebrow_downloader">أداة التنزيل</string>
     <string name="about_eyebrow_licenses">المصادر المفتوحة</string>
@@ -255,6 +258,8 @@
     <string name="about_updating">جارٍ التحديث…</string>
     <string name="about_update_ok">أداة التنزيل محدّثة.</string>
     <string name="about_update_failed">تعذّر التحديث. تحقّق من اتصالك ثم أعد المحاولة.</string>
+    <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
+    <string name="about_notices_title">إشعارات المصادر المفتوحة</string>
     <string name="about_notice_missing">إشعارات المصادر المفتوحة غير متوفّرة في هذه النسخة.</string>
 
     <!-- Ongoing notification while a download runs; the second line is the video title. -->

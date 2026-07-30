@@ -6,7 +6,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,11 +16,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -41,12 +45,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
-import com.haithamassoli.naqi.ui.Eyebrow
+import com.haithamassoli.naqi.ui.NaqiBottomAction
 import com.haithamassoli.naqi.ui.NaqiCard
+import com.haithamassoli.naqi.ui.NaqiIcons
+import com.haithamassoli.naqi.ui.NaqiRowDivider
+import com.haithamassoli.naqi.ui.NaqiTopBar
+import com.haithamassoli.naqi.ui.SectionHeader
 import com.haithamassoli.naqi.ui.durationText
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
 import com.haithamassoli.naqi.work.FilterWorker
 import com.haithamassoli.naqi.work.JobController
+import com.haithamassoli.naqi.work.Queue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -85,6 +94,11 @@ fun JobsScreen(
     // 0 is also the worker's own "too early to say", and both cases mean the same thing here: show nothing.
     val etaMs = info?.progress?.getLong(FilterWorker.KEY_ETA_MS, 0L) ?: 0L
 
+    // Shared items: the queue the user is waiting on. Empty entirely when nothing was ever shared, so
+    // the picker path looks exactly as it did.
+    val queue by Queue.items.collectAsState()
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { Queue.load(context) } }
+
     // Resolved off the main thread: the pre-Q output is a file:// uri that has to be looked up in MediaStore.
     var savedUri by remember { mutableStateOf<Uri?>(null) }
     LaunchedEffect(outputUri) {
@@ -98,21 +112,30 @@ fun JobsScreen(
         library = withContext(Dispatchers.IO) { loadLibrary(context) }
     }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background, modifier = modifier) { pad ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { NaqiTopBar(stringResource(R.string.jobs_title), onBack = onNewJob) },
+        bottomBar = {
+            NaqiBottomAction(
+                label = stringResource(R.string.jobs_new_job),
+                enabled = true,
+                onClick = onNewJob,
+            )
+        },
+        modifier = modifier,
+    ) { pad ->
         Column(
             Modifier
                 .padding(pad)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = NaqiTokens.gutter)
-                .padding(top = NaqiTokens.space4, bottom = NaqiTokens.space7),
+                .padding(top = NaqiTokens.space2, bottom = NaqiTokens.space5),
         ) {
-            TextButton(onClick = onNewJob) { Text(stringResource(R.string.jobs_new_job)) }
-            Spacer(Modifier.height(NaqiTokens.space2))
-
-            // Shared items first: they are the queue the user is waiting on. Absent entirely when
-            // nothing was ever shared, so the picker path looks exactly as it did.
-            QueueSection()
+            if (queue.isNotEmpty()) {
+                QueueCard(queue)
+                Spacer(Modifier.height(NaqiTokens.space5))
+            }
 
             when {
                 running -> JobProgressCard(stageText, progress, etaMs) { JobController.cancel(context) }
@@ -140,28 +163,31 @@ fun JobsScreen(
                         ) { Text(stringResource(R.string.action_resume)) }
                     }
                 }
-                else -> NaqiCard {
-                    Text(
-                        stringResource(R.string.jobs_none_running),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                // Nothing to report and nothing queued: one muted line, not an empty card that looks
+                // like something went missing.
+                queue.isEmpty() -> Text(
+                    stringResource(R.string.jobs_none_running),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = NaqiTokens.space1),
+                )
             }
 
             Spacer(Modifier.height(NaqiTokens.space6))
-            Eyebrow(stringResource(R.string.jobs_library))
-            Spacer(Modifier.height(NaqiTokens.space3))
+            SectionHeader(stringResource(R.string.jobs_library))
             if (library.isEmpty()) {
                 Text(
                     stringResource(R.string.jobs_library_empty),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = NaqiTokens.space1),
                 )
             } else {
-                library.forEach { item ->
-                    LibraryRow(item) { item.uri?.let { view(context, it) } }
-                    Spacer(Modifier.height(NaqiTokens.space2))
+                NaqiCard(contentPadding = 0.dp) {
+                    library.forEachIndexed { index, item ->
+                        if (index > 0) NaqiRowDivider()
+                        LibraryRow(item) { item.uri?.let { view(context, it) } }
+                    }
                 }
             }
         }
@@ -176,13 +202,13 @@ private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel:
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 stage.ifEmpty { starting },
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 color = cs.onSurface,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 stringResource(R.string.jobs_progress_percent, progress),
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.titleMedium,
                 color = cs.primary,
             )
         }
@@ -196,7 +222,6 @@ private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel:
             color = cs.primary,
             trackColor = cs.surfaceContainerHighest,
         )
-        Spacer(Modifier.height(NaqiTokens.space2))
         Row(verticalAlignment = Alignment.CenterVertically) {
             // The worker publishes 0 until it has enough throughput to mean the number; show nothing then.
             if (etaMs > 0) {
@@ -218,16 +243,33 @@ private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel:
 private fun SavedCard(name: String?, uri: Uri?, context: Context) {
     val cs = MaterialTheme.colorScheme
     NaqiCard {
-        Text(stringResource(R.string.jobs_saved_label), style = MaterialTheme.typography.labelMedium, color = cs.primary)
-        Spacer(Modifier.height(NaqiTokens.space1))
-        Text(
-            stringResource(R.string.jobs_saved_path, name.orEmpty()),
-            style = MaterialTheme.typography.bodyMedium,
-            color = cs.onSurface,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(NaqiTokens.radiusButton))
+                    .background(cs.primary),
+                contentAlignment = Alignment.Center,
+            ) { Icon(NaqiIcons.Check, null, tint = cs.onPrimary, modifier = Modifier.size(20.dp)) }
+            Spacer(Modifier.width(NaqiTokens.space3))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.jobs_saved_label),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = cs.onSurface,
+                )
+                Text(
+                    stringResource(R.string.jobs_saved_path, name.orEmpty()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         // No uri (missing key, or a pre-Q file the scanner hasn't indexed yet) means nothing safe to hand out.
         if (uri != null) {
-            Spacer(Modifier.height(NaqiTokens.space3))
+            Spacer(Modifier.height(NaqiTokens.space4))
             Row {
                 Button(
                     onClick = { view(context, uri) },
@@ -248,15 +290,31 @@ private fun SavedCard(name: String?, uri: Uri?, context: Context) {
 @Composable
 private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit) {
     val cs = MaterialTheme.colorScheme
-    NaqiCard(Modifier.clickable(enabled = item.uri != null, onClick = onOpen)) {
-        Text(
-            item.name,
-            style = MaterialTheme.typography.titleSmall,
-            color = cs.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(formatSize(item.bytes), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(enabled = item.uri != null, onClick = onOpen)
+            .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(NaqiTokens.radiusButton))
+                .background(cs.surfaceContainerHighest),
+            contentAlignment = Alignment.Center,
+        ) { Icon(NaqiIcons.Video, null, tint = cs.onSurfaceVariant, modifier = Modifier.size(20.dp)) }
+        Spacer(Modifier.width(NaqiTokens.space3))
+        Column(Modifier.weight(1f)) {
+            Text(
+                item.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = cs.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(formatSize(item.bytes), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+        }
     }
 }
 

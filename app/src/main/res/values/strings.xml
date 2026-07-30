@@ -29,8 +29,8 @@
     <!-- Accepted containers; the format names are proper nouns and stay Latin in every locale. -->
     <string name="pick_video_formats">MP4 · MKV · WebM</string>
 
-    <!-- Section label above the two operation cards. Uppercase is literal — Eyebrow() does not uppercase. -->
-    <string name="pick_eyebrow_choose">CHOOSE WHAT TO FILTER</string>
+    <!-- Section label above the operations card. Sentence case: SectionHeader() renders it as written. -->
+    <string name="pick_eyebrow_choose">Choose what to filter</string>
 
     <!-- Operation cards. -->
     <string name="pick_op_music_title">Remove music</string>
@@ -38,14 +38,17 @@
     <string name="pick_op_women_title">Censor women</string>
     <string name="pick_op_women_desc">Blur female faces and flagged scenes.</string>
 
+    <!-- Overflow menu on the pick screen; content description of the "⋮" button. -->
+    <string name="action_more">More</string>
+
     <!-- Primary CTA: advances to the options screen. -->
     <string name="action_continue">Continue</string>
 
     <!-- Check-marked reassurance line directly under the Continue button. -->
     <string name="pick_reassurance">Original file is never changed.</string>
 
-    <!-- Diagnostics footer (ORT provider + per-model smoke results). Uppercase is literal. -->
-    <string name="pick_diag_title">DEVICE RUNTIME</string>
+    <!-- Device diagnostics, shown on the about screen (ORT providers + per-model smoke results). -->
+    <string name="pick_diag_title">Device runtime</string>
     <string name="pick_diag_running">Running model smoke…</string>
     <!-- %1$s = comma-joined ONNX Runtime execution-provider names, or "—" when the list is empty. -->
     <string name="pick_diag_eps">EPs: %1$s</string>
@@ -65,12 +68,13 @@
          Options — step 2, OptionsScreen
          ============================================================ -->
 
-    <!-- Top-left back affordance; the ← glyph is part of the label. Mirror it to → in RTL locales. -->
-    <string name="action_back">← Back</string>
+    <!-- Content description of the top-bar back arrow. The glyph is NaqiIcons.ArrowBack, which auto-mirrors
+         in RTL, so no arrow belongs in this string any more. -->
+    <string name="action_back">Back</string>
     <string name="opt_title">Options</string>
 
-    <!-- Censor-women section. Uppercase is literal — Eyebrow() does not uppercase. -->
-    <string name="opt_section_censor_women">CENSOR WOMEN</string>
+    <!-- Censor-women section. -->
+    <string name="opt_section_censor_women">Censor women</string>
     <string name="opt_strictness_title">Strictness</string>
     <string name="opt_strictness_desc">How eagerly whole scenes are censored. Face blurring is never affected.</string>
     <string name="opt_blur_amount_title">Blur amount</string>
@@ -78,10 +82,9 @@
     <string name="opt_grayscale_title">Grayscale</string>
     <string name="opt_grayscale_desc">Also drains the color out of censored areas.</string>
 
-    <!-- Remove-music section. Uppercase is literal. -->
-    <string name="opt_section_remove_music">REMOVE MUSIC</string>
-    <!-- Keep-stems card. The wire values "vocals"/"vocals_other" are NOT localizable and are not resources. -->
-    <string name="opt_keep_label">KEEP</string>
+    <!-- Remove-music section. -->
+    <string name="opt_section_remove_music">Remove music</string>
+    <!-- Keep-stems rows. The wire values "vocals"/"vocals_other" are NOT localizable and are not resources. -->
     <string name="opt_keep_vocals_title">Voices only</string>
     <string name="opt_keep_vocals_desc">Keeps dialogue and singing; drops music and sound effects.</string>
     <string name="opt_keep_vocals_other_title">Voices + sounds</string>
@@ -96,7 +99,6 @@
 
     <!-- Language picker (API 33+). Opens system per-app language settings. -->
     <string name="opt_language">Language</string>
-    <string name="opt_language_desc">Choose English or Arabic for this app.</string>
 
     <!-- Primary CTA: enqueues the filtering job. -->
     <string name="action_start">Start</string>
@@ -106,7 +108,7 @@
 
     <!-- Up-front time estimate above Start. %1$s = a dur_* string. Deliberately worded as a FLOOR:
          every measurement behind it came from a flagship, so "at least" is the only honest framing. -->
-    <string name="opt_eta_floor">Estimated at least ~%1$s on this phone.</string>
+    <string name="opt_eta_floor">Estimated at least %1$s on this phone.</string>
 
     <!-- Shown above a disabled Start when a job is already running; Naqi runs one job at a time. -->
     <string name="opt_job_running">A job is already running. Wait for it to finish, or cancel it first.</string>
@@ -121,8 +123,11 @@
          Also reuses action_cancel, action_open and action_share (see Notifications).
          ============================================================ -->
 
-    <!-- Resets the flow back to step 1; the ← glyph is part of the label. Mirror it to → in RTL locales. -->
-    <string name="jobs_new_job">← Filter another video</string>
+    <!-- Bottom-bar action that resets the flow back to step 1. -->
+    <string name="jobs_new_job">Filter another video</string>
+
+    <!-- Top-bar title of step 3: the queue, the running job and the library are all "what Naqi is doing". -->
+    <string name="jobs_title">Activity</string>
 
     <!-- Empty state inside the job card when nothing is running, succeeded or failed. -->
     <!-- Phase 2 resume: shown on a failed long job whose finished segments are still on disk. -->
@@ -130,8 +135,8 @@
     <string name="action_resume">Resume</string>
     <string name="jobs_none_running">No job running.</string>
 
-    <!-- Library list. Uppercase is literal. "Movies/Naqi" is a real on-disk path — keep it Latin, untranslated. -->
-    <string name="jobs_library">LIBRARY</string>
+    <!-- Library list. "Movies/Naqi" is a real on-disk path — keep it Latin, untranslated. -->
+    <string name="jobs_library">Library</string>
     <string name="jobs_library_empty">Filtered videos are saved to Movies/Naqi.</string>
 
     <!-- Progress card. jobs_stage_starting fills the instant before the worker publishes its first stage_* value. -->
@@ -218,9 +223,9 @@
     <string name="share_info_failed">Couldn\'t read this video. It may be private, region-locked, or the site isn\'t supported.</string>
     <!-- Fallback heading when the source exposes no title at all. -->
     <string name="share_untitled">Shared video</string>
-    <!-- Section labels. Uppercase is literal — Eyebrow() does not uppercase. -->
-    <string name="share_eyebrow_quality">QUALITY</string>
-    <string name="share_eyebrow_filters">FILTERS</string>
+    <!-- Section labels. -->
+    <string name="share_eyebrow_quality">Quality</string>
+    <string name="share_eyebrow_filters">Filters</string>
     <string name="share_quality_best">Best</string>
     <!-- 720p is a format name; it stays Latin in every locale. -->
     <string name="share_quality_720">720p</string>
@@ -232,8 +237,8 @@
     <string name="share_no_url">No link found in what you shared.</string>
     <string name="share_already_queued">Already in the queue.</string>
 
-    <!-- Share queue (M4). Uppercase on the eyebrow is literal — Eyebrow() does not uppercase. -->
-    <string name="queue_eyebrow">QUEUE</string>
+    <!-- Share queue (M4). -->
+    <string name="queue_eyebrow">Queue</string>
     <string name="queue_state_pending_download">Waiting to download</string>
     <string name="queue_state_pending_filter">Waiting to filter</string>
     <string name="queue_state_filtering">Filtering</string>
@@ -251,11 +256,9 @@
     <string name="about_license">Licensed under GPL-3.0-or-later.</string>
     <!-- Entry point on the pick screen. -->
     <string name="about_open">About &amp; licenses</string>
-    <string name="about_open_desc">Version, open-source notices, and the downloader update.</string>
 
-    <!-- Uppercase is literal — Eyebrow() does not uppercase. -->
-    <string name="about_eyebrow_downloader">DOWNLOADER</string>
-    <string name="about_eyebrow_licenses">OPEN SOURCE</string>
+    <string name="about_eyebrow_downloader">Downloader</string>
+    <string name="about_eyebrow_licenses">Open source</string>
     <!-- %1$s = a yt-dlp version string like 2026.07.04, or about_ytdlp_unknown. -->
     <string name="about_ytdlp_version">yt-dlp %1$s</string>
     <string name="about_ytdlp_unknown">not updated yet</string>
@@ -264,6 +267,8 @@
     <string name="about_updating">Updating…</string>
     <string name="about_update_ok">Downloader is up to date.</string>
     <string name="about_update_failed">Couldn\'t update. Check your connection and try again.</string>
+    <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
+    <string name="about_notices_title">Open-source notices</string>
     <string name="about_notice_missing">Open-source notices are unavailable in this build.</string>
 
     <!-- Ongoing notification while a download runs; the second line is the video title. -->

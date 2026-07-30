@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.haithamassoli.naqi.ui.screen
 
 import android.Manifest
@@ -6,8 +8,6 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,9 +19,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -34,7 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,8 +44,11 @@ import androidx.core.net.toUri
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.download.Downloader
-import com.haithamassoli.naqi.ui.Eyebrow
-import com.haithamassoli.naqi.ui.SelectDot
+import com.haithamassoli.naqi.ui.NaqiCard
+import com.haithamassoli.naqi.ui.NaqiIcons
+import com.haithamassoli.naqi.ui.NaqiRowDivider
+import com.haithamassoli.naqi.ui.SectionHeader
+import com.haithamassoli.naqi.ui.ToggleTile
 import com.haithamassoli.naqi.ui.durationText
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
 import com.haithamassoli.naqi.work.Eta
@@ -73,8 +77,11 @@ sealed interface Shared {
  * The two flows differ in three places and are otherwise the same screen: a file has no Quality (there
  * is nothing to choose — the file exists), its primary button says Filter, and that button is disabled
  * when both filters are off, because filtering nothing is a no-op the user should not be able to queue.
+ *
+ * Quality is a segmented control rather than three stacked rows, and the filters are switches in one
+ * card: the whole sheet is a screenful shorter, which matters more here than anywhere — this is the
+ * surface a user meets mid-share, on top of another app.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShareSheet(
     shared: Shared,
@@ -110,7 +117,8 @@ fun ShareSheet(
         loading = false
     }
 
-    // Audio has no picture to blur, so the option is hidden rather than shown-and-ignored.
+    // Audio has no picture to blur, so the option is disabled rather than obeyed-and-ignored. Disabled
+    // rather than hidden: switching quality must not make the row under the user's finger disappear.
     val audioOnly = isLink && quality == Downloader.Quality.AUDIO
     val effectiveOps = if (audioOnly) ops.copy(censorWomen = false) else ops
 
@@ -168,7 +176,7 @@ fun ShareSheet(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = NaqiTokens.gutter)
-                .padding(bottom = NaqiTokens.space7),
+                .padding(bottom = NaqiTokens.space6),
         ) {
             // ---- Header: title + duration · domain ----
             when {
@@ -199,7 +207,6 @@ fun ShareSheet(
                         overflow = TextOverflow.Ellipsis,
                     )
                     subtitle(shared, durationMs)?.let {
-                        Spacer(Modifier.height(NaqiTokens.space1))
                         Text(
                             it,
                             style = MaterialTheme.typography.bodySmall,
@@ -211,40 +218,45 @@ fun ShareSheet(
 
             Spacer(Modifier.height(NaqiTokens.space5))
 
-            // ---- Quality (links only) ----
+            // ---- Quality (links only) — one row instead of three ----
             if (isLink) {
-                Eyebrow(stringResource(R.string.share_eyebrow_quality))
-                Spacer(Modifier.height(NaqiTokens.space2))
-                Downloader.Quality.entries.forEach { q ->
-                    OptionRow(
-                        label = stringResource(qualityLabel(q)),
-                        selected = quality == q,
-                        onClick = { quality = q },
-                    )
+                SectionHeader(stringResource(R.string.share_eyebrow_quality))
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    val qualities = Downloader.Quality.entries
+                    qualities.forEachIndexed { index, q ->
+                        SegmentedButton(
+                            selected = quality == q,
+                            onClick = { quality = q },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = qualities.size),
+                        ) { Text(stringResource(qualityLabel(q)), maxLines = 1) }
+                    }
                 }
                 Spacer(Modifier.height(NaqiTokens.space5))
             }
 
             // ---- Filters ----
-            Eyebrow(stringResource(R.string.share_eyebrow_filters))
-            Spacer(Modifier.height(NaqiTokens.space2))
-            OptionRow(
-                label = stringResource(R.string.pick_op_music_title),
-                selected = ops.removeMusic,
-                onClick = { ops = ops.copy(removeMusic = !ops.removeMusic) },
-            )
-            if (!audioOnly) {
-                OptionRow(
-                    label = stringResource(R.string.pick_op_women_title),
-                    selected = ops.censorWomen,
-                    onClick = { ops = ops.copy(censorWomen = !ops.censorWomen) },
+            SectionHeader(stringResource(R.string.share_eyebrow_filters))
+            NaqiCard(contentPadding = 0.dp) {
+                ToggleTile(
+                    title = stringResource(R.string.pick_op_music_title),
+                    icon = NaqiIcons.MusicOff,
+                    checked = ops.removeMusic,
+                    onCheckedChange = { ops = ops.copy(removeMusic = it) },
+                )
+                NaqiRowDivider()
+                ToggleTile(
+                    title = stringResource(R.string.pick_op_women_title),
+                    icon = NaqiIcons.Shield,
+                    checked = effectiveOps.censorWomen,
+                    enabled = !audioOnly,
+                    onCheckedChange = { ops = ops.copy(censorWomen = it) },
                 )
             }
 
             // ---- Warnings ----
             val etaMs = Eta.estimateMs(durationMs, effectiveOps)
             if (etaMs > Eta.CONFIRM_THRESHOLD_MS) {
-                Spacer(Modifier.height(NaqiTokens.space4))
+                Spacer(Modifier.height(NaqiTokens.space3))
                 Text(
                     stringResource(R.string.dlg_long_job_body, durationText(etaMs)),
                     style = MaterialTheme.typography.bodySmall,
@@ -252,7 +264,7 @@ fun ShareSheet(
                 )
             }
             if (spaceError != 0) {
-                Spacer(Modifier.height(NaqiTokens.space4))
+                Spacer(Modifier.height(NaqiTokens.space3))
                 Text(
                     stringResource(spaceError),
                     style = MaterialTheme.typography.bodySmall,
@@ -260,21 +272,21 @@ fun ShareSheet(
                 )
             }
 
-            // ---- Actions ----
+            // ---- Actions: the primary takes the width it deserves ----
             Spacer(Modifier.height(NaqiTokens.space5))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-                Spacer(Modifier.width(NaqiTokens.space2))
+                Spacer(Modifier.width(NaqiTokens.space3))
                 Button(
                     onClick = ::onPrimary,
                     // A local file with no filters selected has nothing to do — the file already exists.
                     // A link with no filters is still a download, so it stays enabled.
                     enabled = !loading && errorRes == 0 && spaceError == 0 &&
                         (isLink || effectiveOps.any),
+                    shape = RoundedCornerShape(NaqiTokens.radiusButton),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
                 ) {
                     Text(stringResource(if (isLink) R.string.action_download else R.string.action_filter))
                 }
@@ -296,21 +308,4 @@ private fun qualityLabel(q: Downloader.Quality) = when (q) {
     Downloader.Quality.BEST -> R.string.share_quality_best
     Downloader.Quality.P720 -> R.string.share_quality_720
     Downloader.Quality.AUDIO -> R.string.share_quality_audio
-}
-
-/** One tappable row with the app's shared selection dot — same affordance as the options screen. */
-@Composable
-private fun OptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(NaqiTokens.radiusCard))
-            .clickable(onClick = onClick)
-            .padding(vertical = NaqiTokens.space3, horizontal = NaqiTokens.space2),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SelectDot(selected)
-        Spacer(Modifier.width(NaqiTokens.space3))
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-    }
 }

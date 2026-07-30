@@ -52,19 +52,46 @@ object NaqiIcons {
         moveTo(9.8f, 16.2f); lineTo(5.6f, 12.0f); lineTo(4.2f, 13.4f)
         lineTo(9.8f, 19.0f); lineTo(20.0f, 8.8f); lineTo(18.6f, 7.4f); close()
     }
+
+    // autoMirror: the back arrow has to point at the start edge, which is the right one in Arabic.
+    val ArrowBack = icon("ArrowBack", autoMirror = true) {
+        moveTo(20f, 11f); lineTo(7.8f, 11f); lineTo(13.4f, 5.4f); lineTo(12f, 4f)
+        lineTo(4f, 12f); lineTo(12f, 20f); lineTo(13.4f, 18.6f); lineTo(7.8f, 13f)
+        lineTo(20f, 13f); close()
+    }
+
+    val Close = icon("Close") {
+        moveTo(18.3f, 7.1f); lineTo(16.9f, 5.7f); lineTo(12f, 10.6f); lineTo(7.1f, 5.7f)
+        lineTo(5.7f, 7.1f); lineTo(10.6f, 12f); lineTo(5.7f, 16.9f); lineTo(7.1f, 18.3f)
+        lineTo(12f, 13.4f); lineTo(16.9f, 18.3f); lineTo(18.3f, 16.9f); lineTo(13.4f, 12f); close()
+    }
+
+    /** Overflow "kebab" — carries the entries that used to be full-width cards on the pick screen. */
+    val More = icon("More") {
+        circle(12f, 5.2f, 1.9f); circle(12f, 12f, 1.9f); circle(12f, 18.8f, 1.9f)
+    }
 }
 
-private fun icon(name: String, path: PathBuilder.() -> Unit): ImageVector =
+private fun icon(name: String, autoMirror: Boolean = false, path: PathBuilder.() -> Unit): ImageVector =
     ImageVector.Builder(
         name = name,
         defaultWidth = 24.dp,
         defaultHeight = 24.dp,
         viewportWidth = 24f,
         viewportHeight = 24f,
+        autoMirror = autoMirror,
     ).apply {
         path(fill = SolidColor(Color.Black)) { path() }
     }.build()
 
 private fun PathBuilder.rect(left: Float, top: Float, right: Float, bottom: Float) {
     moveTo(left, top); lineTo(right, top); lineTo(right, bottom); lineTo(left, bottom); close()
+}
+
+/** Two half-arcs — the only way to get a round dot out of a path builder. */
+private fun PathBuilder.circle(cx: Float, cy: Float, r: Float) {
+    moveTo(cx - r, cy)
+    arcTo(r, r, 0f, false, true, cx + r, cy)
+    arcTo(r, r, 0f, false, true, cx - r, cy)
+    close()
 }

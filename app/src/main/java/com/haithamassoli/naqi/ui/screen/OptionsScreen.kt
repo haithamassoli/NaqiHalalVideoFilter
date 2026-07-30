@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,11 +20,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,9 +42,13 @@ import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.model.FilterOps
-import com.haithamassoli.naqi.ui.Eyebrow
+import com.haithamassoli.naqi.ui.NaqiBottomAction
 import com.haithamassoli.naqi.ui.NaqiCard
+import com.haithamassoli.naqi.ui.NaqiRowDivider
+import com.haithamassoli.naqi.ui.NaqiTopBar
+import com.haithamassoli.naqi.ui.SectionHeader
 import com.haithamassoli.naqi.ui.SelectDot
+import com.haithamassoli.naqi.ui.ToggleTile
 import com.haithamassoli.naqi.ui.durationText
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
 import com.haithamassoli.naqi.work.Eta
@@ -57,6 +60,9 @@ import kotlin.math.roundToInt
 /**
  * Step 2: tune the selected operations, then start the job. Every control is shown only when the op it
  * applies to is on — an option that can't affect the output would just be a lie on screen.
+ *
+ * One card per operation, rows inside it, instead of one card per control: the same settings in about
+ * half the height, and the grouping now says which operation a control belongs to.
  */
 @Composable
 fun OptionsScreen(
@@ -115,67 +121,72 @@ fun OptionsScreen(
         if (etaMs > Eta.CONFIRM_THRESHOLD_MS) confirming = true else startWithPermissions()
     }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background, modifier = modifier) { pad ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { NaqiTopBar(stringResource(R.string.opt_title), onBack = onBack) },
+        bottomBar = {
+            NaqiBottomAction(
+                label = stringResource(R.string.action_start),
+                enabled = !jobRunning,
+                onClick = ::onStart,
+                above = {
+                    // Hidden while probing and on a probe failure — see durationMs above.
+                    if (etaMs > 0) {
+                        Text(
+                            stringResource(R.string.opt_eta_floor, durationText(etaMs)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (jobRunning) {
+                        Text(
+                            stringResource(R.string.opt_job_running),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                },
+            )
+        },
+        modifier = modifier,
+    ) { pad ->
         Column(
             Modifier
                 .padding(pad)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = NaqiTokens.gutter)
-                .padding(top = NaqiTokens.space4, bottom = NaqiTokens.space7),
+                .padding(top = NaqiTokens.space2, bottom = NaqiTokens.space5),
         ) {
-            TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) }
-            Spacer(Modifier.height(NaqiTokens.space2))
-            Text(
-                stringResource(R.string.opt_title),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(NaqiTokens.space5))
-
             if (ops.censorWomen) {
-                Eyebrow(stringResource(R.string.opt_section_censor_women))
-                Spacer(Modifier.height(NaqiTokens.space3))
-                NaqiCard {
+                SectionHeader(stringResource(R.string.opt_section_censor_women))
+                NaqiCard(contentPadding = 0.dp) {
                     SliderRow(
                         title = stringResource(R.string.opt_strictness_title),
                         desc = stringResource(R.string.opt_strictness_desc),
                         value = ops.strictness,
                     ) { onOpsChange(ops.copy(strictness = it)) }
-                }
-                Spacer(Modifier.height(NaqiTokens.space3))
-                NaqiCard {
+                    NaqiRowDivider()
                     SliderRow(
                         title = stringResource(R.string.opt_blur_amount_title),
                         desc = stringResource(R.string.opt_blur_amount_desc),
                         value = ops.blurAmount,
                     ) { onOpsChange(ops.copy(blurAmount = it)) }
-                }
-                Spacer(Modifier.height(NaqiTokens.space3))
-                NaqiCard {
-                    ToggleRow(
+                    NaqiRowDivider()
+                    ToggleTile(
                         title = stringResource(R.string.opt_grayscale_title),
                         desc = stringResource(R.string.opt_grayscale_desc),
                         checked = ops.grayscale,
-                    ) { onOpsChange(ops.copy(grayscale = it)) }
-                }
-                Spacer(Modifier.height(NaqiTokens.space5))
-            }
-
-            if (ops.removeMusic) {
-                Eyebrow(stringResource(R.string.opt_section_remove_music))
-                Spacer(Modifier.height(NaqiTokens.space3))
-                KeepStemsSelector(keepStems = ops.keepStems) { onOpsChange(ops.copy(keepStems = it)) }
-                Spacer(Modifier.height(NaqiTokens.space5))
-            }
-
-            // Advanced is censor-only today, so the whole section disappears on a music-only job.
-            if (ops.censorWomen) {
-                NaqiCard {
+                        onCheckedChange = { onOpsChange(ops.copy(grayscale = it)) },
+                    )
+                    // Advanced is censor-only today, so it lives inside this card rather than as a
+                    // section of its own that would vanish on a music-only job.
+                    NaqiRowDivider()
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clickable { advanced = !advanced },
+                            .clickable { advanced = !advanced }
+                            .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -186,51 +197,38 @@ fun OptionsScreen(
                         )
                         Text(
                             stringResource(if (advanced) R.string.action_hide else R.string.action_show),
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
                     if (advanced) {
-                        Spacer(Modifier.height(NaqiTokens.space3))
-                        ToggleRow(
+                        ToggleTile(
                             title = stringResource(R.string.opt_blur_unknown_faces_title),
                             desc = stringResource(R.string.opt_blur_unknown_faces_desc),
                             checked = ops.blurUnknownFaces,
-                        ) { onOpsChange(ops.copy(blurUnknownFaces = it)) }
+                            onCheckedChange = { onOpsChange(ops.copy(blurUnknownFaces = it)) },
+                        )
                     }
                 }
                 Spacer(Modifier.height(NaqiTokens.space5))
             }
 
-
-
-            // Hidden while probing and on a probe failure — see durationMs above.
-            if (etaMs > 0) {
-                Text(
-                    stringResource(R.string.opt_eta_floor, durationText(etaMs)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(NaqiTokens.space3))
+            if (ops.removeMusic) {
+                SectionHeader(stringResource(R.string.opt_section_remove_music))
+                NaqiCard(contentPadding = 0.dp) {
+                    KeepStemsOption(
+                        title = stringResource(R.string.opt_keep_vocals_title),
+                        desc = stringResource(R.string.opt_keep_vocals_desc),
+                        selected = ops.keepStems == "vocals",
+                    ) { onOpsChange(ops.copy(keepStems = "vocals")) }
+                    NaqiRowDivider()
+                    KeepStemsOption(
+                        title = stringResource(R.string.opt_keep_vocals_other_title),
+                        desc = stringResource(R.string.opt_keep_vocals_other_desc),
+                        selected = ops.keepStems == "vocals_other",
+                    ) { onOpsChange(ops.copy(keepStems = "vocals_other")) }
+                }
             }
-
-            if (jobRunning) {
-                Text(
-                    stringResource(R.string.opt_job_running),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(NaqiTokens.space3))
-            }
-
-            Button(
-                onClick = ::onStart,
-                enabled = !jobRunning,
-                shape = RoundedCornerShape(NaqiTokens.radiusButton),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-            ) { Text(stringResource(R.string.action_start), style = MaterialTheme.typography.labelLarge) }
         }
     }
 
@@ -254,64 +252,43 @@ fun OptionsScreen(
 @Composable
 private fun SliderRow(title: String, desc: String, value: Int, onChange: (Int) -> Unit) {
     val cs = MaterialTheme.colorScheme
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = cs.onSurface, modifier = Modifier.weight(1f))
-        Text(stringResource(R.string.opt_slider_value, value), style = MaterialTheme.typography.labelMedium, color = cs.primary)
-    }
-    Text(desc, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
-    Slider(
-        value = value.toFloat(),
-        onValueChange = { onChange(it.roundToInt()) },
-        valueRange = 0f..100f,
-    )
-}
-
-@Composable
-private fun ToggleRow(title: String, desc: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = cs.onSurface)
-            Text(desc, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+    Column(Modifier.padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                color = cs.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            // The number in a tinted pill: the readout used to be a lone digit that read as decoration.
+            Text(
+                stringResource(R.string.opt_slider_value, value),
+                style = MaterialTheme.typography.labelMedium,
+                color = cs.primary,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(NaqiTokens.radiusPill))
+                    .background(cs.primary.copy(alpha = 0.12f))
+                    .padding(horizontal = NaqiTokens.space3, vertical = 2.dp),
+            )
         }
-        Spacer(Modifier.width(NaqiTokens.space3))
-        Switch(checked = checked, onCheckedChange = onChange)
+        Text(desc, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onChange(it.roundToInt()) },
+            valueRange = 0f..100f,
+        )
     }
 }
 
 /** "vocals" / "vocals_other" are wire values read straight by the worker — never localize or rename them. */
-@Composable
-private fun KeepStemsSelector(keepStems: String, onSelect: (String) -> Unit) {
-    NaqiCard {
-        Text(
-            stringResource(R.string.opt_keep_label),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(NaqiTokens.space2))
-        KeepStemsOption(
-            title = stringResource(R.string.opt_keep_vocals_title),
-            desc = stringResource(R.string.opt_keep_vocals_desc),
-            selected = keepStems == "vocals",
-        ) { onSelect("vocals") }
-        Spacer(Modifier.height(NaqiTokens.space2))
-        KeepStemsOption(
-            title = stringResource(R.string.opt_keep_vocals_other_title),
-            desc = stringResource(R.string.opt_keep_vocals_other_desc),
-            selected = keepStems == "vocals_other",
-        ) { onSelect("vocals_other") }
-    }
-}
-
 @Composable
 private fun KeepStemsOption(title: String, desc: String, selected: Boolean, onSelect: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(NaqiTokens.radiusButton))
             .clickable(onClick = onSelect)
-            .padding(vertical = NaqiTokens.space2),
+            .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -319,6 +296,6 @@ private fun KeepStemsOption(title: String, desc: String, selected: Boolean, onSe
             Text(desc, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         }
         Spacer(Modifier.width(NaqiTokens.space3))
-        SelectDot(selected) // reuse the exact op-card selection dot
+        SelectDot(selected)
     }
 }
