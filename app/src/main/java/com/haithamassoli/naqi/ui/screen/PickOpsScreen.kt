@@ -6,6 +6,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -191,9 +193,9 @@ private fun TrustSeal() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(NaqiTokens.space2),
             modifier = Modifier
-                .clip(RoundedCornerShape(NaqiTokens.radiusPill))
+                .clip(NaqiTokens.shapePill)
                 .background(primary.copy(alpha = 0.08f))
-                .border(1.dp, primary.copy(alpha = 0.22f), RoundedCornerShape(NaqiTokens.radiusPill))
+                .border(1.dp, primary.copy(alpha = 0.22f), NaqiTokens.shapePill)
                 .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space2),
         ) {
             Icon(NaqiIcons.Droplet, contentDescription = null, tint = primary, modifier = Modifier.size(16.dp))
@@ -216,21 +218,37 @@ private fun TrustSeal() {
 @Composable
 private fun PickVideoCard(picked: Boolean, fileName: String?, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
+    val cardBgColor by animateColorAsState(
+        targetValue = if (picked) cs.primary.copy(alpha = 0.08f) else cs.surfaceContainer,
+        animationSpec = NaqiTokens.expressiveSpring(),
+        label = "pickCardBg",
+    )
+    val cardBorderColor by animateColorAsState(
+        targetValue = if (picked) cs.primary else cs.outlineVariant,
+        animationSpec = NaqiTokens.expressiveSpring(),
+        label = "pickCardBorder",
+    )
+    val iconBgColor by animateColorAsState(
+        targetValue = if (picked) cs.primary else cs.surfaceContainerHighest,
+        animationSpec = NaqiTokens.expressiveSpring(),
+        label = "pickIconBg",
+    )
+
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(NaqiTokens.radiusCard))
-            .background(if (picked) cs.primary.copy(alpha = 0.07f) else cs.surfaceContainer)
-            .border(1.5.dp, if (picked) cs.primary else cs.outlineVariant, RoundedCornerShape(NaqiTokens.radiusCard))
+            .clip(NaqiTokens.shapeCard)
+            .background(cardBgColor)
+            .border(1.5.dp, cardBorderColor, NaqiTokens.shapeCard)
             .clickable(onClick = onClick)
             .padding(NaqiTokens.space4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(NaqiTokens.radiusButton))
-                .background(if (picked) cs.primary else cs.surfaceContainerHighest),
+                .size(52.dp)
+                .clip(NaqiTokens.shapeButton)
+                .background(iconBgColor),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

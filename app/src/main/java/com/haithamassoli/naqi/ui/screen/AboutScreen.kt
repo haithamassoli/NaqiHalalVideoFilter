@@ -137,7 +137,7 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 Spacer(Modifier.height(NaqiTokens.space3))
                 OutlinedButton(
                     enabled = !updating,
-                    shape = RoundedCornerShape(NaqiTokens.radiusButton),
+                    shape = NaqiTokens.shapeButton,
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
                         updating = true

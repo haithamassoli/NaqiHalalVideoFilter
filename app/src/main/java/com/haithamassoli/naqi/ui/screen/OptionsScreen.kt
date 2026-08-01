@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -266,7 +267,7 @@ private fun SliderRow(title: String, desc: String, value: Int, onChange: (Int) -
                 style = MaterialTheme.typography.labelMedium,
                 color = cs.primary,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(NaqiTokens.radiusPill))
+                    .clip(NaqiTokens.shapePill)
                     .background(cs.primary.copy(alpha = 0.12f))
                     .padding(horizontal = NaqiTokens.space3, vertical = 2.dp),
             )
@@ -284,9 +285,16 @@ private fun SliderRow(title: String, desc: String, value: Int, onChange: (Int) -
 @Composable
 private fun KeepStemsOption(title: String, desc: String, selected: Boolean, onSelect: () -> Unit) {
     val cs = MaterialTheme.colorScheme
+    val rowBgColor by animateColorAsState(
+        targetValue = if (selected) cs.primary.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceContainer,
+        animationSpec = NaqiTokens.expressiveSpring(),
+        label = "keepStemsRowBg",
+    )
+
     Row(
         Modifier
             .fillMaxWidth()
+            .background(rowBgColor)
             .clickable(onClick = onSelect)
             .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3),
         verticalAlignment = Alignment.CenterVertically,

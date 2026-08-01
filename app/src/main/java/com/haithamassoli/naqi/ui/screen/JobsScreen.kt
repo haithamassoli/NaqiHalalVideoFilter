@@ -22,8 +22,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -193,7 +194,7 @@ fun JobsScreen(
         }
     }
 }
-
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel: () -> Unit) {
     val cs = MaterialTheme.colorScheme
@@ -213,12 +214,11 @@ private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel:
             )
         }
         Spacer(Modifier.height(NaqiTokens.space3))
-        LinearProgressIndicator(
+        LinearWavyProgressIndicator(
             progress = { progress / 100f },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(NaqiTokens.radiusPill)),
+                .height(10.dp),
             color = cs.primary,
             trackColor = cs.surfaceContainerHighest,
         )
