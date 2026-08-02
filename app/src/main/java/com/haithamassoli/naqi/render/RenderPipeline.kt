@@ -55,6 +55,12 @@ object RenderPipeline {
     private const val PROGRESS_POLL_MS = 500L
 
     /**
+     * Bitrate multiplier over the source, so re-encoding does not visibly soften an otherwise
+     * untouched frame. Tune here if output size matters more than fidelity.
+     */
+    private const val GEN2_HEADROOM = 1.3f
+
+    /**
      * @param segment null renders the whole timeline exactly as M1 did — audio transmuxed alongside, one
      *   file, no mux step. Non-null renders just that slice, and **drops audio**: per-segment AAC could
      *   not be concatenated (encoder frames do not align with arbitrary clip boundaries), so the
@@ -101,7 +107,15 @@ object RenderPipeline {
             .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
             .build()
         val encoderFactory = DefaultEncoderFactory.Builder(context)
-            .setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(bitrate).build())
+            .setRequestedVideoEncoderSettings(
+                VideoEncoderSettings.Builder()
+                    .setBitrate(bitrate)
+                    // media3 defaults to 1s, which spends a big slice of the budget on I-frames.
+                    // ponytail: 2s matches typical camera sources; no B-frames (setMaxBFrames) yet —
+                    // add if 1.3x headroom below still isn't enough.
+                    .setiFrameIntervalSeconds(2f)
+                    .build(),
+            )
             .build()
 
         // Transformer is single-threaded: build/start/poll/cancel all run on the Looper thread (Main).
@@ -144,7 +158,12 @@ object RenderPipeline {
         }
     }
 
-    /** Effective encode bitrate = min(source bitrate when known, resolution-tier cap). */
+    /**
+     * Effective encode bitrate = min(source bitrate x [GEN2_HEADROOM] when known, resolution-tier cap).
+     * The headroom is not greed: this is a second-generation encode, so it has to spend bits
+     * reproducing the source encoder's artifacts as well as the picture. At equal bitrate it always
+     * looks worse than the source.
+     */
     private fun resolveBitrate(context: Context, uri: Uri): Int {
         var pixels = 0L
         var sourceBitrate: Int? = null
@@ -183,16 +202,23 @@ object RenderPipeline {
         }
 
         val cap = bitrateCap(pixels)
-        return sourceBitrate?.takeIf { it > 0 }?.let { min(it, cap) } ?: cap
+        // Float, not Int: `it * 1.3` overflows Int above ~165 Mbps, whereas Float.toInt() saturates
+        // to Int.MAX_VALUE and the min() then picks the cap.
+        return sourceBitrate?.takeIf { it > 0 }?.let { min((it * GEN2_HEADROOM).toInt(), cap) } ?: cap
     }
 
-    /** Bitrate cap by output pixel count. Bounds are widescreen pixel counts so wide/tall variants bin correctly. */
+    /**
+     * Bitrate cap by output pixel count, set near what phone cameras actually record so a camera
+     * original is not halved on the way through. Bounds are widescreen pixel counts so wide/tall
+     * variants bin correctly. A low-bitrate source still encodes low — the cap is a ceiling, not a
+     * target, and [resolveBitrate] takes the min.
+     */
     private fun bitrateCap(pixels: Long): Int = when {
-        pixels <= 854L * 480 -> 2_500_000     // <=480p
-        pixels <= 1280L * 720 -> 5_000_000    // <=720p
-        pixels <= 1920L * 1080 -> 8_000_000   // <=1080p
-        pixels <= 2560L * 1440 -> 14_000_000  // <=1440p
-        else -> 25_000_000
+        pixels <= 854L * 480 -> 4_000_000     // <=480p
+        pixels <= 1280L * 720 -> 10_000_000   // <=720p
+        pixels <= 1920L * 1080 -> 16_000_000  // <=1080p, vs ~17-20 Mbps camera original
+        pixels <= 2560L * 1440 -> 24_000_000  // <=1440p
+        else -> 45_000_000                    // 4K, vs ~45-50 Mbps camera original
     }
 
     private fun MediaFormat.intOrNull(key: String): Int? =

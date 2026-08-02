@@ -31,7 +31,9 @@ private const val MAX_REGIONS = 8
 /**
  * M1 pass-2 render effect. Per output frame the [Edl] selects one of: whole-frame censor, a list of
  * regions, or nothing. Censored pixels are separable-Gaussian blurred (when [blurAmount] > 0) and/or
- * BT.709 grayscaled (when [grayscale]); original pixels are kept elsewhere with hard edges.
+ * BT.709 grayscaled (when [grayscale]); original pixels are kept elsewhere. A region's edge is
+ * feathered OUTWARD (see [COMPOSITE_FRAGMENT]) so a face fades into the frame instead of sitting in a
+ * visible rectangle — the rect itself stays fully censored, only pixels outside it are partially so.
  *
  * Regions arrive normalized [0,1] in UPRIGHT, top-left-origin frame space (see analysis.Contracts).
  * Whether effects receive upright or stored-orientation frames is decoder-dependent in media3 1.10
@@ -311,8 +313,12 @@ private val BLUR_FRAGMENT = """
     }
     """.trimIndent()
 
-// Composite: keep original outside censored area; inside, take blurred (or original) base, optionally
-// grayscale. uRegions holds (left, right, yLow, yHigh) in GL y-up coords; loop bound is MAX_REGIONS (8).
+// Composite: mix original toward the blurred (or original) base, optionally grayscaled, by a coverage
+// mask — 1 inside any region, falling to 0 across a feather band outside it. uRegions holds
+// (left, right, yLow, yHigh) in GL y-up coords; loop bound is MAX_REGIONS (8).
+//
+// ponytail: feather width is a literal 0.15 of the region. Promote it to a uniform only if QA wants it
+// per-video; blurAmount already controls the thing users actually reach for.
 private val COMPOSITE_FRAGMENT = """
     #version 100
     #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -330,15 +336,23 @@ private val COMPOSITE_FRAGMENT = """
     varying vec2 vTexCoord;
     void main() {
       vec4 orig = texture2D(uInputTex, vTexCoord);
-      bool inside = uCensorAll == 1;
+      float mask = float(uCensorAll);
       for (int i = 0; i < 8; i++) {
         if (i >= uRegionCount) break;
         vec4 r = uRegions[i];
-        if (vTexCoord.x >= r.x && vTexCoord.x <= r.y && vTexCoord.y >= r.z && vTexCoord.y <= r.w) {
-          inside = true;
-        }
+        // Feather OUTWARD only: mask is 1 across the whole rect and ramps to 0 over a band just
+        // OUTSIDE it. Centering the ramp on the edge instead would leave the outer band of every
+        // face half-blurred — softening must never uncover a pixel the hard rect covered.
+        // Band is 15% of the region's own size, so a distant face gets a small feather and a
+        // close-up a large one; the floor keeps smoothstep's edges distinct on a degenerate rect.
+        vec2 f = max(vec2(r.y - r.x, r.w - r.z) * 0.15, 0.002);
+        mask = max(mask,
+            smoothstep(r.x - f.x, r.x, vTexCoord.x) *
+            (1.0 - smoothstep(r.y, r.y + f.x, vTexCoord.x)) *
+            smoothstep(r.z - f.y, r.z, vTexCoord.y) *
+            (1.0 - smoothstep(r.w, r.w + f.y, vTexCoord.y)));
       }
-      if (!inside) {
+      if (mask <= 0.0) {
         gl_FragColor = orig;
         return;
       }
@@ -347,6 +361,6 @@ private val COMPOSITE_FRAGMENT = """
         float luma = dot(base, vec3(0.2126, 0.7152, 0.0722)); // BT.709
         base = vec3(luma);
       }
-      gl_FragColor = vec4(base, orig.a);
+      gl_FragColor = vec4(mix(orig.rgb, base, mask), orig.a);
     }
     """.trimIndent()
