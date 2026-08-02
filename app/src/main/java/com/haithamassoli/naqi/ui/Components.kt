@@ -1,6 +1,9 @@
 package com.haithamassoli.naqi.ui
 
 import android.content.Context
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +23,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -30,9 +34,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -47,9 +53,7 @@ import com.haithamassoli.naqi.ui.theme.NaqiTokens
 // The handful of pieces that appear on more than one screen. Anything used once stays private to its screen.
 
 /**
- * Every screen wears the same bar: a title, an optional back arrow, and room for actions. Replaces the
- * hand-rolled "← Back" text buttons — an [NaqiIcons.ArrowBack] auto-mirrors in Arabic, which a glyph
- * baked into a translated string can only do if every translator remembers to flip it.
+ * Every screen wears the same bar: a title, an optional back arrow, and room for actions. Expressive top app bar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,8 +80,7 @@ fun NaqiTopBar(
 
 /**
  * The primary action of a screen, pinned to the bottom so it is reachable without scrolling to it.
- * [above] takes the small print that qualifies the button (an estimate, a warning) — it belongs next to
- * the tap, not at the end of a scroll.
+ * M3 Expressive styled action button with organic pill/rounded shape.
  */
 @Composable
 fun NaqiBottomAction(
@@ -99,7 +102,7 @@ fun NaqiBottomAction(
         Button(
             onClick = onClick,
             enabled = enabled,
-            shape = RoundedCornerShape(NaqiTokens.radiusButton),
+            shape = NaqiTokens.shapeButton,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -108,9 +111,7 @@ fun NaqiBottomAction(
 }
 
 /**
- * Section label. Sentence case at title size, not 12sp all-caps with wide tracking: the old eyebrows
- * were the least readable text on every screen. [trailing] holds a section-level action ("Clear
- * finished"), which otherwise had to be parked as a stray button below the list.
+ * Section label. Sentence case at title size with M3 Expressive typography and alignment.
  */
 @Composable
 fun SectionHeader(text: String, trailing: @Composable (() -> Unit)? = null) {
@@ -122,7 +123,7 @@ fun SectionHeader(text: String, trailing: @Composable (() -> Unit)? = null) {
     ) {
         Text(
             text,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
@@ -130,16 +131,33 @@ fun SectionHeader(text: String, trailing: @Composable (() -> Unit)? = null) {
     }
 }
 
-/** The selection indicator for single-choice rows (the keep-stems options). */
+/** The selection indicator for single-choice rows with Expressive spring animation. */
 @Composable
 fun SelectDot(selected: Boolean) {
     val cs = MaterialTheme.colorScheme
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0.85f,
+        animationSpec = NaqiTokens.expressiveSpring(),
+        label = "selectDotScale",
+    )
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) cs.primary else Color.Transparent,
+        animationSpec = NaqiTokens.expressiveSpring(),
+        label = "selectDotBg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) Color.Transparent else cs.outline,
+        animationSpec = NaqiTokens.expressiveSpring(),
+        label = "selectDotBorder",
+    )
+
     Box(
         Modifier
+            .scale(scale)
             .size(24.dp)
             .clip(CircleShape)
-            .background(if (selected) cs.primary else Color.Transparent)
-            .border(1.5.dp, if (selected) Color.Transparent else cs.outline, CircleShape),
+            .background(bgColor)
+            .border(1.5.dp, borderColor, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         if (selected) Icon(NaqiIcons.Check, null, tint = cs.onPrimary, modifier = Modifier.size(15.dp))
@@ -147,8 +165,7 @@ fun SelectDot(selected: Boolean) {
 }
 
 /**
- * The standard bordered block. Related rows go in ONE card separated by [NaqiRowDivider] rather than a
- * card each — a card per row is what made the old screens scroll for so long.
+ * The standard bordered block using M3 Expressive card shapes and surface containers.
  */
 @Composable
 fun NaqiCard(
@@ -160,9 +177,9 @@ fun NaqiCard(
     Column(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(NaqiTokens.radiusCard))
+            .clip(NaqiTokens.shapeCard)
             .background(cs.surfaceContainer)
-            .border(1.dp, cs.outlineVariant, RoundedCornerShape(NaqiTokens.radiusCard))
+            .border(1.dp, cs.outlineVariant, NaqiTokens.shapeCard)
             .padding(contentPadding),
         content = content,
     )
@@ -178,12 +195,7 @@ fun NaqiRowDivider(inset: Dp = NaqiTokens.space4) {
 }
 
 /**
- * One independent on/off setting: whole row tappable, a real [Switch] on the end. A switch rather than a
- * check dot because these are not a choice between options — each one is on or off by itself, and a dot
- * reads as "pick one of these".
- *
- * `Switch(onCheckedChange = null)` plus `toggleable` on the row is deliberate: it makes the row a single
- * node for TalkBack instead of a label and a separately-focusable control.
+ * M3 Expressive Toggle Tile with animated spring feedback for selection states.
  */
 @Composable
 fun ToggleTile(
@@ -195,6 +207,17 @@ fun ToggleTile(
     enabled: Boolean = true,
 ) {
     val cs = MaterialTheme.colorScheme
+    val iconBgColor by animateColorAsState(
+        targetValue = if (checked) cs.primary.copy(alpha = 0.16f) else cs.surfaceContainerHighest,
+        animationSpec = NaqiTokens.expressiveSpring(),
+        label = "toggleIconBg",
+    )
+    val iconTintColor by animateColorAsState(
+        targetValue = if (checked) cs.primary else cs.onSurfaceVariant,
+        animationSpec = NaqiTokens.expressiveSpring(),
+        label = "toggleIconTint",
+    )
+
     Row(
         Modifier
             .fillMaxWidth()
@@ -205,15 +228,15 @@ fun ToggleTile(
         if (icon != null) {
             Box(
                 Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(NaqiTokens.radiusButton))
-                    .background(if (checked) cs.primary.copy(alpha = 0.14f) else cs.surfaceContainerHighest),
+                    .size(42.dp)
+                    .clip(NaqiTokens.shapeButton)
+                    .background(iconBgColor),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     icon,
                     null,
-                    tint = if (checked) cs.primary else cs.onSurfaceVariant,
+                    tint = iconTintColor,
                     modifier = Modifier.size(22.dp),
                 )
             }
