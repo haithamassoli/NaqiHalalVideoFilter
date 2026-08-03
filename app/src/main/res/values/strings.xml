@@ -245,6 +245,28 @@
     <string name="queue_clear_finished">Clear finished</string>
 
     <!-- ============================================================
+         App update card (UpdateCard, on the pick screen). Naqi ships from GitHub Releases, so it
+         checks for and installs its own updates.
+         ============================================================ -->
+    <!-- %1$s = the new version, e.g. 1.3. -->
+    <string name="update_available">Naqi %1$s available</string>
+    <!-- %1$s = download size, %2$s = the version installed now. -->
+    <string name="update_sub">%1$s · you have %2$s</string>
+    <string name="update_action">Update</string>
+    <!-- %1$s = the version being downloaded. Also the title of the system download notification. -->
+    <string name="update_downloading">Downloading Naqi %1$s</string>
+    <!-- %1$s = bytes so far, %2$s = total, both already formatted with their unit. -->
+    <string name="update_bytes">%1$s of %2$s</string>
+    <!-- %1$s = the version waiting to be installed. -->
+    <string name="update_ready">Naqi %1$s ready to install</string>
+    <string name="update_ready_sub">Your videos and settings are kept.</string>
+    <string name="update_install">Install</string>
+    <string name="update_failed">Download failed</string>
+    <string name="update_failed_sub">Check your connection and try again.</string>
+    <string name="update_retry">Retry</string>
+    <string name="update_dismiss">Dismiss</string>
+
+    <!-- ============================================================
          About / open-source licences (M4). AboutScreen.
          ============================================================ -->
     <string name="about_title">About Naqi</string>

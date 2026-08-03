@@ -66,6 +66,16 @@ object NaqiIcons {
         lineTo(12f, 13.4f); lineTo(16.9f, 18.3f); lineTo(18.3f, 16.9f); lineTo(13.4f, 12f); close()
     }
 
+    /** Arrow into a tray — the update card, and the only place it appears. */
+    val Download = icon("Download") {
+        // shaft + head
+        moveTo(11f, 3f); lineTo(13f, 3f); lineTo(13f, 11.2f); lineTo(16.6f, 7.6f); lineTo(18f, 9f)
+        lineTo(12f, 15f); lineTo(6f, 9f); lineTo(7.4f, 7.6f); lineTo(11f, 11.2f); close()
+        // tray
+        moveTo(4.5f, 16f); lineTo(6.5f, 16f); lineTo(6.5f, 19f); lineTo(17.5f, 19f)
+        lineTo(17.5f, 16f); lineTo(19.5f, 16f); lineTo(19.5f, 21f); lineTo(4.5f, 21f); close()
+    }
+
     /** Overflow "kebab" — carries the entries that used to be full-width cards on the pick screen. */
     val More = icon("More") {
         circle(12f, 5.2f, 1.9f); circle(12f, 12f, 1.9f); circle(12f, 18.8f, 1.9f)
