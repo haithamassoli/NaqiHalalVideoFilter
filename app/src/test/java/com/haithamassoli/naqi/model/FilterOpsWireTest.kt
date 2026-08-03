@@ -55,6 +55,19 @@ class FilterOpsWireTest {
         assertEquals(FilterOps.EVERYONE, FilterOps.whoOrNull("female"))
     }
 
+    /**
+     * The product defaults, pinned: `DEFAULT_WHO` is what every entry point opens on when nothing was
+     * ever picked, and it must be a real choice rather than [FilterOps.NONE] — a default of "off" would
+     * ship an app that censors nothing. `censorWho`'s own default stays [FilterOps.NONE] regardless
+     * (`FilterOps.kt:30-34`): `FilterOps()` means "nothing picked yet".
+     */
+    @Test
+    fun theDefaultsAreTheOnesTheUiOpensOn() {
+        assertEquals(FilterOps.WOMEN, FilterOps.DEFAULT_WHO)
+        assertEquals(FilterOps.NONE, FilterOps().censorWho)
+        assertEquals(40, FilterOps().strictness)
+    }
+
     @Test
     fun theLegacyBooleanMapsToTheTwoStatesItCouldExpress() {
         assertEquals(FilterOps.EVERYONE, FilterOps.whoFromLegacy(true))

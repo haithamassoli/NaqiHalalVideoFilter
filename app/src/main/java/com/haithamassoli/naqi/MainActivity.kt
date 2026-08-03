@@ -213,7 +213,9 @@ class MainActivity : ComponentActivity() {
         val ops = FilterOps(
             removeMusic = removeMusic,
             censorWho = censorWho,
-            strictness = intent.getIntExtra("strictness", 50),
+            // `--ez whole_frame true` — covers the whole picture while a censored face is on screen.
+            wholeFrameBlur = intent.getBooleanExtra("whole_frame", false),
+            strictness = intent.getIntExtra("strictness", FilterOps.DEFAULT_STRICTNESS),
             blurAmount = intent.getIntExtra("blur", 60),
             grayscale = intent.getBooleanExtra("grayscale", false),
             // `--ei solid 0xFF000000`-style; 0 (the default) keeps blur.
@@ -224,7 +226,7 @@ class MainActivity : ComponentActivity() {
         // Echo what actually parsed. `everyone` and `women` censor identically until Phase C ships a
         // classifier, so without this an adb run cannot show WHICH value survived the wire — only that
         // something censored. Same reason the E2E hooks exist at all: logcat beats UI scripting here.
-        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} removeMusic=${ops.removeMusic}")
+        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur}")
 
         // `--ez ytdlp_update true` forces the yt-dlp self-update from adb.
         if (intent.getBooleanExtra("ytdlp_update", false)) {

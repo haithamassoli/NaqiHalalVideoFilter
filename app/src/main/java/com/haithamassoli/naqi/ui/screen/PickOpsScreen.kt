@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.media.displayName
+import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.NaqiBottomAction
 import com.haithamassoli.naqi.ui.NaqiCard
@@ -81,11 +82,10 @@ fun PickOpsScreen(
     val context = LocalContext.current
 
     // Off is [FilterOps.NONE], which erases *which* faces were picked, so the toggle remembers the last
-    // real choice or off-then-on would silently downgrade a "Women" run to "Everyone".
-    // ponytail: screen-local, so it resets if the user detours through Options while the toggle is off —
-    // and a reset means Everyone, this app's safe direction. Hoist into NaqiApp's `ops` state only if
-    // that detour turns out to be a real path.
-    val who = remember { mutableStateOf(FilterOps.EVERYONE) }
+    // real choice or off-then-on would silently change a "Women" run to something else. Seeded from
+    // Prefs rather than a constant, so the pick survives the Options detour, the back button and the
+    // process — a fresh install is the only thing that gets FilterOps.DEFAULT_WHO.
+    val who = remember { mutableStateOf(Prefs.lastWho(context)) }
         .apply { if (ops.censorFaces) value = ops.censorWho }
         .value
 

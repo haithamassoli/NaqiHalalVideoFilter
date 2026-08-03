@@ -81,6 +81,85 @@ class EdlTest {
         assertEquals(edl, Edl.fromJson(edl.toJson()))
     }
 
+    // --- whole-frame mode (plan-whole-frame-blur §3) ---
+
+    private fun track(s: Long, e: Long) = FaceTrackEdl(s, e, listOf(s to r(0.1f, 0.1f, 0.2f, 0.2f)))
+
+    @Test fun mergeRangesPassesThroughTrivialInput() {
+        assertEquals(emptyList<LongRange>(), mergeRanges(emptyList()))
+        assertEquals(listOf(5L..9L), mergeRanges(listOf(5L..9L)))
+    }
+
+    @Test fun mergeRangesSortsAndMergesOverlapping() {
+        assertEquals(
+            listOf(0L..2500L, 9000L..9500L),
+            mergeRanges(listOf(9000L..9500L, 1000L..2500L, 0L..1500L), bridgeMs = 0L),
+        )
+    }
+
+    /** The bridge is the anti-strobe rule: a gap of exactly BRIDGE_MS still merges, one ms more does not. */
+    @Test fun mergeRangesBridgesGapsUpToBridgeMs() {
+        assertEquals(listOf(0L..1000L, 1000L + BRIDGE_MS + 1..2000L),
+            mergeRanges(listOf(0L..1000L, 1000L + BRIDGE_MS + 1..2000L)))
+        assertEquals(listOf(0L..2000L), mergeRanges(listOf(0L..1000L, 1000L + BRIDGE_MS..2000L)))
+    }
+
+    /** A contained range must not extend the merged end backwards. */
+    @Test fun mergeRangesKeepsOuterEndWhenNextIsContained() {
+        assertEquals(listOf(0L..5000L), mergeRanges(listOf(0L..5000L, 1000L..2000L), bridgeMs = 0L))
+    }
+
+    @Test fun promotedTrackBlanksTheWholeFrameAndSuppressesRegions() {
+        val tracks = listOf(track(1000, 2000))
+        val edl = Edl(promoteFacesToFullFrame(emptyList(), tracks), tracks)
+        assertTrue(edl.fullFrameAt(1500))
+        assertEquals(emptyList<NRect>(), edl.regionsAt(1500)) // precedence: no rects under full frame
+        assertFalse(edl.fullFrameAt(2500))
+    }
+
+    /** Flag off is byte-for-byte today's behaviour: the rect is still what gets censored. */
+    @Test fun withoutPromotionTheRectStillCensors() {
+        val tracks = listOf(track(1000, 2000))
+        val edl = Edl(emptyList(), tracks)
+        assertFalse(edl.fullFrameAt(1500))
+        assertEquals(1, edl.regionsAt(1500).size)
+    }
+
+    /** Gate intervals and face spans collapse together — the reason fullFrameAt stays a short scan. */
+    @Test fun promotionMergesGateIntervalsWithFaceSpans() {
+        assertEquals(
+            listOf(0L..3000L),
+            promoteFacesToFullFrame(listOf(0L..1200L), listOf(track(1100, 2000), track(2100, 3000))),
+        )
+    }
+
+    /** A one-sample track is a 100 ms span: 2-3 frames of the whole picture blinking. Never promote it. */
+    @Test fun isolatedBlipIsNotPromotedAndKeepsItsRect() {
+        val tracks = listOf(track(5000, 5100))
+        val edl = Edl(promoteFacesToFullFrame(emptyList(), tracks), tracks)
+        assertFalse(edl.fullFrameAt(5050))
+        assertEquals(1, edl.regionsAt(5050).size) // still censored — by its own rect
+    }
+
+    /** The floor runs after the merge, so blips that bridge into a long enough span survive together. */
+    @Test fun blipsThatMergePastTheFloorAreKept() {
+        val spans = promoteFacesToFullFrame(emptyList(), listOf(track(5000, 5100), track(5400, 5500)))
+        assertEquals(listOf(5000L..5500L), spans)
+    }
+
+    /**
+     * Replays the real S23 EDL (tv1.webm, 643 s, whole-frame run): the three 100 ms and one 300 ms
+     * spans go, the 600/701 ms ones stay, and nothing under the floor survives.
+     */
+    @Test fun measuredS23SpansLoseOnlyTheBlips() {
+        val measured = listOf(
+            308558L..308658L, 311161L..311761L, 485969L..486069L,
+            581564L..581664L, 585368L..585668L, 587170L..587871L, 619319L..638903L,
+        )
+        val kept = mergeRanges(measured).filter { it.last - it.first >= MIN_FULL_MS }
+        assertEquals(listOf(311161L..311761L, 587170L..587871L, 619319L..638903L), kept)
+    }
+
     private companion object {
         const val EPS = 1e-5f
     }

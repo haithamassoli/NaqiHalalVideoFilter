@@ -77,6 +77,8 @@
     <string name="opt_who_everyone">الجميع</string>
     <string name="opt_who_women">النساء</string>
     <string name="opt_who_men">الرجال</string>
+    <string name="opt_whole_frame_title">حجب الشاشة كاملة</string>
+    <string name="opt_whole_frame_desc">يحجب الصورة كاملة طوال ظهور وجه محجوب، لا الوجه وحده. غالبًا ما يُحجب معظم الفيديو بهذه الطريقة.</string>
     <string name="opt_strictness_title">الصرامة</string>
     <string name="opt_strictness_desc">مدى سهولة حجب المشهد كاملًا. لا يتأثّر تمويه الوجوه بهذا الإعداد.</string>
     <string name="opt_censor_style_title">أسلوب الحجب</string>

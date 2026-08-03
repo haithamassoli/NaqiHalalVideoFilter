@@ -44,7 +44,7 @@ enum class NaqiModel(
      * **3.37× faster (8.21 → 2.44 ms) and 17.3 → 5.1 MB, with no new model, licence or dataset.**
      * Measured off-device on 360 real frames from `test-video-1.webm`: 96.1 % argmax agreement with
      * fp32, and after [com.haithamassoli.naqi.analysis.NsfwGate]'s hysteresis the censored timeline at
-     * the default strictness 50 is a strict SUPERSET of fp32's — 0 ms missed. Worst point of the
+     * strictness 50 is a strict SUPERSET of fp32's — 0 ms missed. Worst point of the
      * strictness sweep is 95.5 % interval recall at strictness 0. Hysteresis absorbs the per-frame
      * drift, which is the metric that decides whether a frame gets censored.
      *

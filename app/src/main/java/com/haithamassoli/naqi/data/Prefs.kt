@@ -43,17 +43,33 @@ object Prefs {
     const val NO_DOWNLOAD = -1L
 
     /**
-     * Last-used ops. Defaults to both filters on — the reason someone installed Naqi.
+     * Last-used ops. Defaults to both filters on — the reason someone installed Naqi — which is why
+     * neither key falls back to [FilterOps]'s own defaults (`FilterOps.kt:30-34`).
      *
-     * The legacy `true` carries that default: on a fresh install neither censor key is set, and
-     * [FilterOps]'s own default is [FilterOps.NONE] (`FilterOps.kt:30-34`).
+     * The legacy key is read only when it is actually there: an upgrade keeps whatever the old boolean
+     * said, a fresh install gets [FilterOps.DEFAULT_WHO].
      */
     fun ops(context: Context): FilterOps = with(prefs(context)) {
         FilterOps(
             removeMusic = getBoolean(KEY_REMOVE_MUSIC, true),
             censorWho = FilterOps.whoOrNull(getString(KEY_CENSOR_WHO, null))
-                ?: FilterOps.whoFromLegacy(getBoolean(KEY_CENSOR_WOMEN, true)),
+                ?: if (contains(KEY_CENSOR_WOMEN)) FilterOps.whoFromLegacy(getBoolean(KEY_CENSOR_WOMEN, true))
+                else FilterOps.DEFAULT_WHO,
         )
+    }
+
+    /**
+     * The last *real* Who pick, for the two places that turn censoring back on and must not answer the
+     * question themselves: the faces toggle on step 1 and the share sheet's. Never [FilterOps.NONE] —
+     * "off" is the toggle's state, not a choice of whom to cover.
+     */
+    fun lastWho(context: Context): String =
+        FilterOps.whoOrNull(prefs(context).getString(KEY_CENSOR_WHO, null))
+            ?.takeIf { it != FilterOps.NONE } ?: FilterOps.DEFAULT_WHO
+
+    /** Remembers a Who pick made in the main flow, which has no [save] of its own to ride along on. */
+    fun saveWho(context: Context, who: String) {
+        if (who != FilterOps.NONE) prefs(context).edit().putString(KEY_CENSOR_WHO, who).apply()
     }
 
     fun quality(context: Context): Downloader.Quality =

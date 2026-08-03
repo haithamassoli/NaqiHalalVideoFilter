@@ -32,6 +32,7 @@ import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.edl.Edl
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.edl.FaceTrackEdl
+import com.haithamassoli.naqi.edl.promoteFacesToFullFrame
 import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.media.firstTrackIndex
 import com.haithamassoli.naqi.media.requireTrackIndex
@@ -80,7 +81,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     // The tuning knobs, read once. Every shape below used to re-read its own subset out of inputData,
     // which meant the default for e.g. KEY_STRICTNESS was written out four times — four places for a
     // future edit to change three of them.
-    private val strictness = inputData.getInt(KEY_STRICTNESS, 50)
+    private val strictness = inputData.getInt(KEY_STRICTNESS, FilterOps.DEFAULT_STRICTNESS)
     private val grayscale = inputData.getBoolean(KEY_GRAYSCALE, false)
 
     /** Non-zero replaces blur with a flat fill; see [FilterOps.solidColor] for why 0 means blur. */
@@ -113,6 +114,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     private val censorWho = FilterOps.whoOrNull(inputData.getString(KEY_CENSOR_WHO))
         ?: FilterOps.whoFromLegacy(inputData.getBoolean(KEY_CENSOR_WOMEN, false))
 
+    /** [FilterOps.wholeFrameBlur] — read here, applied once per EDL build in [promoteFacesToFullFrame]. */
+    private val wholeFrameBlur = inputData.getBoolean(KEY_WHOLE_FRAME, false)
+
     /**
      * Key for this job's working directory. Derived from the source and every option that changes the
      * OUTPUT — not from [getId] — so Phase 2's resume finds the same directory after process death, and
@@ -139,13 +143,16 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // and harmless: the orphan re-analyzes from scratch and the 7-day sweep collects the old one.
             FilterOps.whoOrNull(inputData.getString(KEY_CENSOR_WHO))
                 ?: FilterOps.whoFromLegacy(inputData.getBoolean(KEY_CENSOR_WOMEN, false)),
-            inputData.getInt(KEY_STRICTNESS, 50),
+            inputData.getInt(KEY_STRICTNESS, FilterOps.DEFAULT_STRICTNESS),
             inputData.getInt(KEY_BLUR_AMOUNT, 60),
             inputData.getBoolean(KEY_GRAYSCALE, false),
             // Adding this moved every existing key once, orphaning any resumable directory left by a
             // pre-solid build — the same cost as the plan bump below, and unavoidable: a blurred segment
             // and a solid-filled one must never resume into each other.
             inputData.getInt(KEY_SOLID_COLOR, FilterOps.BLUR),
+            // Same reason as the two above: a rect-blurred segment and a whole-frame one must never
+            // resume into each other. Moves every existing key once, orphaning pre-whole-frame dirs.
+            inputData.getBoolean(KEY_WHOLE_FRAME, false),
             inputData.getString(KEY_KEEP_STEMS),
             inputData.getString(KEY_FORCE_INTERVALS), // debug hook, but it does change the output
             // Not an input: a plan generation. Segment boundaries moved to sync samples in
@@ -618,9 +625,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         // ONE hysteresis pass over the whole timeline — the reason firings are accumulated rather than
         // turned into intervals per segment. The 7.4 overflow promotion also runs once, here, for the same
         // reason: it needs every segment's tracks to know how many faces overlap across a seam.
-        val intervals = intervalsFor(firings, durationMs) + overflowSpans(faceTracks)
+        val intervals = censorSpans(firings, durationMs, faceTracks)
         Log.i(TAG, "pass1 segmented: gateFirings=${firings.size} intervalCount=${intervals.size} " +
-            "faceTracks=${faceTracks.size}")
+            "faceTracks=${faceTracks.size} wholeFrame=$wholeFrameBlur")
         logVotes("pass1 segmented")
         return Edl(intervals, faceTracks.sortedBy { it.startMs })
     }
@@ -1067,13 +1074,13 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         val wallMs = (System.nanoTime() - tWall) / 1_000_000
 
         val faceTracks = faceTracker.finish()
-        val intervals = intervalsFor(firings, durationMs) + overflowSpans(faceTracks)
+        val intervals = censorSpans(firings, durationMs, faceTracks)
         // Counts on their own line: a feature-length film produces hundreds of intervals, and logcat
         // truncates a message at ~4 kB — on the first 155-min soak that silently ate the face counts
         // off the end of the combined line, which were the whole point of logging it.
         // plan-v2 §4.6: `gate=` is session.run alone now; its preprocessing is the sampler's `gateFill=`.
         Log.i(TAG, "pass1: gateFirings=${firings.size} intervalCount=${intervals.size} " +
-            "faceTracks=${faceTracks.size} ${faceTracker.retention()} " +
+            "wholeFrame=$wholeFrameBlur faceTracks=${faceTracks.size} ${faceTracker.retention()} " +
             "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms")
         logVotes("pass1")
         Log.i(TAG, "pass1 intervals=$intervals")
@@ -1110,6 +1117,20 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
      * censored. An unknown duration must mean "do not clamp the far end", not "clamp it to nothing". The
      * mapping is here rather than at the two call sites so no third one can reintroduce it.
      */
+    /**
+     * Every whole-frame span the EDL will carry: the gate's hysteresis intervals, the 7.4 overflow
+     * promotion, and — under [wholeFrameBlur] — every censored face track promoted to the whole frame.
+     *
+     * One function because both pass-1 shapes must agree. It runs ONCE over the whole timeline, never
+     * per segment: a segment checkpoint stores its bare tracks (`Edl(emptyList(), segTracks)`), so a
+     * resume under a different flag still rebuilds the right spans — and promoting per segment could
+     * not bridge a face that spans a seam.
+     */
+    private fun censorSpans(firings: List<Long>, durationMs: Long, tracks: List<FaceTrackEdl>): List<LongRange> {
+        val base = intervalsFor(firings, durationMs) + overflowSpans(tracks)
+        return if (wholeFrameBlur) promoteFacesToFullFrame(base, tracks) else base
+    }
+
     private fun intervalsFor(firings: List<Long>, durationMs: Long): List<LongRange> {
         val intervals = NsfwGate.intervals(firings, if (durationMs > 0L) durationMs else Long.MAX_VALUE)
         if (!BuildConfig.DEBUG_HOOKS) return intervals
@@ -1237,6 +1258,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         const val KEY_BLUR_AMOUNT = "blur_amount"
         const val KEY_GRAYSCALE = "grayscale"
         const val KEY_SOLID_COLOR = "solid_color"
+        const val KEY_WHOLE_FRAME = "whole_frame"
 
         // KEY_BLUR_UNKNOWN ("blur_unknown_faces") was deleted with the gender vote (plan-v2 §5.4)
         // along with FilterOps.blurUnknownFaces. Unlike KEY_CENSOR_WOMEN above, the wire string did NOT

@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.analysis.FrameSampler
+import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.NaqiBottomAction
 import com.haithamassoli.naqi.ui.NaqiCard
@@ -201,7 +202,18 @@ fun OptionsScreen(
                 NaqiCard(contentPadding = 0.dp) {
                     // First in the card: Who is the largest decision in the section, everything below
                     // only tunes what it selected.
-                    WhoRow(ops.censorWho) { onOpsChange(ops.copy(censorWho = it)) }
+                    // Saved on pick, not on Start: this is the only control that sets Who, and the
+                    // pick screen's toggle reads it back the next time censoring is turned on.
+                    WhoRow(ops.censorWho) { Prefs.saveWho(context, it); onOpsChange(ops.copy(censorWho = it)) }
+                    NaqiRowDivider()
+                    // Directly under Who because it is the other "how much gets covered" decision, and
+                    // above Strictness for the same reason Who is: it changes the picture, not the tuning.
+                    ToggleTile(
+                        title = stringResource(R.string.opt_whole_frame_title),
+                        desc = stringResource(R.string.opt_whole_frame_desc),
+                        checked = ops.wholeFrameBlur,
+                        onCheckedChange = { onOpsChange(ops.copy(wholeFrameBlur = it)) },
+                    )
                     NaqiRowDivider()
                     SliderRow(
                         title = stringResource(R.string.opt_strictness_title),

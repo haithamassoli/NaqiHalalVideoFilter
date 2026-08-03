@@ -87,6 +87,66 @@ data class Edl(val censorIntervalsMs: List<LongRange>, val faceTracks: List<Face
     }
 }
 
+/**
+ * Gap under which two whole-frame spans merge rather than strobe. A face track ends `SPAN_PAD_MS`
+ * after its last sample and a re-detect a few frames later would otherwise unblur and re-blur the
+ * whole picture — invisible when it is a rect, very visible when it is the frame.
+ *
+ * ponytail: one fixed bridge for every video. Make it shot-length-aware only if a real asset strobes.
+ */
+internal const val BRIDGE_MS = 400L
+
+/** Merge overlapping or near-adjacent ranges. Input need not be sorted; output is, and is disjoint. */
+internal fun mergeRanges(ranges: List<LongRange>, bridgeMs: Long = BRIDGE_MS): List<LongRange> {
+    if (ranges.size <= 1) return ranges
+    val sorted = ranges.sortedBy { it.first }
+    val out = ArrayList<LongRange>(sorted.size)
+    var start = sorted[0].first
+    var end = sorted[0].last
+    for (i in 1 until sorted.size) {
+        val r = sorted[i]
+        if (r.first <= end + bridgeMs) {
+            if (r.last > end) end = r.last
+        } else {
+            out.add(start..end)
+            start = r.first
+            end = r.last
+        }
+    }
+    out.add(start..end)
+    return out
+}
+
+/**
+ * Shortest whole-frame span worth keeping. A one-sample face track spans `first-50..last+50` = 100 ms,
+ * which is 2-3 frames — the entire picture blinks and comes back, and it reads as a decode glitch.
+ *
+ * Measured on the S23 (tv1.webm, 643 s): 6 of the 29 merged spans were under 1 s and three were
+ * exactly 100 ms. [BRIDGE_MS] cannot remove those; it only joins spans that are already near each
+ * other, and these are isolated.
+ *
+ * **Dropping a short span costs no coverage.** `Edl.regionsAt` only returns rects where no full-frame
+ * span is active, so a dropped promotion falls back to that track's own blurred rect — exactly what
+ * rect mode does. The face stays censored; only the whole-frame flash goes away.
+ */
+internal const val MIN_FULL_MS = 500L
+
+/**
+ * Whole-frame mode: every censored face span becomes a whole-frame span, merged into [intervals].
+ *
+ * Merging is not cosmetic. The 155-min film in `long-film-plan.md` produced 3 362 tracks and
+ * [Edl.fullFrameAt] is a linear scan per rendered frame; unmerged that is ~3 362 comparisons across
+ * ~232 k frames. Merged, footage with people in most shots collapses to a few dozen ranges — fewer
+ * than [Edl.regionsAt] scans today, which is why this mode does not cost render time (plan §4).
+ *
+ * The [MIN_FULL_MS] filter runs AFTER the merge, so two blips 300 ms apart become one 500 ms span and
+ * survive together rather than being dropped one at a time. It cannot drop a gate interval either:
+ * `NsfwGate` hysteresis floors those at 2 s, measured as the shortest span in every run.
+ */
+internal fun promoteFacesToFullFrame(intervals: List<LongRange>, tracks: List<FaceTrackEdl>): List<LongRange> =
+    mergeRanges(intervals + tracks.map { it.startMs..it.endMs })
+        .filter { it.last - it.first >= MIN_FULL_MS }
+
 /** Linear-interpolate the track's rect at [tMs], clamped to the first/last keyframe at the span edges. */
 private fun FaceTrackEdl.rectAt(tMs: Long): NRect? {
     val kf = keyframes

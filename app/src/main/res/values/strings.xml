@@ -87,6 +87,10 @@
     <string name="opt_who_everyone">Everyone</string>
     <string name="opt_who_women">Women</string>
     <string name="opt_who_men">Men</string>
+    <!-- The desc has to state the cost plainly: on ordinary footage this covers most of the video, and
+         the output is a re-encoded file, so it cannot be undone the way a browser blur can. -->
+    <string name="opt_whole_frame_title">Cover the whole frame</string>
+    <string name="opt_whole_frame_desc">Covers the entire picture while a censored face is on screen, not just the face. Most of the video usually ends up covered.</string>
     <string name="opt_strictness_title">Strictness</string>
     <string name="opt_strictness_desc">How eagerly whole scenes are censored. Face blurring is never affected.</string>
     <string name="opt_censor_style_title">Censor style</string>

@@ -98,7 +98,7 @@ fun ShareSheet(
     // What the faces toggle turns back ON to. The sheet has no Who control by design
     // (plan-censor-who §2.3) — it re-asks nothing, but it must not silently ANSWER either, so off-then-on
     // restores the last saved pick rather than hard-coding Everyone and persisting that downgrade below.
-    val lastWho = remember { ops.censorWho.takeIf { it != FilterOps.NONE } ?: FilterOps.EVERYONE }
+    val lastWho = remember { Prefs.lastWho(context) }
 
     // Link metadata. `loading` starts true only for a link — a local file has nothing to fetch.
     var loading by remember { mutableStateOf(isLink) }

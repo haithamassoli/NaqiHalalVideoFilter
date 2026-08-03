@@ -27,13 +27,23 @@ data class FilterOps(
      * (`queue.json`, WorkManager `Data`, `Prefs`, the debug intent) take it unchanged — see [whoOrNull]
      * for the read side.
      *
-     * **Defaults to [NONE], not [EVERYONE].** `FilterOps()` means "nothing picked yet" and must keep
+     * **Defaults to [NONE], not [DEFAULT_WHO].** `FilterOps()` means "nothing picked yet" and must keep
      * `any == false`: `Queue.kt:56` defaults an item's ops to it, `ui/NaqiApp.kt:37` seeds the pick
      * screen from it, and `EtaTest.kt:62` asserts a no-op job estimates 0 ms. The entry points that
      * *should* open with censoring on default it themselves (`Prefs.kt:54`, `MainActivity.kt:208`).
      */
     val censorWho: String = NONE,
-    val strictness: Int = 50,
+    /**
+     * Cover the WHOLE frame for as long as a censored face is on screen, instead of just its padded
+     * rect (HaramBlur's behaviour). Applies only to faces — the NSFW gate has always been whole-frame.
+     *
+     * Lands in the EDL at build time (`promoteFacesToFullFrame`), so the renderer, the shader and the
+     * checkpoint format are untouched and `edl.json` records the decision. It is a *mode*, not a better
+     * default: on ordinary footage most of the runtime ends up covered, and the output is a re-encode,
+     * so unlike a browser extension's CSS filter it cannot be undone. Default false.
+     */
+    val wholeFrameBlur: Boolean = false,
+    val strictness: Int = DEFAULT_STRICTNESS,
     val blurAmount: Int = 60,
     val grayscale: Boolean = false,
     /**
@@ -57,6 +67,17 @@ data class FilterOps(
         const val EVERYONE = "everyone"
         const val WOMEN = "women"
         const val MEN = "men"
+
+        /**
+         * What "censor faces" means before the user says otherwise — the value every entry point opens
+         * on and falls back to, not [censorWho]'s own default (that one stays [NONE], see above).
+         * The last real pick is remembered in `Prefs.lastWho`, so this is only ever the fresh-install
+         * answer.
+         */
+        const val DEFAULT_WHO = WOMEN
+
+        /** Where the NSFW gate's strictness slider opens, and what every wire reader falls back to. */
+        const val DEFAULT_STRICTNESS = 40
 
         /** Legacy `censorWomen` boolean -> the new field; `true` censored every detected face. */
         fun whoFromLegacy(censorWomen: Boolean): String = if (censorWomen) EVERYONE else NONE

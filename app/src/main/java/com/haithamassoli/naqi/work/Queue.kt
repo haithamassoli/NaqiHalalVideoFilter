@@ -139,6 +139,7 @@ internal object Queue {
             JSONObject().apply {
                 put("removeMusic", i.ops.removeMusic)
                 put("censorWho", i.ops.censorWho)
+                put("wholeFrameBlur", i.ops.wholeFrameBlur)
                 put("strictness", i.ops.strictness)
                 put("blurAmount", i.ops.blurAmount)
                 put("grayscale", i.ops.grayscale)
@@ -172,7 +173,8 @@ internal object Queue {
         // `optString` yields "" for an absent key, which is exactly what `whoOrNull` reads as absent.
         censorWho = FilterOps.whoOrNull(ops.optString("censorWho"))
             ?: FilterOps.whoFromLegacy(ops.optBoolean("censorWomen", false)),
-        strictness = ops.optInt("strictness", 50),
+        wholeFrameBlur = ops.optBoolean("wholeFrameBlur", false),
+        strictness = ops.optInt("strictness", FilterOps.DEFAULT_STRICTNESS),
         blurAmount = ops.optInt("blurAmount", 60),
         grayscale = ops.optBoolean("grayscale", false),
         solidColor = ops.optInt("solidColor", FilterOps.BLUR),
