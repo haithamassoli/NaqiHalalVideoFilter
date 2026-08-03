@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.MediaExtractor
 import android.net.Uri
 import android.os.Build
+import android.graphics.Bitmap
 import android.util.Log
 import androidx.core.net.toUri
 import androidx.work.ForegroundInfo
@@ -14,8 +15,10 @@ import androidx.work.workDataOf
 import com.google.android.gms.tasks.Tasks
 import com.haithamassoli.naqi.BuildConfig
 import com.haithamassoli.naqi.R
+import com.haithamassoli.naqi.analysis.FaceGenderVoter
 import com.haithamassoli.naqi.analysis.FaceTracker
 import com.haithamassoli.naqi.analysis.FrameSampler
+import com.haithamassoli.naqi.analysis.NRect
 import com.haithamassoli.naqi.analysis.NsfwGate
 import com.haithamassoli.naqi.analysis.VideoMeta
 import com.haithamassoli.naqi.audio.AudioPipeline
@@ -39,6 +42,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.FloatBuffer
+import kotlin.math.exp
+import kotlin.math.max
 
 /**
  * Filtering job. Up to two passes over one source video plus an audio pass, promoted to a foreground
@@ -98,6 +106,14 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     private val keepStems = inputData.getString(KEY_KEEP_STEMS) ?: "vocals"
 
     /**
+     * WHICH faces get censored — one of [FilterOps]' four states (plan-censor-who §1.1). Every branch
+     * of [doWork] still asks only *whether* (`!= NONE`); only [genderVoter] and the [FaceTracker]s look
+     * at the value. The fallback keeps a job enqueued before the rename censoring.
+     */
+    private val censorWho = FilterOps.whoOrNull(inputData.getString(KEY_CENSOR_WHO))
+        ?: FilterOps.whoFromLegacy(inputData.getBoolean(KEY_CENSOR_WOMEN, false))
+
+    /**
      * Key for this job's working directory. Derived from the source and every option that changes the
      * OUTPUT — not from [getId] — so Phase 2's resume finds the same directory after process death, and
      * so a job restarted with different settings can never resume into work rendered under the old ones.
@@ -112,7 +128,17 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         JobStore.keyOf(
             inputData.getString(KEY_INPUT_URI),
             inputData.getBoolean(KEY_REMOVE_MUSIC, false),
-            inputData.getBoolean(KEY_CENSOR_WOMEN, false),
+            // Back-compat read like doWork's, and hashed as the STRING since Phase C: "women" and "men"
+            // now select different faces, so two jobs that differ only in Who produce different output
+            // and must never resume into each other's segments. Hashed as a raw getBoolean it would
+            // read false for every job written after the rename and stop encoding the censor op at all.
+            //
+            // This moves every existing key once and so orphans any resumable directory left by a
+            // pre-Phase-C build. That is correct — such a directory holds segments rendered under
+            // "censor every face", which a resumed "women" job would silently adopt as its verdict —
+            // and harmless: the orphan re-analyzes from scratch and the 7-day sweep collects the old one.
+            FilterOps.whoOrNull(inputData.getString(KEY_CENSOR_WHO))
+                ?: FilterOps.whoFromLegacy(inputData.getBoolean(KEY_CENSOR_WOMEN, false)),
             inputData.getInt(KEY_STRICTNESS, 50),
             inputData.getInt(KEY_BLUR_AMOUNT, 60),
             inputData.getBoolean(KEY_GRAYSCALE, false),
@@ -140,8 +166,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
     override suspend fun doWork(): Result {
         val removeMusic = inputData.getBoolean(KEY_REMOVE_MUSIC, false)
-        val censorWomen = inputData.getBoolean(KEY_CENSOR_WOMEN, false)
-        if (!removeMusic && !censorWomen) return Result.failure()
+        // Whether, never which: every branch below asks only whether faces are censored, which is what
+        // FilterOps.censorFaces is and why "everyone" is byte for byte the old `true` path. Which faces
+        // is [censorWho]'s business, and it reaches only [genderVoter] and the FaceTrackers.
+        val censorFaces = censorWho != FilterOps.NONE
+        if (!removeMusic && !censorFaces) return Result.failure()
         val inputUri = (inputData.getString(KEY_INPUT_URI) ?: return Result.failure()).toUri()
 
         // Reclaim orphaned job directories before writing several GB of our own. Here rather than in
@@ -169,7 +198,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         if (audioOnly) Log.i(TAG, "audio-only job: no video track, publishing to Music/Naqi")
 
         val plan = if (audioOnly) emptyList() else planFor(inputUri, durationMs, inputData.getLong(KEY_SEGMENT_MS, 0L))
-        val segmented = censorWomen && plan.isNotEmpty()
+        val segmented = censorFaces && plan.isNotEmpty()
         // The censor-only concat copies the SOURCE audio track sample-for-sample, and framework MediaMuxer
         // carries only AAC/AMR — which rejects the AC-3/E-AC-3/DTS a film ships AND the Opus/Vorbis in every
         // MKV/WebM. Such a source used to give up the segmented route entirely: correct output, but NO
@@ -200,7 +229,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             allowNoVideo = audioOnly,
             tempCopies = when {
                 segmented -> 2
-                removeMusic && censorWomen -> 2
+                removeMusic && censorFaces -> 2
                 else -> 1
             },
             // The separated-audio scratch: int16 stereo 44.1 kHz = 176 400 B per second of source. Plus,
@@ -223,7 +252,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         return when {
             audioOnly -> runAudioOnly(inputUri)
             segmented -> runSegmented(inputUri, plan, removeMusic, audioPlan, durationMs, meta!!)
-            removeMusic && censorWomen -> runCombined(inputUri, meta!!)
+            removeMusic && censorFaces -> runCombined(inputUri, meta!!)
             removeMusic -> runMusicOnly(inputUri, durationMs)
             else -> runCensorOnly(inputUri, meta!!) // M1's unsegmented path
         }
@@ -535,8 +564,10 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             }
             val segFirings = ArrayList<Long>()
             // Fresh per segment: this is what bounds FaceTracker's growth by construction, on top of the
-            // per-track eviction Phase 1 added.
-            val tracker = FaceTracker()
+            // per-track eviction Phase 1 added. The voter is fresh too, so its buffer lives exactly as
+            // long as the segment's tracker does; the counters it feeds are the worker's and stay
+            // cumulative across segments.
+            val tracker = FaceTracker(genderVoter, censorWho)
             var tDetect = 0L; var tGate = 0L; val tWall = System.nanoTime()
             try {
                 FrameSampler.sample(
@@ -556,7 +587,10 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                         if (NsfwGate.fires(probs, strictness)) segFirings += ptsMs
                     }
                     val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
-                    tracker.onFaces(faces, uprightW, uprightH, ptsMs)
+                    // `image` is passed because the gender vote crops from its NV21 pixels. Those pixels
+                    // are RING-OWNED and valid only for the duration of this callback — onFaces runs
+                    // inside it, so this is safe, but nothing may retain the image or defer the vote.
+                    tracker.onFaces(faces, image, uprightW, uprightH, ptsMs)
                     val within = ((ptsMs - seg.startMs).toFloat() / (seg.endMs - seg.startMs).coerceAtLeast(1))
                     val pct = (progressBase + ((seg.index + within.coerceIn(0f, 1f)) * progressSpan / plan.size).toInt())
                         .coerceIn(progressBase, progressBase + progressSpan)
@@ -587,6 +621,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         val intervals = intervalsFor(firings, durationMs) + overflowSpans(faceTracks)
         Log.i(TAG, "pass1 segmented: gateFirings=${firings.size} intervalCount=${intervals.size} " +
             "faceTracks=${faceTracks.size}")
+        logVotes("pass1 segmented")
         return Edl(intervals, faceTracks.sortedBy { it.startMs })
     }
 
@@ -634,7 +669,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val tempFile = File(workDir, "render.mp4")
-        val faceTracker = FaceTracker()
+        val faceTracker = FaceTracker(genderVoter, censorWho)
         try {
             val edl = analyze(inputUri, faceTracker, meta)
             // No removeAudio: this file IS the published output, so Transformer transmuxing the source
@@ -704,7 +739,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
         val renderTemp = File(workDir, "render.mp4")
         val audioTemp = File(workDir, "audio.m4a")
-        val faceTracker = FaceTracker()
+        val faceTracker = FaceTracker(genderVoter, censorWho)
         try {
             branches(
                 audio = { demote ->
@@ -852,6 +887,140 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         reportAsync(stageLabel ?: stage(R.string.stage_separating), videoPct + audioPct)
     }
 
+    /** Gender-vote instrumentation, cumulative over the whole pass. Reported by [logVotes]. */
+    private var voteCrops = 0
+    private var voteAbstained = 0
+    private var voteNanos = 0L
+    private var voteFailures = 0
+    private var voteFailureLogged = false
+
+    /**
+     * The face-gender classifier the [FaceTracker]s vote with, or **null** under Everyone/Off — which is
+     * the point: those two states allocate nothing and run pass 1 byte for byte as before, so no existing
+     * user pays for this feature (plan-censor-who §4.1).
+     *
+     * FilterWorker owns the ORT call and the buffer; [FaceTracker] owns the policy (which crops are worth
+     * classifying, `VOTE_CAP`, the majority rule). This side is deliberately just "pixels in, ±1 out".
+     *
+     * **One buffer for the whole pass** — hence `by lazy` and not a function: the segmented path builds a
+     * fresh [FaceTracker] per segment and would otherwise build a buffer per segment too. ORT wraps a
+     * DIRECT native-order buffer zero-copy and *copies* a heap one on every run (see [Infer.nsfw]'s KDoc),
+     * so a per-crop buffer would additionally mean a 110 KB copy per face per frame. Safe to share because
+     * pass 1 is single-threaded and the crop is consumed inside the `Infer.genderAge` call it was filled
+     * for — the segments run in sequence, and in [runCombined] only the video branch votes.
+     *
+     * The whole body is guarded: pass 1 runs for up to three hours and one ORT throw on one crop must not
+     * cost the job. A failure abstains, and an abstention already means censor (§4.2), so the safe
+     * direction survives the error path too — as does a missing model, which is what the null return is.
+     */
+    private val genderVoter: FaceGenderVoter? by lazy {
+        // Asked once, here, rather than per crop: without the asset every eligible face would pay a full
+        // 9 216-pixel YUV->RGB walk to reach a guaranteed abstention. Null degrades Women/Men to "no vote
+        // cast", which §4.2 already defines as censor — i.e. to Everyone, the safe direction.
+        if ((censorWho != FilterOps.WOMEN && censorWho != FilterOps.MEN) ||
+            !Infer.genderAgeAvailable(applicationContext)
+        ) return@lazy null
+        val side = FrameSampler.CROP_SIDE
+        val crop = ByteBuffer.allocateDirect(3 * side * side * Float.SIZE_BYTES)
+            .order(ByteOrder.nativeOrder()).asFloatBuffer()
+        FaceGenderVoter { image, uprightW, uprightH, rect ->
+            val t0 = System.nanoTime()
+            val vote = try {
+                // InputImage.getWidth/getHeight are the UNROTATED NV21 buffer's dims here (the sampler
+                // hands ML Kit the buffer plus a rotation), which is exactly cropToTensor's dispW/dispH.
+                FrameSampler.cropToTensor(
+                    image.byteBuffer!!, image.width, image.height, image.rotationDegrees,
+                    uprightW, uprightH, rect, crop,
+                )
+                // out is RAW logits [female, male]; softmax over the two collapses to a sigmoid of their
+                // difference. p = P(male). Null = model not installed. See Models.kt's GENDERAGE contract.
+                val out = Infer.genderAge(applicationContext, crop)
+                if (out == null) 0 else {
+                    val p = 1f / (1f + exp(-(out[1] - out[0])))
+                    dumpCrop(crop, p, rect, uprightW, uprightH, image.rotationDegrees)
+                    if (max(p, 1f - p) < CONF_FLOOR) 0 else if (p >= 0.5f) 1 else -1
+                }
+            } catch (t: Throwable) {
+                // One trace, not thousands: a per-crop failure mode (an ORT throw on this graph, a moved
+                // buffer limit) is systematic, so logging it per crop would bury the pass's own lines.
+                if (!voteFailureLogged) {
+                    voteFailureLogged = true
+                    Log.w(TAG, "gender vote failed, abstaining (logged once)", t)
+                }
+                voteFailures++
+                0
+            }
+            voteNanos += System.nanoTime() - t0
+            voteCrops++
+            if (vote == 0) voteAbstained++
+            vote
+        }
+    }
+
+    /**
+     * plan-censor-who §3.2's eval set: the crops the vote actually saw, as PNGs, named with the model's
+     * own p(male) and the face's upright pixel size. Labelling these by hand is what turns the logged
+     * abstention rate into §3.3's balanced accuracy — and looking at even one of them is what proves the
+     * crop is a FACE, which no vote-rate statistic can (a transposed axis would still abstain plausibly).
+     *
+     * Off unless `filesDir/dump-crops` exists, so enabling it is one `adb shell run-as ... touch` and
+     * needs no new intent extra, no new `Data` key and no wire-format change. `DEBUG_HOOKS`, not `DEBUG`,
+     * to match the rest of this file's hooks: the non-debuggable `benchmark` build has to keep them.
+     *
+     * ponytail: capped at [DUMP_CAP] and no directory rotation — this is a measurement harness, not a
+     * feature. A film would otherwise write ~17 000 files into the app's own data dir.
+     */
+    private fun dumpCrop(
+        crop: FloatBuffer, pMale: Float,
+        rect: NRect, uprightW: Int, uprightH: Int, rotation: Int,
+    ) {
+        val dir = cropDumpDir ?: return
+        if (dumped >= DUMP_CAP) return
+        val px = maxOf(rect.width * uprightW, rect.height * uprightH).toInt()
+        val side = FrameSampler.CROP_SIDE
+        val plane = side * side
+        // NCHW 0..255 floats back to ARGB. Nothing here is on the hot path — it returns above when off.
+        val pixels = IntArray(plane) { i ->
+            (0xFF shl 24) or (crop.get(i).toInt() shl 16) or
+                (crop.get(plane + i).toInt() shl 8) or crop.get(2 * plane + i).toInt()
+        }
+        val name = "crop_%04d_p%.3f_%dpx_box%.3f,%.3f,%.3f,%.3f_up%dx%d_rot%d.png"
+            .format(dumped, pMale, px, rect.left, rect.top, rect.right, rect.bottom, uprightW, uprightH, rotation)
+        runCatching {
+            File(dir, name).outputStream().use {
+                Bitmap.createBitmap(pixels, side, side, Bitmap.Config.ARGB_8888)
+                    .compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            dumped++
+        }
+    }
+
+    /**
+     * Non-null only while the marker exists — resolved once, see [dumpCrop]. `touch` creates a FILE, so
+     * that is turned into the directory; the final `isDirectory` is what keeps a failed `mkdirs` from
+     * throwing a swallowed `FileNotFoundException` per crop for the rest of the pass.
+     */
+    private val cropDumpDir: File? by lazy {
+        File(applicationContext.filesDir, "dump-crops")
+            .takeIf { BuildConfig.DEBUG_HOOKS && it.exists() }
+            ?.also { if (!it.isDirectory) { it.delete(); it.mkdirs() } }
+            ?.takeIf { it.isDirectory }
+    }
+    private var dumped = 0
+
+    /**
+     * plan-censor-who §5 budgets ~1 ms/crop and says drop `VOTE_CAP` to 3 if the measured cost exceeds
+     * ~5 % of analyze — this line is how that gets measured on the S23, so it sits with the pass's other
+     * timings. Its OWN line rather than appended to `pass1:`, because logcat truncates a message at ~4 kB
+     * and that line already lost content to it once (see [analyze]).
+     */
+    private fun logVotes(where: String) {
+        if (voteCrops == 0) return
+        val ms = voteNanos / 1_000_000
+        Log.i(TAG, "$where gender: who=$censorWho crops=$voteCrops abstained=$voteAbstained " +
+            "failed=$voteFailures total=${ms}ms perCrop=${"%.2f".format(ms.toFloat() / voteCrops)}ms")
+    }
+
     /**
      * Pass 1: sample once, run faces and the gate on every sampled frame, build the EDL. [pct]
      * becomes `progressBase + fraction*progressSpan`; the defaults reproduce the M1 0..50 band exactly.
@@ -881,7 +1050,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 if (NsfwGate.fires(probs, strictness)) firings += ptsMs
             }
             val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
-            faceTracker.onFaces(faces, uprightW, uprightH, ptsMs)
+            // See analyzeSegments: `image`'s NV21 pixels are ring-owned and valid only inside this
+            // callback, which is where the gender vote crops from them. Nothing may retain the image.
+            faceTracker.onFaces(faces, image, uprightW, uprightH, ptsMs)
             index++
             val pct = (progressBase + (ptsMs.toFloat() / progressDen) * progressSpan)
                 .toInt().coerceIn(progressBase, progressBase + progressSpan)
@@ -904,6 +1075,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         Log.i(TAG, "pass1: gateFirings=${firings.size} intervalCount=${intervals.size} " +
             "faceTracks=${faceTracks.size} ${faceTracker.retention()} " +
             "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms")
+        logVotes("pass1")
         Log.i(TAG, "pass1 intervals=$intervals")
         return Edl(intervals, faceTracks)
     }
@@ -1047,10 +1219,17 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         const val KEY_REMOVE_MUSIC = "remove_music"
 
         /**
-         * The censor op. The literal is PERSISTED — WorkManager input data on enqueued jobs, and
-         * `Prefs`' SharedPreferences key — so it keeps the "women" spelling even though the feature is
-         * now "censor faces" (plan-v2 §5.4). Renaming the wire string would silently re-default every
-         * queued job and every returning user's toggle.
+         * The censor op: one of [FilterOps]' four `censorWho` states, not a boolean
+         * (plan-censor-who §1.1). The literal is PERSISTED in the input data of enqueued jobs.
+         */
+        const val KEY_CENSOR_WHO = "censor_who"
+
+        /**
+         * READ-ONLY legacy — the boolean this op was until the rename above. Nothing writes it any
+         * more, but a job enqueued by an older build is sitting in WorkManager's database carrying only
+         * this key, so every read of [KEY_CENSOR_WHO] falls back to it (`filterOps()`, [doWork], the
+         * job key). Dropping it would re-default those jobs to "do not censor" — a full render that
+         * silently returns the input, which is the worst failure this app has.
          */
         const val KEY_CENSOR_WOMEN = "censor_women"
         const val KEY_INPUT_URI = "input_uri"
@@ -1099,6 +1278,19 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
          * value on purpose is affected. Only the exact no-op combination reaches it.
          */
         private const val MIN_EFFECTIVE_BLUR = 25
+
+        /**
+         * Softmax probability of the winning gender below which a crop votes for nobody
+         * (plan-censor-who §4.2). **Tunable, and it is THE dial** of §3.3's curve: raise it and
+         * abstentions rise, so Women/Men both drift toward Everyone; lower it and more men stay visible
+         * at the cost of more women exposed. 0.60 is a starting point, not a measured optimum — Phase B
+         * reads the real value off the sweep, using the `perCrop=`/`abstained=` numbers [logVotes]
+         * prints. An abstention already means censor, so this only ever trades in the safe direction.
+         */
+        private const val CONF_FLOOR = 0.60f
+
+        /** Crops [dumpCrop] writes before it stops. Enough to hand-label for §3.3, few enough to `adb pull`. */
+        private const val DUMP_CAP = 240
 
         /**
          * Rects `CensorEffect` can composite in one frame — **must match its private `MAX_REGIONS`**

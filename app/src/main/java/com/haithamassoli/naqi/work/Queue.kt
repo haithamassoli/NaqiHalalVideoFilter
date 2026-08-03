@@ -138,7 +138,7 @@ internal object Queue {
             "ops",
             JSONObject().apply {
                 put("removeMusic", i.ops.removeMusic)
-                put("censorWomen", i.ops.censorWomen)
+                put("censorWho", i.ops.censorWho)
                 put("strictness", i.ops.strictness)
                 put("blurAmount", i.ops.blurAmount)
                 put("grayscale", i.ops.grayscale)
@@ -148,31 +148,37 @@ internal object Queue {
         )
     }
 
-    private fun fromJson(o: JSONObject): Item {
-        val ops = o.optJSONObject("ops") ?: JSONObject()
-        return Item(
-            id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
-            url = o.optStringOrNull("url"),
-            sourceUri = o.optStringOrNull("sourceUri"),
-            title = o.optStringOrNull("title"),
-            // An unknown state name means a file written by a newer build; treat it as failed rather
-            // than crashing the screen that is supposed to show the user what went wrong.
-            state = runCatching { State.valueOf(o.optString("state")) }.getOrDefault(State.FAILED),
-            quality = o.optStringOrNull("quality"),
-            error = o.opt("error").let { if (it is Int) it else null },
-            outputUri = o.optStringOrNull("outputUri"),
-            ops = FilterOps(
-                removeMusic = ops.optBoolean("removeMusic", false),
-                censorWomen = ops.optBoolean("censorWomen", false),
-                strictness = ops.optInt("strictness", 50),
-                blurAmount = ops.optInt("blurAmount", 60),
-                grayscale = ops.optBoolean("grayscale", false),
-                solidColor = ops.optInt("solidColor", FilterOps.BLUR),
-                // A "blurUnknownFaces" key written by an older build is simply ignored (plan-v2 §5.4).
-                keepStems = ops.optString("keepStems").ifBlank { "vocals" },
-            ),
-        )
-    }
+    private fun fromJson(o: JSONObject) = Item(
+        id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
+        url = o.optStringOrNull("url"),
+        sourceUri = o.optStringOrNull("sourceUri"),
+        title = o.optStringOrNull("title"),
+        // An unknown state name means a file written by a newer build; treat it as failed rather
+        // than crashing the screen that is supposed to show the user what went wrong.
+        state = runCatching { State.valueOf(o.optString("state")) }.getOrDefault(State.FAILED),
+        quality = o.optStringOrNull("quality"),
+        error = o.opt("error").let { if (it is Int) it else null },
+        outputUri = o.optStringOrNull("outputUri"),
+        ops = opsFromJson(o.optJSONObject("ops") ?: JSONObject()),
+    )
+
+    /**
+     * The ops half of [fromJson], its own `internal` function so a JVM test can exercise the wire
+     * mapping directly — the `censorWomen` fallback below is what a `queue.json` written before the
+     * rename depends on, and it has to keep loading while an item is mid-flight (plan-censor-who §1.1).
+     */
+    internal fun opsFromJson(ops: JSONObject) = FilterOps(
+        removeMusic = ops.optBoolean("removeMusic", false),
+        // `optString` yields "" for an absent key, which is exactly what `whoOrNull` reads as absent.
+        censorWho = FilterOps.whoOrNull(ops.optString("censorWho"))
+            ?: FilterOps.whoFromLegacy(ops.optBoolean("censorWomen", false)),
+        strictness = ops.optInt("strictness", 50),
+        blurAmount = ops.optInt("blurAmount", 60),
+        grayscale = ops.optBoolean("grayscale", false),
+        solidColor = ops.optInt("solidColor", FilterOps.BLUR),
+        // A "blurUnknownFaces" key written by an older build is simply ignored (plan-v2 §5.4).
+        keepStems = ops.optString("keepStems").ifBlank { "vocals" },
+    )
 
     /** `optString` turns a JSON null into the string "null"; this does not. */
     private fun JSONObject.optStringOrNull(key: String): String? =

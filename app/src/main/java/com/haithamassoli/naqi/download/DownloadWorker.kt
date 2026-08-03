@@ -8,6 +8,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.haithamassoli.naqi.R
+import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.work.FilterWorker
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.JobNotifications
@@ -35,10 +36,11 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
     override suspend fun doWork(): Result {
         val url = inputData.getString(KEY_URL)?.takeIf { it.isNotBlank() } ?: return Result.failure()
         val quality = Downloader.Quality.of(inputData.getString(KEY_QUALITY))
-        // Blur women is meaningless on an audio-only item; the sheet hides it, and this is the half that
-        // cannot be raced by a stale queue entry written before that rule existed.
+        // Face censoring is meaningless on an audio-only item; the sheet hides it, and this is the half
+        // that cannot be raced by a stale queue entry written before that rule existed. Dropped to NONE
+        // rather than remembered, so `ops.any` can go false and the publish-as-is path below can fire.
         val ops = inputData.filterOps()
-            .let { if (quality == Downloader.Quality.AUDIO) it.copy(censorWomen = false) else it }
+            .let { if (quality == Downloader.Quality.AUDIO) it.copy(censorWho = FilterOps.NONE) else it }
         val title = inputData.getString(KEY_TITLE)?.takeIf { it.isNotBlank() }
             ?: applicationContext.getString(R.string.stage_downloading)
 

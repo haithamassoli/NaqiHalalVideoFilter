@@ -12,9 +12,9 @@ import org.junit.Test
  */
 class EtaTest {
 
-    private val censor = FilterOps(censorWomen = true)
+    private val censor = FilterOps(censorWho = FilterOps.EVERYONE)
     private val music = FilterOps(removeMusic = true)
-    private val both = FilterOps(censorWomen = true, removeMusic = true)
+    private val both = FilterOps(censorWho = FilterOps.EVERYONE, removeMusic = true)
 
     @Test
     fun everyShapeScalesWithSourceDuration() {

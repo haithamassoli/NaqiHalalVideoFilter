@@ -19,6 +19,9 @@ object Prefs {
     private const val FILE = "naqi_share_prefs"
 
     private const val KEY_REMOVE_MUSIC = "remove_music"
+    private const val KEY_CENSOR_WHO = "censor_who"
+
+    /** Read-only legacy: what [KEY_CENSOR_WHO] replaced. Still read so an upgrade keeps the last pick. */
     private const val KEY_CENSOR_WOMEN = "censor_women"
     private const val KEY_QUALITY = "quality"
     private const val KEY_LAST_UPDATE_CHECK = "last_update_check"
@@ -39,11 +42,17 @@ object Prefs {
     /** No download in flight. -1 is safe: [android.app.DownloadManager] ids start at 1. */
     const val NO_DOWNLOAD = -1L
 
-    /** Last-used ops. Defaults to both filters on — the reason someone installed Naqi. */
+    /**
+     * Last-used ops. Defaults to both filters on — the reason someone installed Naqi.
+     *
+     * The legacy `true` carries that default: on a fresh install neither censor key is set, and
+     * [FilterOps]'s own default is [FilterOps.NONE] (`FilterOps.kt:30-34`).
+     */
     fun ops(context: Context): FilterOps = with(prefs(context)) {
         FilterOps(
             removeMusic = getBoolean(KEY_REMOVE_MUSIC, true),
-            censorWomen = getBoolean(KEY_CENSOR_WOMEN, true),
+            censorWho = FilterOps.whoOrNull(getString(KEY_CENSOR_WHO, null))
+                ?: FilterOps.whoFromLegacy(getBoolean(KEY_CENSOR_WOMEN, true)),
         )
     }
 
@@ -53,7 +62,7 @@ object Prefs {
     fun save(context: Context, ops: FilterOps, quality: Downloader.Quality) {
         prefs(context).edit()
             .putBoolean(KEY_REMOVE_MUSIC, ops.removeMusic)
-            .putBoolean(KEY_CENSOR_WOMEN, ops.censorWomen)
+            .putString(KEY_CENSOR_WHO, ops.censorWho)
             .putString(KEY_QUALITY, quality.name)
             .apply()
     }

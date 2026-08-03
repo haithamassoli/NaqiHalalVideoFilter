@@ -60,7 +60,7 @@ internal object Preflight {
      * the single-op shapes write one. Derived here rather than at each call site — it was spelled out
      * identically in the share sheet's pre-queue check and in the worker's own.
      */
-    private fun tempCopiesFor(ops: FilterOps): Int = if (ops.removeMusic && ops.censorWomen) 2 else 1
+    private fun tempCopiesFor(ops: FilterOps): Int = if (ops.removeMusic && ops.censorFaces) 2 else 1
 
     /**
      * Would a source of [sourceBytes] fit? Used before a download starts, where there is no file to

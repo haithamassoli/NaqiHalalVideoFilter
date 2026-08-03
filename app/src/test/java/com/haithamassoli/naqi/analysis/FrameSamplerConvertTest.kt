@@ -22,6 +22,10 @@ import java.nio.FloatBuffer
  *   here, with ML Kit rotating its own copy from the `rotationDegrees` [FrameSampler.uprightSize]
  *   describes. If the two disagreed, a rotated video would be blurred in the wrong place.
  *
+ * plan-censor-who §4.1 added a third walk on top, tested at the bottom: [FrameSampler.cropToTensor]
+ * (the NV21 above -> genderage's 96² crop), which is where the same rotation indexing is now applied a
+ * second time, from the opposite direction.
+ *
  * Planes are built with deliberately awkward geometry — `rowStride > width`, a non-zero base, and
  * chroma in both the planar (pixelStride 1) and semi-planar (pixelStride 2, one shared buffer)
  * layouts a `COLOR_FormatYUV420Flexible` decoder can hand over.
@@ -204,5 +208,121 @@ class FrameSamplerConvertTest {
     @Test
     fun `planar and semi-planar chroma pack to identical NV21`() {
         assertArrayEquals(packed(planar = true), packed(planar = false))
+    }
+
+    // --- the face crop (plan-censor-who §4.1) ---
+    //
+    // Same two risks as the gate walk, one step harder: this walk reads the NV21 the pack above WROTE
+    // (unrotated, display-sized) but is addressed in UPRIGHT normalized coordinates, so a transposed
+    // axis is invisible on a square frame and catastrophic on a real one. Every frame here is therefore
+    // deliberately non-square, and the rotation expectation is built by rotating a grid rather than by
+    // re-deriving the production case table.
+
+    private val cropW = 16 // display (unrotated) frame — non-square on purpose
+    private val cropH = 8
+
+    /** Display-space NV21 exactly as [FrameSampler.packNv21] lays it out: luma plane, then V,U pairs. */
+    private fun nv21(w: Int, h: Int, u: Int = 128, v: Int = 128, luma: (Int, Int) -> Int): ByteBuffer {
+        val buf = ByteBuffer.allocateDirect(w * h * 3 / 2)
+        for (dy in 0 until h) for (dx in 0 until w) buf.put(dy * w + dx, luma(dx, dy).toByte())
+        val plane = w * h
+        for (cy in 0 until h / 2) for (cx in 0 until w / 2) {
+            buf.put(plane + cy * w + cx * 2, v.toByte())
+            buf.put(plane + cy * w + cx * 2 + 1, u.toByte())
+        }
+        return buf
+    }
+
+    private fun crop(side: Int = FrameSampler.CROP_SIDE) = ByteBuffer.allocateDirect(3 * side * side * 4)
+        .order(ByteOrder.nativeOrder()).asFloatBuffer()
+
+    /**
+     * Rotate a `[y][x]` grid 90 degrees CLOCKWISE — the direction Android's rotation metadata means, so
+     * applying it `rotation/90` times to the stored frame gives what ML Kit calls upright. Written out
+     * independently of [FrameSampler.cropToTensor]'s case table on purpose: that table is the subject.
+     */
+    private fun rotateCw(src: Array<IntArray>): Array<IntArray> {
+        val h = src.size
+        val w = src[0].size
+        return Array(w) { y -> IntArray(h) { x -> src[h - 1 - x][y] } }
+    }
+
+    /** Output index -> upright pixel: the square crop's own geometry, restated so the test can predict it. */
+    private fun cropMap(centre: Float, boxSide: Float, frameSide: Int): IntArray {
+        val half = boxSide * 1.5f / 2f
+        val step = half * 2f / FrameSampler.CROP_SIDE
+        return IntArray(FrameSampler.CROP_SIDE) { (centre - half + it * step).toInt().coerceIn(0, frameSide - 1) }
+    }
+
+    /**
+     * The assertion that catches a transposed axis. The display frame carries its own coordinates in
+     * luma with neutral chroma (r = g = b = y), the upright frame is obtained by rotating that grid, and
+     * every one of the 9 216 output pixels is then checked against the upright grid. A swapped dx/dy
+     * survives the solid-colour test below and dies here.
+     */
+    @Test
+    fun `crop maps upright box coordinates back to the right unrotated pixel`() {
+        for (rotation in intArrayOf(0, 90, 180, 270)) {
+            val buf = nv21(cropW, cropH) { dx, dy -> dy * cropW + dx + 1 } // 1..128, unique per pixel
+            var upright = Array(cropH) { dy -> IntArray(cropW) { dx -> dy * cropW + dx + 1 } }
+            repeat(rotation / 90) { upright = rotateCw(upright) }
+            val (uw, uh) = FrameSampler.uprightSize(cropW, cropH, rotation)
+            // The sanity check the mapping rests on: at 90/270 the axes swap, so dx still indexes cropW.
+            assertEquals("uprightW@$rotation", upright[0].size, uw)
+            assertEquals("uprightH@$rotation", upright.size, uh)
+
+            val out = crop()
+            // Whole-frame box: the 1.5x square then overhangs the short axis, exercising the clamp too.
+            FrameSampler.cropToTensor(buf, cropW, cropH, rotation, uw, uh, NRect(0f, 0f, 1f, 1f), out)
+
+            // One SQUARE of side max(boxW, boxH) * 1.5 — so both axes share the long side, not their own.
+            val boxSide = maxOf(uw, uh).toFloat()
+            val uxMap = cropMap(uw / 2f, boxSide, uw)
+            val uyMap = cropMap(uh / 2f, boxSide, uh)
+            for (oy in 0 until FrameSampler.CROP_SIDE) for (ox in 0 until FrameSampler.CROP_SIDE) {
+                assertEquals(
+                    "r[$ox,$oy]@$rotation",
+                    upright[uyMap[oy]][uxMap[ox]].toFloat(),
+                    out.get(oy * FrameSampler.CROP_SIDE + ox),
+                    1e-3f,
+                )
+            }
+        }
+    }
+
+    /**
+     * Colour anchor, and the one difference from the gate tensor: genderage's `input_std` is 1.0, so
+     * these are 0..255 floats and NOT the gate's /255. Same BT.601 red (238, 15, 13) from Y=81 U=90
+     * V=240, at every rotation, in all three planes.
+     */
+    @Test
+    fun `crop is BT601 full range at 0 to 255, laid out R then G then B`() {
+        for (rotation in intArrayOf(0, 90, 180, 270)) {
+            val buf = nv21(cropW, cropH, u = 90, v = 240) { _, _ -> 81 }
+            val (uw, uh) = FrameSampler.uprightSize(cropW, cropH, rotation)
+            val out = crop()
+            FrameSampler.cropToTensor(buf, cropW, cropH, rotation, uw, uh, NRect(0.3f, 0.3f, 0.6f, 0.6f), out)
+            val plane = FrameSampler.CROP_SIDE * FrameSampler.CROP_SIDE
+            for (i in 0 until plane) {
+                assertEquals("red[$i]@$rotation", 238f, out.get(i), 1e-3f)
+                assertEquals("green[$i]@$rotation", 15f, out.get(plane + i), 1e-3f)
+                assertEquals("blue[$i]@$rotation", 13f, out.get(2 * plane + i), 1e-3f)
+            }
+            assertEquals(0, out.position()) // absolute writes: the reused buffer never moves
+        }
+    }
+
+    /**
+     * A box hanging off the frame edge — a face half out of shot, which pass 1 produces constantly.
+     * It must clamp to the edge pixel rather than throw, so on a solid frame the crop is still solid.
+     */
+    @Test
+    fun `a box past the frame edge clamps instead of throwing`() {
+        val buf = nv21(cropW, cropH, u = 90, v = 240) { _, _ -> 81 }
+        val out = crop()
+        FrameSampler.cropToTensor(buf, cropW, cropH, 90, cropH, cropW, NRect(0.85f, 0.9f, 1.3f, 1.4f), out)
+        for (i in 0 until FrameSampler.CROP_SIDE * FrameSampler.CROP_SIDE) {
+            assertEquals("red[$i]", 238f, out.get(i), 1e-3f)
+        }
     }
 }

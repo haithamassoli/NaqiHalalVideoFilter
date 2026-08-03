@@ -44,6 +44,7 @@ import androidx.core.net.toUri
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.download.Downloader
+import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.NaqiIcons
 import com.haithamassoli.naqi.ui.NaqiRowDivider
@@ -94,6 +95,10 @@ fun ShareSheet(
 
     var ops by remember { mutableStateOf(Prefs.ops(context)) }
     var quality by remember { mutableStateOf(Prefs.quality(context)) }
+    // What the faces toggle turns back ON to. The sheet has no Who control by design
+    // (plan-censor-who §2.3) — it re-asks nothing, but it must not silently ANSWER either, so off-then-on
+    // restores the last saved pick rather than hard-coding Everyone and persisting that downgrade below.
+    val lastWho = remember { ops.censorWho.takeIf { it != FilterOps.NONE } ?: FilterOps.EVERYONE }
 
     // Link metadata. `loading` starts true only for a link — a local file has nothing to fetch.
     var loading by remember { mutableStateOf(isLink) }
@@ -120,7 +125,7 @@ fun ShareSheet(
     // Audio has no picture to blur, so the option is disabled rather than obeyed-and-ignored. Disabled
     // rather than hidden: switching quality must not make the row under the user's finger disappear.
     val audioOnly = isLink && quality == Downloader.Quality.AUDIO
-    val effectiveOps = if (audioOnly) ops.copy(censorWomen = false) else ops
+    val effectiveOps = if (audioOnly) ops.copy(censorWho = FilterOps.NONE) else ops
 
     fun queue() {
         Prefs.save(context, ops, quality)
@@ -247,9 +252,9 @@ fun ShareSheet(
                 ToggleTile(
                     title = stringResource(R.string.pick_op_faces_title),
                     icon = NaqiIcons.Shield,
-                    checked = effectiveOps.censorWomen,
+                    checked = effectiveOps.censorFaces,
                     enabled = !audioOnly,
-                    onCheckedChange = { ops = ops.copy(censorWomen = it) },
+                    onCheckedChange = { ops = ops.copy(censorWho = if (it) lastWho else FilterOps.NONE) },
                 )
             }
 

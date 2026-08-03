@@ -61,7 +61,7 @@ import com.haithamassoli.naqi.ui.theme.NaqiTokens
 
 /**
  * Step 1: choose the video and which operations to run. Tuning for those operations lives on the
- * options screen, so nothing here writes anything but [FilterOps.removeMusic]/[FilterOps.censorWomen].
+ * options screen, so nothing here writes anything but [FilterOps.removeMusic]/[FilterOps.censorWho].
  *
  * Everything that is not one of those two decisions was pushed off the screen: language and about into
  * the overflow menu, the model smoke report into [AboutScreen]. What is left fits on a phone without
@@ -79,6 +79,15 @@ fun PickOpsScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+
+    // Off is [FilterOps.NONE], which erases *which* faces were picked, so the toggle remembers the last
+    // real choice or off-then-on would silently downgrade a "Women" run to "Everyone".
+    // ponytail: screen-local, so it resets if the user detours through Options while the toggle is off —
+    // and a reset means Everyone, this app's safe direction. Hoist into NaqiApp's `ops` state only if
+    // that detour turns out to be a real path.
+    val who = remember { mutableStateOf(FilterOps.EVERYONE) }
+        .apply { if (ops.censorFaces) value = ops.censorWho }
+        .value
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -140,10 +149,18 @@ fun PickOpsScreen(
                 NaqiRowDivider()
                 ToggleTile(
                     title = stringResource(R.string.pick_op_faces_title),
-                    desc = stringResource(R.string.pick_op_faces_desc),
+                    // The subtitle states the current choice instead of claiming "every face", which
+                    // Women/Men would make a lie (plan-censor-who §2.1). Off gets the plain description
+                    // of the op: ToggleTile renders `desc` at full emphasis either way, so an off row
+                    // saying "Everyone · and flagged scenes." would assert censoring that is not running.
+                    desc = if (ops.censorFaces)
+                        stringResource(R.string.pick_op_faces_desc, stringResource(whoLabelRes(who)))
+                    else stringResource(R.string.pick_op_faces_desc_off),
                     icon = NaqiIcons.Shield,
-                    checked = ops.censorWomen,
-                    onCheckedChange = { onOpsChange(ops.copy(censorWomen = it)) },
+                    checked = ops.censorFaces,
+                    onCheckedChange = {
+                        onOpsChange(ops.copy(censorWho = if (it) who else FilterOps.NONE))
+                    },
                 )
             }
         }

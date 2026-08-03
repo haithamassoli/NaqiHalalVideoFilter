@@ -121,6 +121,47 @@ enum class NaqiModel(
         downloadUrl = null, // locally converted from the Kaggle SavedModel — no public host yet
         listOf(longArrayOf(15600)),
     ),
+
+    /**
+     * Face gender/age classifier — InsightFace `buffalo_l`'s own `genderage.onnx`, 1.3 MB, opset 12,
+     * shipped verbatim (no conversion, no quantization). Powers the per-track vote behind the
+     * Women/Men picker (`plan-censor-who` §3.1, §4). **The licence question was explicitly waived by
+     * the owner on 2026-08-03** — it was §3.1's only objection to the obvious candidate, and with it
+     * gone this is a 1.3 MB asset in the ORT runtime already here, i.e. no new dependency.
+     *
+     * **IO contract — and the trap.** Input `data` [N,3,96,96] f32, NCHW **RGB in 0..255 with NO
+     * scaling and no mean subtraction** (insightface `Attribute`: `input_mean=0.0, input_std=1.0`).
+     * The NSFW gate one entry up is 1/255 on the identical layout, so a copy-pasted fill silently
+     * feeds this graph 1/255th of its trained range. Output `fc1` [1,3] is **raw logits, NOT softmax**
+     * — unlike the gate, which softmaxes in-graph: `out[0]`=female, `out[1]`=male, `out[2] × 100`=age.
+     * gender = `argmax(out[0..1])`, 1 = male, 0 = female; confidence over the two is
+     * `1 / (1 + exp(-(out[male] - out[female])))` for the winner.
+     *
+     * Why this and not the alternatives (§3.1's rejected table, one line each): `gender_googlenet`
+     * (Adience) is 23 MB @224² ⇒ ~17–25 ms/crop ⇒ ~300–400 s added to analyze, 6–8× the budget;
+     * FairFace (ResNet-34) is ~90 MB for a secondary feature, 5× the NSFW gate, plus session load and
+     * RSS; MiVOLO is a ViT at ~90–200 MB that also wants a body crop, out of budget by an order of
+     * magnitude; fine-tuning MobileNetV3-Small is the fallback if this misses the bar, never the start.
+     *
+     * **No landmarks needed** (§3.1 reason 2). InsightFace trains on a SQUARE of side
+     * `max(boxW, boxH) × 1.5` centred on the box centre, resized to 96² — and
+     * `FaceTracker.KEYFRAME_PAD = 0.25f` already produces exactly that 1.5×. So detection stays on
+     * `PERFORMANCE_MODE_FAST` + `enableTracking()`; an ArcFace-aligned model would have forced
+     * `LANDMARK_MODE_ALL` and taxed detection on *every* frame, a cost `plan-v2` §5 never budgeted.
+     *
+     * **On the NudeNet precedent** — the repo has failed this exact task once: `FACE_FEMALE` fired
+     * 0.69–0.83 on Einstein/Obama/Trump while `FACE_MALE` stayed ≤ 0.07 (`docs/m0-spikes.md:35`), so
+     * the old vote censored ~everyone while claiming to select. But that was a detection class inside
+     * a *nudity DETECTOR*, trained where female faces dominate the distribution and never trained to
+     * discriminate between the two. This is a two-class classifier trained for precisely that, which
+     * is why the repo is trying again rather than treating §3.3's bar as already lost.
+     */
+    GENDERAGE(
+        "genderage.onnx",
+        "4fde69b1c810857b88c64a335084f1c3fe8f01246c9a191b48c7bb756d6652fb",
+        downloadUrl = null, // ships inside buffalo_l.zip (289 MB); scripts/fetch-models.sh unzips just this file
+        listOf(longArrayOf(1, 3, 96, 96)),
+    ),
 }
 
 /** GantMan class order (alphabetical, index-locked). sfw = drawings+neutral; nsfw = the rest. */

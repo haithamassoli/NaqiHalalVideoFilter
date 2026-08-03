@@ -40,10 +40,25 @@ data class FaceSample(val ptsMs: Long, val rect: NRect)
 
 /**
  * A face tracked across sampled frames. [id] is the ML Kit tracking id, or a negative synthetic one
- * for a detection ML Kit could not assign an id to (see [FaceTracker]); it groups samples and nothing
- * else. Every track is censored — plan-v2 §5.4 removed the gender vote, so there is no per-track
- * verdict left to carry.
+ * for a detection ML Kit could not assign an id to (see [FaceTracker]); it groups samples, and — when
+ * the user picked Women or Men — carries the gender vote that decides whether this track is censored
+ * at all (plan-censor-who §4.1). Under Everyone/Off nothing below moves off zero.
+ *
+ * The load-bearing property of this shape: the verdict is **four ints, not crop bitmaps**. The NudeNet
+ * implementation plan-v2 §5.4 removed held every crop it classified for the whole pass — ~500 MB on a
+ * feature-length film — and that retention, not the classifier, is the failure this layout exists to
+ * avoid. Each crop is classified inside the detector callback and dropped; only the tallies survive.
  */
 class FaceTrack(val id: Int) {
     val samples = mutableListOf<FaceSample>()
+
+    // ponytail: four counters, not crops. That is the 500 MB fix.
+    var femaleVotes = 0
+    var maleVotes = 0
+
+    /** Largest crop (max side, upright px) already classified in this track; 0 = none yet. §4.2. */
+    var classifiedPx = 0
+
+    /** Classifications RUN, abstentions included — the `VOTE_CAP` counter, so cost is per-track. */
+    var votesTried = 0
 }

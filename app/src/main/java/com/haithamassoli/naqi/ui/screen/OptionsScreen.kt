@@ -83,6 +83,20 @@ private val SOLID_LABELS = listOf(
 private val DEFAULT_SOLID = FilterOps.SOLID_COLORS[1]
 
 /**
+ * The three *reachable* [FilterOps.censorWho] values, in segment order. [FilterOps.NONE] is missing on
+ * purpose: it is the toggle on step 1, not a segment here (plan-censor-who §2.2).
+ */
+private val WHO_CHOICES = listOf(
+    FilterOps.EVERYONE to R.string.opt_who_everyone,
+    FilterOps.WOMEN to R.string.opt_who_women,
+    FilterOps.MEN to R.string.opt_who_men,
+)
+
+/** Shared with [PickOpsScreen], whose faces row states the current choice in its subtitle (§2.1). */
+internal fun whoLabelRes(who: String): Int =
+    WHO_CHOICES.firstOrNull { it.first == who }?.second ?: R.string.opt_who_everyone
+
+/**
  * Step 2: tune the selected operations, then start the job. Every control is shown only when the op it
  * applies to is on — an option that can't affect the output would just be a lie on screen.
  *
@@ -182,9 +196,13 @@ fun OptionsScreen(
                 .padding(horizontal = NaqiTokens.gutter)
                 .padding(top = NaqiTokens.space2, bottom = NaqiTokens.space5),
         ) {
-            if (ops.censorWomen) {
+            if (ops.censorFaces) {
                 SectionHeader(stringResource(R.string.opt_section_censor_faces))
                 NaqiCard(contentPadding = 0.dp) {
+                    // First in the card: Who is the largest decision in the section, everything below
+                    // only tunes what it selected.
+                    WhoRow(ops.censorWho) { onOpsChange(ops.copy(censorWho = it)) }
+                    NaqiRowDivider()
                     SliderRow(
                         title = stringResource(R.string.opt_strictness_title),
                         desc = stringResource(R.string.opt_strictness_desc),
@@ -249,6 +267,30 @@ fun OptionsScreen(
                 TextButton(onClick = { confirming = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
+    }
+}
+
+/**
+ * Which faces get covered. Three segments, not four: the whole card renders only under
+ * `ops.censorFaces`, so [FilterOps.NONE] cannot be the current value here and a fourth "Off" segment
+ * would be a control that turns off the card containing it. Off stays the step-1 toggle.
+ */
+@Composable
+private fun WhoRow(who: String, onChange: (String) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Column(Modifier.padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3)) {
+        Text(stringResource(R.string.opt_who_title), style = MaterialTheme.typography.titleSmall, color = cs.onSurface)
+        Text(stringResource(R.string.opt_who_desc), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+        Spacer(Modifier.height(NaqiTokens.space3))
+        SingleChoiceSegmentedButtonRow {
+            WHO_CHOICES.forEachIndexed { i, (value, label) ->
+                SegmentedButton(
+                    selected = who == value,
+                    onClick = { onChange(value) },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = WHO_CHOICES.size),
+                ) { Text(stringResource(label)) }
+            }
+        }
     }
 }
 

@@ -84,9 +84,9 @@ object Eta {
     fun estimateMs(durationMs: Long, ops: FilterOps): Long {
         if (durationMs <= 0) return 0L
         val factor = when {
-            ops.censorWomen && ops.removeMusic -> COMBINED
+            ops.censorFaces && ops.removeMusic -> COMBINED
             ops.removeMusic -> MUSIC
-            ops.censorWomen -> CENSOR
+            ops.censorFaces -> CENSOR
             else -> return 0L
         }
         return (durationMs * factor).toLong()

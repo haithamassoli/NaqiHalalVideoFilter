@@ -26,3 +26,21 @@ done
   python3 scripts/nsfw_int8_quantize.py
 # YAMNet music gate (A1).
 [ -s "$DEST/yamnet.onnx" ] || python3 scripts/yamnet_export.py
+
+# Face gender vote (plan-censor-who §3.1). Shipped verbatim — no conversion step, but InsightFace
+# publishes it only inside buffalo_l.zip (289 MB) so we pull the pack, extract the one 1.3 MB file
+# and throw the rest away. `unzip -j` drops the buffalo_l/ prefix.
+GENDERAGE_SHA=4fde69b1c810857b88c64a335084f1c3fe8f01246c9a191b48c7bb756d6652fb
+if [ ! -s "$DEST/genderage.onnx" ]; then
+  ZIP="$DEST/buffalo_l.zip.tmp"
+  curl -fL -o "$ZIP" \
+    https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip
+  unzip -o -j "$ZIP" buffalo_l/genderage.onnx -d "$DEST"
+  rm -f "$ZIP"
+fi
+# Verified even when the file was already present: the sha is the contract NaqiModel.GENDERAGE
+# pins, and a silently different graph is worse than a missing one.
+echo "$GENDERAGE_SHA  $DEST/genderage.onnx" | shasum -a 256 -c - || {
+  echo "genderage.onnx sha256 MISMATCH — refusing to ship it" >&2
+  exit 1
+}

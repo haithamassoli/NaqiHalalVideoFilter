@@ -55,6 +55,9 @@ object FrameSampler {
     /** NSFW gate input side — the model's locked contract is `[1,3,224,224]` (see `ml/Models.kt`). */
     private const val GATE_SIDE = 224
 
+    /** Face-gender crop side — genderage.onnx's locked contract is `[1,3,96,96]` (see `ml/Models.kt`). */
+    internal const val CROP_SIDE = 96
+
     // perf-plan 1.3b. [RING] must stay above the frames the consumer side can be holding — [QUEUE]
     // queued plus the one it is reading — or the decoder would overwrite pixels still being read.
     private const val QUEUE = 2
@@ -480,6 +483,83 @@ object FrameSampler {
                 out.put(i, r / 255f)              // R plane
                 out.put(plane + i, g / 255f)      // G plane
                 out.put(2 * plane + i, b / 255f)  // B plane
+            }
+        }
+    }
+
+    /**
+     * Walk one face box out of the NV21 buffer ML Kit was handed into [out] as genderage.onnx's
+     * `[1,3,96,96]` NCHW RGB tensor (plan-censor-who §4.1).
+     *
+     * **Why the NV21 and not a bitmap.** V1 deleted the 640-px ARGB bitmap that used to exist purely so
+     * the old gender vote could crop faces out of it (see this object's header). Re-adding one — or
+     * re-decoding the frame — would hand plan-v2 §5.1's whole saving back for a secondary feature. The
+     * pixels are already in memory, unrotated, in the very buffer the detector read, so the crop is a
+     * ~9 216-px gather against the NSFW gate's 50 176 per frame: noise next to the pass it rides on.
+     *
+     * **Coordinates.** [rect] is the UPRIGHT-normalized box `FaceTracker` stores (normalized by
+     * [uprightSize], the same space as every EDL [NRect]); the buffer is the
+     * UNROTATED [dispW]x[dispH] one. So this maps upright -> display with exactly the case table
+     * [convertToTensor] uses, generalized off a square onto the two frame sides — at 90/270
+     * `uprightW == dispH` and `uprightH == dispW`, which is what keeps `dx` inside [dispW].
+     *
+     * **The crop shape is InsightFace's, not `FaceTracker.padRect`'s.** The model trains on a SQUARE of side
+     * `max(boxW, boxH) * 1.5` centred on the box centre, resized to 96² — a square, where the EDL's
+     * padded rect grows each axis by 25 % independently. Same 1.5 factor, different shape; feeding it
+     * the EDL rect would stretch every non-square face against what it saw in training.
+     *
+     * **Output is 0..255, NOT scaled by 1/255** — insightface's Attribute preprocessing is
+     * `input_mean=0.0, input_std=1.0` (unlike the NSFW gate above, hence the two near-identical walks).
+     * BT.601 coefficients are copied verbatim from [convertToTensor] so both consumers see one colour.
+     *
+     * [out] must be a DIRECT, native-order buffer of `3 * CROP_SIDE²` floats, reused for the whole
+     * pass; every read and write is ABSOLUTE, so neither this buffer's position nor the NV21's moves
+     * (ML Kit is still reading that one).
+     *
+     * ponytail: nearest-neighbour, and out-of-frame samples clamp to the edge pixel rather than the
+     * black/reflected border the Python reference pads with — a face at the frame edge therefore gets a
+     * smear of its own edge column instead of padding. Same simplification [packNv21]/[convertToTensor]
+     * already make about sampling, and it only affects crops that are partly outside the frame. Revisit
+     * only if §3.2's per-size-band numbers show edge crops failing specifically.
+     */
+    internal fun cropToTensor(
+        nv21: ByteBuffer, dispW: Int, dispH: Int, rotation: Int,
+        uprightW: Int, uprightH: Int, rect: NRect, out: FloatBuffer,
+    ) {
+        val half = maxOf(rect.width * uprightW, rect.height * uprightH) * 1.5f / 2f
+        val x0 = (rect.left + rect.right) / 2f * uprightW - half
+        val y0 = (rect.top + rect.bottom) / 2f * uprightH - half
+        val step = half * 2f / CROP_SIDE
+        // Output index -> upright pixel, clamped into the frame (that is the edge padding above).
+        val uxMap = IntArray(CROP_SIDE) { (x0 + it * step).toInt().coerceIn(0, uprightW - 1) }
+        val uyMap = IntArray(CROP_SIDE) { (y0 + it * step).toInt().coerceIn(0, uprightH - 1) }
+
+        val plane = CROP_SIDE * CROP_SIDE
+        val chromaBase = dispW * dispH // NV21: full luma plane, then interleaved V,U per 2x2 block
+        for (oy in 0 until CROP_SIDE) {
+            val uy = uyMap[oy]
+            val row = oy * CROP_SIDE
+            for (ox in 0 until CROP_SIDE) {
+                val ux = uxMap[ox]
+                val dx: Int
+                val dy: Int
+                when (rotation) { // upright pixel -> unrotated display pixel
+                    90 -> { dx = uy; dy = uprightW - 1 - ux }
+                    180 -> { dx = uprightW - 1 - ux; dy = uprightH - 1 - uy }
+                    270 -> { dx = uprightH - 1 - uy; dy = ux }
+                    else -> { dx = ux; dy = uy }
+                }
+                val ci = chromaBase + (dy shr 1) * dispW + (dx shr 1) * 2
+                val y = nv21.get(dy * dispW + dx).toInt() and 0xFF
+                val v = (nv21.get(ci).toInt() and 0xFF) - 128     // NV21: V first,
+                val u = (nv21.get(ci + 1).toInt() and 0xFF) - 128 // then U
+                val r = (y + ((1436 * v) shr 10)).coerceIn(0, 255)
+                val g = (y - ((352 * u + 731 * v) shr 10)).coerceIn(0, 255)
+                val b = (y + ((1815 * u) shr 10)).coerceIn(0, 255)
+                val i = row + ox
+                out.put(i, r.toFloat())              // R plane
+                out.put(plane + i, g.toFloat())      // G plane
+                out.put(2 * plane + i, b.toFloat())  // B plane
             }
         }
     }

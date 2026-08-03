@@ -56,7 +56,9 @@ abstract class QueuedWorker(ctx: Context, params: WorkerParameters) : CoroutineW
  */
 internal fun FilterOps.pairs(): Array<Pair<String, Any?>> = arrayOf(
     FilterWorker.KEY_REMOVE_MUSIC to removeMusic,
-    FilterWorker.KEY_CENSOR_WOMEN to censorWomen,
+    // Only the new key is written; the legacy boolean is read-side back-compat and nothing else.
+    // Emitting both would leave two sources of truth for one option, one of which cannot say "women".
+    FilterWorker.KEY_CENSOR_WHO to censorWho,
     FilterWorker.KEY_STRICTNESS to strictness,
     FilterWorker.KEY_BLUR_AMOUNT to blurAmount,
     FilterWorker.KEY_GRAYSCALE to grayscale,
@@ -67,7 +69,10 @@ internal fun FilterOps.pairs(): Array<Pair<String, Any?>> = arrayOf(
 /** Inverse of [pairs]; the defaults are the ones [FilterOps] itself declares. */
 internal fun Data.filterOps(): FilterOps = FilterOps(
     removeMusic = getBoolean(FilterWorker.KEY_REMOVE_MUSIC, false),
-    censorWomen = getBoolean(FilterWorker.KEY_CENSOR_WOMEN, false),
+    // A job enqueued before the rename is still sitting in WorkManager's database carrying only the
+    // boolean, so the new key falls back to it (plan-censor-who §1.1).
+    censorWho = FilterOps.whoOrNull(getString(FilterWorker.KEY_CENSOR_WHO))
+        ?: FilterOps.whoFromLegacy(getBoolean(FilterWorker.KEY_CENSOR_WOMEN, false)),
     strictness = getInt(FilterWorker.KEY_STRICTNESS, 50),
     blurAmount = getInt(FilterWorker.KEY_BLUR_AMOUNT, 60),
     grayscale = getBoolean(FilterWorker.KEY_GRAYSCALE, false),

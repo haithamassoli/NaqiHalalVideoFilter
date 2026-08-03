@@ -200,15 +200,19 @@ class MainActivity : ComponentActivity() {
             return
         }
         val removeMusic = intent.getBooleanExtra("remove_music", false)
-        // censor defaults true, except a music-only run (music requested, censor not explicitly passed).
-        val censorWomen = if (intent.hasExtra("censor_women")) {
-            intent.getBooleanExtra("censor_women", true)
-        } else {
-            !removeMusic
-        }
+        // censor defaults on, except a music-only run (music requested, censor not explicitly passed).
+        // `--es censor_who none|everyone|women|men` is the current key; `--ez censor_women` still reads
+        // so a stale script keeps working (plan-censor-who §1.1), and the default rule above applies
+        // only when neither was passed. Unparseable `censor_who` resolves to everyone, not to the
+        // legacy branch — see FilterOps.whoOrNull.
+        val censorWho = FilterOps.whoOrNull(intent.getStringExtra("censor_who"))
+            ?: FilterOps.whoFromLegacy(
+                if (intent.hasExtra("censor_women")) intent.getBooleanExtra("censor_women", true)
+                else !removeMusic
+            )
         val ops = FilterOps(
             removeMusic = removeMusic,
-            censorWomen = censorWomen,
+            censorWho = censorWho,
             strictness = intent.getIntExtra("strictness", 50),
             blurAmount = intent.getIntExtra("blur", 60),
             grayscale = intent.getBooleanExtra("grayscale", false),
@@ -217,6 +221,10 @@ class MainActivity : ComponentActivity() {
             // `--ez blur_unknown` is gone with the gender vote (plan-v2 §5.4); passing it is now a no-op.
             keepStems = intent.getStringExtra("keep_stems") ?: "vocals",
         )
+        // Echo what actually parsed. `everyone` and `women` censor identically until Phase C ships a
+        // classifier, so without this an adb run cannot show WHICH value survived the wire — only that
+        // something censored. Same reason the E2E hooks exist at all: logcat beats UI scripting here.
+        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} removeMusic=${ops.removeMusic}")
 
         // `--ez ytdlp_update true` forces the yt-dlp self-update from adb.
         if (intent.getBooleanExtra("ytdlp_update", false)) {

@@ -4,11 +4,13 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
+import android.util.Log
 import java.nio.FloatBuffer
 
 /**
- * M1 ORT inference for the NSFW gate, per the locked contract in [NaqiModel]. The session is created
- * lazily and cached for the process, on the same [imageSessionOptions] [ModelSmoke] load-checks it with.
+ * M1 ORT inference for the image models — the NSFW gate and the face gender vote — per the locked
+ * contracts in [NaqiModel]. Sessions are created lazily and cached for the process, on the same
+ * [imageSessionOptions] [ModelSmoke] load-checks them with.
  *
  * **Preprocessing no longer lives here (plan-v2 §5.2, "V2").** [nsfw] used to allocate, per call, a
  * 224² `Bitmap`, an `IntArray(50 176)` and a heap `FloatBuffer.allocate(150 528)` — ~1 MB × 46 500
@@ -27,8 +29,30 @@ object Infer {
     /** [NaqiModel.NSFW_GATE]'s locked input shape. */
     private val GATE_SHAPE = longArrayOf(1, 3, 224, 224)
 
+    /** [NaqiModel.GENDERAGE]'s locked input shape. */
+    private val GENDERAGE_SHAPE = longArrayOf(1, 3, 96, 96)
+
     private val env: OrtEnvironment by lazy { OrtEnvironment.getEnvironment() }
     private val sessions = HashMap<NaqiModel, OrtSession>()
+
+    /** Memoized [genderAgeAvailable]; null until first asked. */
+    @Volatile
+    private var genderAgeInstalled: Boolean? = null
+
+    /**
+     * Is [NaqiModel.GENDERAGE] on disk? **Memoized, and that is the point** — resolving it means a
+     * `File.length()` stat, and on the missing path an `AssetManager.open` that throws and swallows a
+     * `FileNotFoundException`. A film classifies thousands of crops, and the answer cannot change
+     * mid-pass (the file is installed once, at smoke time). Callers should ask ONCE, before the pass:
+     * `FilterWorker.genderVoter()` returns null on false, so a build without the asset skips the crop
+     * fill as well as the inference instead of paying 9 216 pixels per face for a guaranteed abstention.
+     */
+    fun genderAgeAvailable(context: Context): Boolean = genderAgeInstalled ?: run {
+        val ok = ModelSmoke.modelFile(context, NaqiModel.GENDERAGE) != null
+        genderAgeInstalled = ok
+        if (!ok) Log.w("Infer", "${NaqiModel.GENDERAGE.assetName} not installed — face gender vote abstains")
+        ok
+    }
 
     /**
      * GantMan 5-class softmax in [NSFW_CLASSES] order. [input] must be a DIRECT, native-order
@@ -54,6 +78,30 @@ object Infer {
             session.run(mapOf(session.inputNames.first() to tensor)).use { result ->
                 val out = (result[0] as OnnxTensor).floatBuffer
                 return FloatArray(NSFW_CLASSES.size) { out.get(it) }
+            }
+        }
+    }
+
+    /**
+     * InsightFace `genderage.onnx` (`plan-censor-who` §4.1). [input] must be a DIRECT, native-order
+     * `[1,3,96,96]` NCHW RGB buffer in **0..255, unscaled** — see [NaqiModel.GENDERAGE]; the gate
+     * above wants 1/255 on the same layout, so the two fills are NOT interchangeable. Same
+     * zero-copy-view reasoning as [nsfw] for why the tensor is not cached.
+     *
+     * @return raw `[female, male, age]` logits (NOT softmax), or null when the model is not installed.
+     *
+     * Null rather than throwing because face censoring must keep working when only *this* model is
+     * missing — [session] `error()`s, and the whole feature degrades to "no vote cast", which §4.2
+     * already defines as censor. The warn is one-shot: a track classifies up to `VOTE_CAP` crops, so
+     * logging per crop is 5 lines per track and thousands per film.
+     */
+    fun genderAge(context: Context, input: FloatBuffer): FloatArray? {
+        if (!genderAgeAvailable(context)) return null
+        val session = session(context, NaqiModel.GENDERAGE)
+        OnnxTensor.createTensor(env, input, GENDERAGE_SHAPE).use { tensor ->
+            session.run(mapOf(session.inputNames.first() to tensor)).use { result ->
+                val out = (result[0] as OnnxTensor).floatBuffer
+                return FloatArray(3) { out.get(it) }
             }
         }
     }
