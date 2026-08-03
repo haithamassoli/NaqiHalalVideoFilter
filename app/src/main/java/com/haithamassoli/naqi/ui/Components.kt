@@ -60,11 +60,21 @@ import com.haithamassoli.naqi.ui.theme.NaqiTokens
 fun NaqiTopBar(
     title: String,
     onBack: (() -> Unit)? = null,
+    titleIcon: ImageVector? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     TopAppBar(
         title = {
-            Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NaqiTokens.space1),
+            ) {
+                // Brand mark, not a control: it sits with the name so the two read as one lockup.
+                titleIcon?.let {
+                    Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                }
+                Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         },
         navigationIcon = {
             if (onBack != null) {

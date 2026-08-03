@@ -94,6 +94,7 @@ fun PickOpsScreen(
         topBar = {
             NaqiTopBar(
                 title = stringResource(R.string.app_name),
+                titleIcon = NaqiIcons.Droplet,
                 actions = { OverflowMenu(onAbout = onAbout) },
             )
         },
@@ -203,7 +204,6 @@ private fun TrustSeal() {
                 .border(1.dp, primary.copy(alpha = 0.22f), NaqiTokens.shapePill)
                 .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space2),
         ) {
-            Icon(NaqiIcons.Droplet, contentDescription = null, tint = primary, modifier = Modifier.size(16.dp))
             Text(
                 stringResource(R.string.pick_seal_on_device),
                 style = MaterialTheme.typography.labelMedium,
