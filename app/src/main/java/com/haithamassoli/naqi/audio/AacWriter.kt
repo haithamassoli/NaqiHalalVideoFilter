@@ -5,22 +5,22 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
-import androidx.media3.common.C
-import androidx.media3.common.audio.AudioProcessor
-import androidx.media3.common.audio.SonicAudioProcessor
 import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import kotlin.math.roundToInt
 
 /**
- * M2 audio egress (android-media-spec stage d). Streams the DSP's interleaved f32 stereo 44.1k through
- * a single [SonicAudioProcessor] float session (44100 -> 48000), quantizes to int16 LE, and AAC-LC
- * encodes at 192 kbps into a temp .m4a via framework [MediaCodec] + [MediaMuxer].
+ * M2 audio egress (android-media-spec stage d). Quantizes the DSP's interleaved f32 stereo 44.1 kHz to
+ * int16 LE and AAC-LC encodes it at 192 kbps into a temp .m4a via framework [MediaCodec] + [MediaMuxer].
+ *
+ * **In 44.1, out 44.1 — no resampling anywhere in this class.** There used to be a 44 100 -> 48 000
+ * `SonicAudioProcessor` session here. AAC-LC encodes 44.1 kHz natively, so it bought nothing and cost the
+ * ~−27 dB in-band distortion `tasks.md:58` records: Sonic is 2-tap linear interpolation with no
+ * anti-imaging filter, a playback-speed tool rather than an SRC. Deleting it is primarily a QUALITY fix
+ * and `plan-v2` §5.9 (A6) ranks it as one; the encoder feed getting ~8 % shorter is a side effect.
  *
  * The muxer audio track is added ONLY from the encoder's INFO_OUTPUT_FORMAT_CHANGED output format (it
- * carries the AudioSpecificConfig); the standalone CODEC_CONFIG buffer is dropped. Encoder-input PTS is
- * a monotonic 48 kHz sample counter anchored at [firstPtsUs] (the source's first audio PTS) so the track
+ * carries the AudioSpecificConfig); the standalone CODEC_CONFIG buffer is dropped. Encoder-input PTS is a
+ * monotonic [RATE] sample counter anchored at [firstPtsUs] (the source's first audio PTS) so the track
  * shares the video epoch in the final mux; the ~2048-sample encoder priming is left uncompensated by
  * convention. Feed with [write], end with [finish], always [close]. Thread-confined.
  */
@@ -28,14 +28,12 @@ class AacWriter(tempM4a: File, private val firstPtsUs: Long) : AutoCloseable {
 
     private companion object {
         const val TIMEOUT_US = 10_000L
-        const val IN_RATE = 44100
-        const val OUT_RATE = 48000
-    }
 
-    private val sonic = SonicAudioProcessor().apply {
-        setOutputSampleRateHz(OUT_RATE) // OUTPUT rate — set BEFORE configure
-        configure(AudioProcessor.AudioFormat(IN_RATE, 2, C.ENCODING_PCM_FLOAT))
-        flush(AudioProcessor.StreamMetadata.DEFAULT)
+        /**
+         * Separator rate in, encoder rate out, PTS clock — one number, which is the whole of A6. Also
+         * [AudioDecoder]'s output rate and htdemucs's training rate, so nothing upstream converts either.
+         */
+        const val RATE = 44100
     }
 
     // Acquired together so a partial failure (encoder configure/start throwing, or the MediaMuxer
@@ -48,7 +46,7 @@ class AacWriter(tempM4a: File, private val firstPtsUs: Long) : AutoCloseable {
         var enc: MediaCodec? = null
         var mux: MediaMuxer? = null
         try {
-            val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, OUT_RATE, 2).apply {
+            val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, RATE, 2).apply {
                 setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
                 setInteger(MediaFormat.KEY_BIT_RATE, 192_000)
                 setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
@@ -62,7 +60,6 @@ class AacWriter(tempM4a: File, private val firstPtsUs: Long) : AutoCloseable {
             encoder = enc
             muxer = mux
         } catch (t: Throwable) {
-            runCatching { sonic.reset() }
             runCatching { enc?.stop() }
             runCatching { enc?.release() }
             runCatching { mux?.release() }
@@ -75,36 +72,33 @@ class AacWriter(tempM4a: File, private val firstPtsUs: Long) : AutoCloseable {
     private var audioTrackIx = -1
     private var muxerStarted = false
     private var muxerStopped = false
-    private var samples48k = 0L // stereo frames handed to the encoder so far
+    private var samplesOut = 0L // stereo frames handed to the encoder so far
 
-    // Hot buffers, grown on demand and reused across every write.
-    private var inputDirect: ByteBuffer? = null
+    // Hot buffer, grown on demand and reused across every write.
     private var pcm16 = ByteArray(0)
 
-    /** Feed one interleaved f32 stereo 44.1k batch (already soft-clipped upstream). */
+    /** Feed one interleaved f32 stereo 44.1 kHz batch (already soft-clipped upstream). */
     fun write(interleaved: FloatArray, frames: Int) {
         if (frames == 0) return
         val n2 = frames * 2
-        val need = n2 * 4
-        var idb = inputDirect
-        if (idb == null || idb.capacity() < need) {
-            idb = ByteBuffer.allocateDirect(need).order(ByteOrder.nativeOrder())
-            inputDirect = idb
+        if (pcm16.size < n2 * 2) pcm16 = ByteArray(n2 * 2)
+        var bi = 0
+        for (i in 0 until n2) {
+            // NaN has no int16 image and `roundToInt` throws on it rather than saturating, which
+            // turned one corrupt sample out of the separator into a lost multi-minute job. The
+            // separator now sanitizes its own output ([DemucsSeparator.nonFinite]); this stays as the
+            // boundary guard, because this is where float stops being representable and every other
+            // producer of this buffer would hit the same edge.
+            val v = interleaved[i]
+            val s = if (v.isFinite()) (v * 32767f).roundToInt().coerceIn(-32768, 32767) else 0
+            pcm16[bi++] = (s and 0xFF).toByte()
+            pcm16[bi++] = ((s shr 8) and 0xFF).toByte()
         }
-        idb.clear()
-        idb.asFloatBuffer().put(interleaved, 0, n2)
-        idb.position(0).limit(need)
-        while (idb.hasRemaining()) { // queueInput may consume partially — interleave drains
-            sonic.queueInput(idb)
-            drainSonicToEncoder()
-        }
+        feedEncoder(pcm16, bi)
     }
 
-    /** Flush the resampler tail, signal encoder EOS, drain to the muxer, and finalize the .m4a. */
+    /** Signal encoder EOS, drain the tail to the muxer, and finalize the .m4a. */
     fun finish() {
-        sonic.queueEndOfStream()
-        while (!sonic.isEnded()) if (!drainSonicToEncoder()) break
-
         var inIx = encoder.dequeueInputBuffer(TIMEOUT_US)
         while (inIx < 0) { drainEncoder(false); inIx = encoder.dequeueInputBuffer(TIMEOUT_US) }
         encoder.queueInputBuffer(inIx, 0, 0, ptsUs(), MediaCodec.BUFFER_FLAG_END_OF_STREAM)
@@ -113,44 +107,14 @@ class AacWriter(tempM4a: File, private val firstPtsUs: Long) : AutoCloseable {
         if (muxerStarted && !muxerStopped) { muxer.stop(); muxerStopped = true }
     }
 
-    /** Release codec/muxer/resampler. Idempotent; safe after [finish] or on an error path. */
+    /** Release codec and muxer. Idempotent; safe after [finish] or on an error path. */
     override fun close() {
-        runCatching { sonic.reset() }
         runCatching { encoder.stop() }
         runCatching { encoder.release() }
         runCatching { muxer.release() } // never stop() a muxer that didn't reach finish() — moov would be incomplete
     }
 
-    private fun ptsUs(): Long = firstPtsUs + samples48k * 1_000_000L / OUT_RATE
-
-    // Drain available Sonic output, quantize to int16 LE, and push into the encoder. Returns whether
-    // anything was consumed (bounds the finish() tail loop).
-    private fun drainSonicToEncoder(): Boolean {
-        var any = false
-        while (true) {
-            val out = sonic.getOutput()
-            val bytes = out.remaining()
-            if (bytes == 0) break
-            any = true
-            val floats = bytes / 4
-            val fb = out.order(ByteOrder.nativeOrder()).asFloatBuffer()
-            if (pcm16.size < floats * 2) pcm16 = ByteArray(floats * 2)
-            var bi = 0
-            for (i in 0 until floats) {
-                // NaN has no int16 image and `roundToInt` throws on it rather than saturating, which
-                // turned one corrupt sample out of the separator into a lost multi-minute job. The
-                // separator now sanitizes its own output ([DemucsSeparator.nonFinite]); this stays as the
-                // boundary guard, because this is where float stops being representable and every other
-                // producer of this buffer would hit the same edge.
-                val v = fb.get(i)
-                val s = if (v.isFinite()) (v * 32767f).roundToInt().coerceIn(-32768, 32767) else 0
-                pcm16[bi++] = (s and 0xFF).toByte()
-                pcm16[bi++] = ((s shr 8) and 0xFF).toByte()
-            }
-            feedEncoder(pcm16, floats * 2)
-        }
-        return any
-    }
+    private fun ptsUs(): Long = firstPtsUs + samplesOut * 1_000_000L / RATE
 
     private fun feedEncoder(pcm: ByteArray, size: Int) {
         var off = 0
@@ -163,7 +127,7 @@ class AacWriter(tempM4a: File, private val firstPtsUs: Long) : AutoCloseable {
             ib.put(pcm, off, n)
             val frames = n / 4 // stereo int16 = 4 bytes/frame
             encoder.queueInputBuffer(inIx, 0, n, ptsUs(), 0)
-            samples48k += frames
+            samplesOut += frames
             off += n
             drainEncoder(false)
         }

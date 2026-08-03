@@ -3,8 +3,10 @@ package com.haithamassoli.naqi.analysis
 /**
  * Shared M1 analysis types. Pure Kotlin — no Android imports, so gate/EDL logic stays
  * JVM-unit-testable. All rectangles are normalized to [0,1] in UPRIGHT (display-oriented)
- * frame space: the sampler bakes rotation into the bitmaps it emits, and Media3's effect
- * pipeline hands effects upright frames, so both passes share one coordinate space.
+ * frame space: the sampler hands ML Kit an unrotated buffer plus the source rotation and ML Kit
+ * reports boxes in that rotated (upright) space — normalized against
+ * [FrameSampler.uprightSize] — and Media3's effect pipeline hands effects upright frames, so both
+ * passes share one coordinate space.
  */
 data class NRect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val width: Float get() = right - left
@@ -33,13 +35,15 @@ data class VideoMeta(
     val fps: Float,
 )
 
-enum class Gender { FEMALE, MALE, UNKNOWN }
-
 /** One face observation on one sampled frame. */
-data class FaceSample(val ptsMs: Long, val rect: NRect, val frontal: Boolean)
+data class FaceSample(val ptsMs: Long, val rect: NRect)
 
-/** A face tracked across sampled frames (ML Kit tracking id), plus its voted gender. */
+/**
+ * A face tracked across sampled frames. [id] is the ML Kit tracking id, or a negative synthetic one
+ * for a detection ML Kit could not assign an id to (see [FaceTracker]); it groups samples and nothing
+ * else. Every track is censored — plan-v2 §5.4 removed the gender vote, so there is no per-track
+ * verdict left to carry.
+ */
 class FaceTrack(val id: Int) {
     val samples = mutableListOf<FaceSample>()
-    var gender: Gender = Gender.UNKNOWN
 }

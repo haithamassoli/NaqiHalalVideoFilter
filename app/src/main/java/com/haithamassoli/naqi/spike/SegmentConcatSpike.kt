@@ -8,6 +8,7 @@ import android.net.Uri
 import android.util.Log
 import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.audio.ConcatPart
+import com.haithamassoli.naqi.audio.MuxOut
 import com.haithamassoli.naqi.audio.Remux
 import com.haithamassoli.naqi.audio.TrackSource
 import com.haithamassoli.naqi.edl.Edl
@@ -147,7 +148,7 @@ object SegmentConcatSpike {
                     context,
                     parts = listOf(ConcatPart(segA, 0L), ConcatPart(segB, SEG_A_MS)),
                     audio = if (hasAudio) TrackSource.FromUri(uri) else null,
-                    outFile = joined,
+                    out = MuxOut.ToFile(joined),
                 ) { }
             }
         } catch (t: Throwable) {

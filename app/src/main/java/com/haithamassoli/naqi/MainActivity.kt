@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (BuildConfig.DEBUG) maybeAutorun()
+        if (BuildConfig.DEBUG_HOOKS) maybeAutorun()
         deleteTarget = deleteTargetOf(intent)
         shared = sharedOf(intent)
         // Weekly yt-dlp check (PRD M4.4). Off the main thread, failure-tolerant, and no-op six days out
@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         // Default launchMode means a redelivered intent lands here, not in onCreate — the debug
         // cancel hook has to be honoured on both paths or `am start --ez autorun_cancel` is a no-op.
-        if (BuildConfig.DEBUG) maybeAutorun()
+        if (BuildConfig.DEBUG_HOOKS) maybeAutorun()
         deleteTargetOf(intent)?.let { deleteTarget = it }
         sharedOf(intent)?.let { shared = it }
     }
@@ -181,6 +181,10 @@ class MainActivity : ComponentActivity() {
      * Debug E2E entry point: `-e autorun_path <file>` starts a job with no permission prompts, and
      * `--ez autorun_cancel true` cancels the running one (the only way to exercise cancel-mid-job
      * from adb — the real cancel lives on the notification and in the UI).
+     *
+     * Gated on `DEBUG_HOOKS`, not `DEBUG`: the `benchmark` build type is non-debuggable and still has to
+     * reach this, because it is the only way to start a job from adb and so the only way the SOAK lines
+     * get emitted on an optimised build (plan-v2 §4.1).
      */
     private fun maybeAutorun() {
         if (intent.getBooleanExtra("autorun_cancel", false)) {
@@ -208,7 +212,7 @@ class MainActivity : ComponentActivity() {
             strictness = intent.getIntExtra("strictness", 50),
             blurAmount = intent.getIntExtra("blur", 60),
             grayscale = intent.getBooleanExtra("grayscale", false),
-            blurUnknownFaces = intent.getBooleanExtra("blur_unknown", false),
+            // `--ez blur_unknown` is gone with the gender vote (plan-v2 §5.4); passing it is now a no-op.
             keepStems = intent.getStringExtra("keep_stems") ?: "vocals",
         )
 

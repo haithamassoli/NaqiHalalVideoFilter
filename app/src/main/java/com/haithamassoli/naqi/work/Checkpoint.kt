@@ -113,9 +113,14 @@ internal object Checkpoint {
     // ---- audio ----
 
     /**
-     * How far the separator got, plus the whole-track scalars a resumed run must NOT recompute: [mean] and
-     * [std] normalize on feed and are inverted on emit, so re-deriving them from a re-decode that differs
-     * by one frame would step the level in the middle of the film; [totalFrames] fixes the chunk grid.
+     * How far the separator got, plus the whole-track scalars a resumed run must NOT recompute: `mean` and
+     * `std` normalize on feed and are inverted on emit, so re-deriving them from a re-decode that differs
+     * by one frame would step the level in the middle of the film.
+     *
+     * `stats.frames` used to be a declared total that fixed the chunk grid. Since `plan-v2` §5.7 (A3) the
+     * separator measures its own length from the stream, so this field is instead the **completion
+     * marker**: 0 while the separator still owes work, the measured frame count once a full run finished.
+     * See [com.haithamassoli.naqi.audio.AudioDecoder.Stats].
      */
     class AudioProgress(
         val framesEmitted: Long,

@@ -25,12 +25,19 @@ import kotlin.math.tanh
  * - whole-track mono-mix mean/std normalization in, inverted on emit (apply.py "ref" norm — the
  *   per-segment norm is inside the ONNX graph and must NOT be repeated here);
  * - the 0.5 s zero pre-pad + shift trick with the deterministic `shift_offset = 0` draw;
- * - segments of [SEG] samples every [STRIDE] (25 % overlap), triangle-weighted overlap-add with
- *   weight-sum division (`TRANSITION_POWER = 1.0`);
+ * - segments of [SEG] samples every [STRIDE] (10 % overlap — see [STRIDE]), triangle-weighted
+ *   overlap-add with weight-sum division (`TRANSITION_POWER = 1.0`);
  * - short tail chunks assembled per torch `TensorChunk.padded` (real left context, zeros past the
  *   end, outputs read back center-trimmed) — NOT the C++ centering bug documented in dsp-spec §3;
  * - kept-stem masked SPECTROGRAMS are summed before ONE iSTFT per chunk (linearity, dsp-spec §4),
  *   then the kept time branches are added; drums/bass are never kept.
+ *
+ * Two things here are NOT the reference, both from `plan-v2`:
+ * - **the track length is learned, not declared** (A3 / item 7.5) — see [estimatedFrames] and [framesFed];
+ * - **a chunk with no music passes through** instead of being separated (A1) — see [isMusic] and
+ *   [passthroughChunk]. That is a quality change as well as a speed one: in "vocals" mode the sound
+ *   effects of every dialogue-only stretch survive instead of being destroyed with the music
+ *   (`plan-v2` §5.10, against the tradeoff `prd-video-filter-android.md:80` documents and accepts).
  *
  * The PRD soft-clip guard (tanh knee at 0.95) is applied on the denormalized sum at emit time.
  * Contract: single-threaded (one worker drives feed/finish); [emit] receives interleaved stereo.
@@ -39,7 +46,20 @@ class DemucsSeparator(
     keepOther: Boolean,
     mean: Float,
     std: Float,
-    private val totalFrames: Long,
+    /**
+     * Frames the CONTAINER says the track holds. **A progress denominator and nothing else** (A3,
+     * `plan-v2` §5.7). It used to be `totalFrames` and it fixed the entire chunk grid, the emitted-frame
+     * cap and the tail geometry — which meant a stream that delivered fewer frames than declared was
+     * silently zero-padded to look complete (correctness item 7.5). The end of the grid now resolves in
+     * [finish] from [framesFed], so this may be wrong in either direction and the only consequence is a
+     * progress bar that finishes slightly early or late.
+     */
+    private val estimatedFrames: Long,
+    /**
+     * One chunk through the model -> (masked spec, time branch) for the KEPT stems only, **compacted**:
+     * `keptStems(keepOther).size` contiguous blocks in that array's order, NOT the graph's four (A4,
+     * `plan-v2` §5.9). Both arrays may be reused across calls; this class consumes them within the chunk.
+     */
     private val infer: (wav: FloatArray, spec: FloatArray) -> Pair<FloatArray, FloatArray>,
     private val onChunk: (done: Int, total: Int) -> Unit,
     /**
@@ -50,20 +70,39 @@ class DemucsSeparator(
      * Declared before [emit] so [emit] stays the trailing parameter its callers pass as a lambda.
      */
     private val resumeFrames: Long = 0L,
+    /**
+     * A1 (`plan-v2` §5.5): "does this window of mono 44.1 kHz audio contain music?" — null disables the
+     * gate and every chunk is separated, which is also what happens when the model is not installed.
+     *
+     * The callback takes DENORMALIZED mono (real amplitudes), because a music classifier and a silence
+     * floor both need the signal the user would hear, not this class's unit-variance view of it. It is a
+     * lambda rather than a `MusicGate` so this class stays Android-free for its JVM tests.
+     */
+    private val isMusic: ((mono: FloatArray, frames: Int) -> Boolean)? = null,
     private val emit: (interleaved: FloatArray, frames: Int) -> Unit,
 ) {
-    private val keep = if (keepOther) intArrayOf(OTHER, VOCALS) else intArrayOf(VOCALS)
+    // A4: the absolute stem ids are the SESSION's business now (it does the compaction on the way out of
+    // ORT), so all this class needs is how many blocks came back. Derived through the same [keptStems]
+    // the caller used to build the session, so the two cannot drift apart.
+    private val nKeep = keptStems(keepOther).size
     private val mean = mean
     private val std = std.coerceAtLeast(1e-8f) // same scalar for normalize and denormalize
 
-    private val shiftedLen = totalFrames + MAX_SHIFT // shift_offset=0: lead zeros only (reference trims these)
-    private val totalChunks = ((shiftedLen + STRIDE - 1) / STRIDE).toInt()
+    private val totalChunks = ((estimatedFrames + MAX_SHIFT + STRIDE - 1) / STRIDE).toInt()
 
     // Input ring: normalized planar samples addressed by absolute virtual position (lead zeros are
     // the ring's own zero-init; positions ≥ writePos and < 0 read as zero = TensorChunk out-of-range).
     private val inL = FloatArray(IN_CAP)
     private val inR = FloatArray(IN_CAP)
     private var writePos = MAX_SHIFT // virtual positions [0, MAX_SHIFT) are the pre-pad zeros
+
+    /**
+     * One past the last real input position — i.e. the end of the chunk grid. `Long.MAX_VALUE` while
+     * input is still arriving, resolved to [writePos] by [finish]. This is A3/7.5 in one line: the
+     * length is LEARNED from the stream instead of declared, so a decode that stops early produces a
+     * shorter output rather than a full-length one padded with silence.
+     */
+    private var endPos = Long.MAX_VALUE
 
     // Output ring: weighted overlap-add accumulator + weight sums; cells are zeroed as they flush.
     private val outL = FloatArray(OUT_CAP)
@@ -72,17 +111,43 @@ class DemucsSeparator(
     private var flushPos = 0L // virtual position below which everything was emitted (or skipped as pre-pad)
     private var emitted = 0L
 
-    private var chunksDone = 0
+    /** Chunks the grid has advanced past, inferred or passed through. Read by the caller for the A1 log. */
+    var chunksDone = 0
+        private set
+
     private var nextChunkOff = 0L
+
+    init {
+        /*
+         * `ceil(SEG/STRIDE) == 2` — at most two chunks cover any one output position. This was a comment;
+         * `plan-v2` §5.6 asks for it as an assertion, because it is what an overlap change silently
+         * breaks and THREE things ride on it:
+         *
+         * - [skipChunks] under-skips (safe, re-runs a chunk) but never over-skips (a hole in the ring)
+         *   only while `floor(R/STRIDE) - floor((R−SEG)/STRIDE) <= 2`, which is this bound exactly.
+         * - [OUT_CAP] `= SEG + STRIDE` is the span of the two live chunks. With three live it would alias.
+         *   217_854 cells at 10 % vs 200_655 at 25 % — the ring auto-sizes off STRIDE, it just got roomier.
+         * - [IN_CAP] `= 2*SEG + LOOKAHEAD` covers the worst-case lookback. [feed] slices at SEG/2 and
+         *   fires at most ONE chunk per slice (STRIDE > SEG/2), so `writePos < off + SEG + LOOKAHEAD +
+         *   SEG/2` when a chunk fires, and [inferChunk] reads back to `off − delta/2 >= off − SEG/2` —
+         *   span < 2*SEG + LOOKAHEAD. At [finish] the un-fired chunks satisfy `off > writePos − SEG −
+         *   LOOKAHEAD`, so their span is < 1.5*SEG + LOOKAHEAD, which is smaller. Raising STRIDE only
+         *   fires chunks less often; it cannot widen either window.
+         *
+         * SEG/STRIDE was 1.333 at 25 % and is 1.111 at the shipped 10 %; 50 % would be exactly 2.0, which
+         * still holds. It is overlap ABOVE 50 % that pushes the ceiling to 3 and breaks all three at once.
+         */
+        check(STRIDE < SEG && SEG <= 2 * STRIDE) { "ceil(SEG/STRIDE) must be 2: SEG=$SEG STRIDE=$STRIDE" }
+    }
 
     /**
      * Chunks whose inference can be skipped on a resume.
      *
      * An emitted frame `e` lives at virtual position `MAX_SHIFT + e`, and chunk `c` covers positions
-     * `[c*STRIDE, c*STRIDE + clen)`. With 25 % overlap, `ceil(SEG/STRIDE) = ceil(1.333) = 2`, so any one
-     * output position is covered by at most TWO chunks — which means exactly ONE chunk before the resume
-     * point has to be re-run to rebuild the overlap-add ring for the first frame we still owe. A
-     * checkpoint is always taken at a chunk boundary, where this is exactly `chunksDone - 1`.
+     * `[c*STRIDE, c*STRIDE + clen)`. `ceil(SEG/STRIDE) = 2` (asserted above), so any one output position
+     * is covered by at most TWO chunks — which means exactly ONE chunk before the resume point has to be
+     * re-run to rebuild the overlap-add ring for the first frame we still owe. A checkpoint is always
+     * taken at a chunk boundary, where this is exactly `chunksDone - 1`.
      *
      * ponytail: the exactly-minimal form is `floorDiv(MAX_SHIFT + resumeFrames - SEG, STRIDE) + 1`.
      * Identical at every value a checkpoint can actually hold, and off-boundary this form re-runs at most
@@ -104,6 +169,16 @@ class DemucsSeparator(
         min(i + 1, SEG - i).toFloat() / (SEG / 2).toFloat()
     }
 
+    // A1 gate state. One chunk's window, denormalized and folded to mono, plus the last few decisions.
+    private val gateMono = FloatArray(SEG)
+    private val gateMusic = BooleanArray(GATE_RING)
+    private var gateFrom = Int.MAX_VALUE // lowest chunk index whose decision is in [gateMusic]
+    private var gateTo = -1              // highest, inclusive
+
+    /** Chunks the A1 gate passed through instead of separating. Read by the caller for the skip-rate log. */
+    var skippedChunks = 0
+        private set
+
     /** Feed the next [frames] interleaved stereo samples; may synchronously run inference and emit. */
     fun feed(interleaved: FloatArray, frames: Int) {
         var src = 0
@@ -118,18 +193,20 @@ class DemucsSeparator(
             writePos += n
             src += n
             remaining -= n
-            // Process every chunk whose full SEGMENT of input is now available; short tails wait for finish().
-            while (nextChunkOff < shiftedLen && nextChunkOff + SEG <= writePos) processChunk()
+            // Process every chunk whose full segment AND its [LOOKAHEAD] are available; the rest wait for
+            // finish(). The old `nextChunkOff < shiftedLen` guard is gone with the declared length — the
+            // condition below already implies `nextChunkOff < writePos <= endPos`.
+            while (nextChunkOff + SEG + LOOKAHEAD <= writePos) processChunk()
         }
     }
 
     /**
-     * Frames the emit stream fell short of [totalFrames]. 0 in the normal case; read after [finish] so
-     * the caller can log a tolerated shortfall (this class stays Android-free for its JVM tests, so it
-     * cannot log one itself).
+     * Frames the stream actually delivered, i.e. what [feed] was handed in total (correctness item 7.5).
+     * Read after [finish]: this is the authoritative length of the output, and the caller compares it
+     * against the container's estimate to surface a short decode (this class stays Android-free for its
+     * JVM tests, so it cannot log one itself).
      */
-    var shortfall = 0L
-        private set
+    val framesFed: Long get() = (writePos - MAX_SHIFT).toLong()
 
     /**
      * Samples the model returned as NaN or ±Inf, replaced with silence by [finite]. Read after [finish]
@@ -146,6 +223,26 @@ class DemucsSeparator(
     var nonFinite = 0L
         private set
 
+    /**
+     * Wall nanos spent inside the three phases of a chunk, accumulated over the run and read by the
+     * caller (this class stays Android-free for its JVM tests, so it cannot log them itself).
+     *
+     * `plan-v2` §5.9 asks for exactly this before anyone sizes A5: the STFT sits inside a stage that has
+     * never been timed internally, so its share "could be 2 % or 15 %" and the plan refuses to rank the
+     * work until someone knows which. The remainder of a chunk — the input-ring gather and [flush]'s
+     * divide / soft-clip / emit — is deliberately not counted; it is wall minus these three.
+     */
+    var stftNs = 0L
+        private set
+
+    /** ORT inference only, i.e. [infer]. See [stftNs]. */
+    var inferNs = 0L
+        private set
+
+    /** iSTFT + the spec sum + the weighted overlap-add loop. See [stftNs]. */
+    var olaNs = 0L
+        private set
+
     /** NaN/±Inf out of inference becomes silence, and is counted. See [nonFinite]. */
     private fun finite(x: Float): Float {
         if (x.isFinite()) return x
@@ -153,20 +250,18 @@ class DemucsSeparator(
         return 0f
     }
 
-    /** Process the remaining (short) chunks, flush the tail, and emit [totalFrames] frames. */
+    /**
+     * Resolve the true length from what was actually fed, process the remaining (short) chunks, and flush
+     * the tail. After this, `emitted == framesFed` by construction — the walk below covers exactly
+     * `[MAX_SHIFT, endPos)` and nothing caps it, which is why the old `shortfall` equality check is gone
+     * rather than relaxed: it compared `emitted` against a number that no longer exists. The mismatch
+     * worth surfacing (item 7.5) is [framesFed] against the container's estimate, and that is the
+     * caller's to log because only the caller has the estimate.
+     */
     fun finish() {
-        while (nextChunkOff < shiftedLen) processChunk()
-        shortfall = totalFrames - emitted
-        // A tolerance rather than an equality (`long-film-plan.md` Phase 1 asked for this), but the honest
-        // note is that the original equality was **structurally unreachable**, not a live trap: [finish]
-        // drives nextChunkOff to shiftedLen unconditionally, [flush] walks flushPos over the whole
-        // [MAX_SHIFT, shiftedLen) window, and shiftedLen - MAX_SHIFT == totalFrames by construction — so
-        // `emitted` lands on totalFrames even if the stream pass feeds nothing at all (short input just
-        // reads as zeros past writePos). Resume does not change that either: it suppresses the emit CALL,
-        // never the counter. The invariant that can actually catch a short stream pass is the PCM temp's
-        // length, asserted in [AudioPipeline.removeMusic]; this stays as cheap insurance against a future
-        // edit that makes the walk conditional.
-        check(shortfall in 0..MAX_SHORTFALL_FRAMES) { "separator emitted $emitted of $totalFrames frames" }
+        endPos = writePos.toLong()
+        if (framesFed <= 0L) return // nothing decoded: emit nothing rather than infer a chunk of silence
+        while (nextChunkOff < endPos) processChunk()
     }
 
     /**
@@ -177,19 +272,76 @@ class DemucsSeparator(
      * can never erase a cell the first inferred chunk writes.
      */
     private fun processChunk() {
-        if (chunksDone >= skipChunks) inferChunk(nextChunkOff)
+        if (chunksDone >= skipChunks) {
+            if (separateChunk(chunksDone)) inferChunk(nextChunkOff)
+            else { skippedChunks++; passthroughChunk(nextChunkOff) }
+        }
         nextChunkOff += STRIDE
         chunksDone++
-        flush(min(nextChunkOff, shiftedLen)) // samples below the next chunk's start are final
+        flush(min(nextChunkOff, endPos)) // samples below the next chunk's start are final
         // Skipped chunks must not report progress: on a film resumed near the end that would fire hundreds
         // of times in a second, spam the per-chunk log, call thermalYield with nothing hot, and — worst —
         // poison JobStats.etaMs, which extrapolates from elapsed-vs-percent. One call at the transition
         // hands the UI the correct resumed percentage.
-        if (chunksDone >= skipChunks) onChunk(chunksDone, totalChunks)
+        // max(): totalChunks is a container-duration ESTIMATE since A3, so a track that outruns it must
+        // not hand the caller done > total and push the bar past its band.
+        if (chunksDone >= skipChunks) onChunk(chunksDone, maxOf(totalChunks, chunksDone))
+    }
+
+    /**
+     * A1 (`plan-v2` §5.5): does chunk [c] have to go through the model, or can its input pass through?
+     *
+     * Music-free chunks are separated anyway unless the gate is confident about the [DILATE] chunks on
+     * EITHER side too — fades, stings and quiet bars are where a frame-level classifier is least sure,
+     * and a missed music chunk is an audible product failure where a spurious separation costs one chunk
+     * of wall clock. Everything here fails toward separating.
+     *
+     * Scoring only ever moves FORWARD, and it has to: [feed] holds `2*SEG + LOOKAHEAD` of input, which at
+     * the moment chunk `c` fires covers chunk `c+DILATE`'s window exactly (that is what [LOOKAHEAD] buys)
+     * and does NOT reach back to chunk `c-DILATE`'s. The backward half of the dilation is therefore served
+     * from REMEMBERED decisions, and a chunk that was never scored counts as music. On a fresh run that
+     * never happens — chunk 0 scores 0..DILATE and everything below 0 is silence. It happens after a
+     * RESUME, where the first processed chunk lands mid-film with no history, and costs [DILATE] chunks of
+     * unnecessary separation once per resume.
+     */
+    private fun separateChunk(c: Int): Boolean {
+        val gate = isMusic ?: return true
+        var i = maxOf(gateTo + 1, c)
+        while (i <= c + DILATE) {
+            if (gateFrom == Int.MAX_VALUE) gateFrom = i
+            gateMusic[i % GATE_RING] = scoreChunk(i, gate)
+            gateTo = i
+            i++
+        }
+        for (k in (c - DILATE)..(c + DILATE)) {
+            if (k < 0) continue                 // before the film starts: there is no music there
+            if (k < gateFrom) return true       // never scored (start of a run, or a resume) -> separate
+            if (gateMusic[k % GATE_RING]) return true
+        }
+        return false
+    }
+
+    /**
+     * Fill [gateMono] with chunk [c]'s window, denormalized and folded to mono, and score it. Only the
+     * REAL samples are handed over — a tail chunk hanging past the end of the stream would otherwise be
+     * scored mostly on zeros and read as silence.
+     */
+    private fun scoreChunk(c: Int, gate: (FloatArray, Int) -> Boolean): Boolean {
+        val off = c.toLong() * STRIDE
+        val n = min(SEG.toLong(), writePos - off).coerceAtLeast(0L).toInt()
+        if (n == 0) return false // entirely past the end of the stream: nothing there to separate
+        for (j in 0 until n) {
+            // Denormalize the mono fold in one step: ((l*std+mean) + (r*std+mean)) / 2. The pre-pad
+            // positions below MAX_SHIFT are the ring's own zeros and denormalize to `mean`, which is the
+            // DC of the track — right, and inaudible either way.
+            val cell = ((off + j) % IN_CAP).toInt()
+            gateMono[j] = 0.5f * (inL[cell] + inR[cell]) * std + mean
+        }
+        return gate(gateMono, n)
     }
 
     private fun inferChunk(off: Long) {
-        val clen = min(SEG.toLong(), shiftedLen - off).toInt()
+        val clen = min(SEG.toLong(), endPos - off).toInt()
         val delta = SEG - clen // > 0 only for tail chunks
         val readStart = off - delta / 2 // TensorChunk.padded: real left context, zeros out of range
 
@@ -207,13 +359,21 @@ class DemucsSeparator(
         System.arraycopy(segL, 0, wav, 0, SEG)
         System.arraycopy(segR, 0, wav, SEG, SEG)
 
+        // Four nanoTime reads against a ~2 s chunk cost nothing, and they are the only way anyone sizes
+        // A5 for real: `plan-v2` §5.9 flags that this whole stage is un-instrumented internally, so the
+        // STFT work "could be 2 % or 15 %". See [stftNs].
+        val t0 = System.nanoTime()
         val spec = stft.forward(segL, segR, SEG)
+        val t1 = System.nanoTime()
         val (specOut, timeOut) = infer(wav, spec)
+        val t2 = System.nanoTime()
 
         // Sum kept masked specs (one iSTFT total — dsp-spec §4), then kept time branches per sample.
-        System.arraycopy(specOut, keep[0] * STEM_SPEC, sumCac, 0, STEM_SPEC)
-        for (k in 1 until keep.size) {
-            val base = keep[k] * STEM_SPEC
+        // A4: both arrays hold ONLY the kept stems, packed 0..nKeep-1, so the index is the compacted one
+        // and never the stem id.
+        System.arraycopy(specOut, 0, sumCac, 0, STEM_SPEC)
+        for (k in 1 until nKeep) {
+            val base = k * STEM_SPEC
             for (i in 0 until STEM_SPEC) sumCac[i] += specOut[base + i]
         }
         stft.inverse(sumCac, SEG, waveL, waveR)
@@ -223,9 +383,9 @@ class DemucsSeparator(
         for (j in 0 until clen) {
             var tl = 0f
             var tr = 0f
-            for (s in keep) {
-                tl += timeOut[(2 * s) * SEG + read + j]
-                tr += timeOut[(2 * s + 1) * SEG + read + j]
+            for (k in 0 until nKeep) {
+                tl += timeOut[(2 * k) * SEG + read + j]
+                tr += timeOut[(2 * k + 1) * SEG + read + j]
             }
             val g = weight[j]
             val cell = ((off + j) % OUT_CAP).toInt()
@@ -233,14 +393,48 @@ class DemucsSeparator(
             outR[cell] += g * (waveR[read + j] + tr)
             wsum[cell] += g
         }
+        stftNs += t1 - t0
+        inferNs += t2 - t1
+        olaNs += System.nanoTime() - t2
     }
 
-    /** Emit finalized virtual positions [flushPos, limit) ∩ [MAX_SHIFT, MAX_SHIFT+totalFrames), zeroing cells. */
+    /**
+     * A1: the same overlap-add write as [inferChunk], with the chunk's own input in place of the model's
+     * output. Deliberately NOT a separate bypass that copies input straight to the sink:
+     *
+     * - identical `weight[j]` / `wsum[cell]` bookkeeping, so [flush]'s `outL/wsum` divide is unchanged and
+     *   a fully-skipped run reconstructs the input exactly (Σ g·x / Σ g == x);
+     * - at a skipped/separated boundary the triangular window becomes a natural crossfade instead of a
+     *   hard seam, because the two chunks that cover that position contribute under the same weights.
+     *
+     * Positions are the same as [inferChunk]'s: output `off + j` reads segment position `delta/2 + j`,
+     * i.e. absolute position `off + j`, so this reads the ring at `off + j` with no trim arithmetic.
+     */
+    private fun passthroughChunk(off: Long) {
+        val clen = min(SEG.toLong(), endPos - off).toInt()
+        val t0 = System.nanoTime()
+        for (j in 0 until clen) {
+            val p = off + j
+            val g = weight[j]
+            val cell = (p % OUT_CAP).toInt()
+            if (p < writePos) { // past the fed stream reads as zero, exactly as inferChunk's gather does
+                val src = (p % IN_CAP).toInt()
+                outL[cell] += g * inL[src]
+                outR[cell] += g * inR[src]
+            }
+            wsum[cell] += g
+        }
+        olaNs += System.nanoTime() - t0
+    }
+
+    /** Emit finalized virtual positions [flushPos, limit) ∩ [MAX_SHIFT, endPos), zeroing cells. */
     private fun flush(limit: Long) {
         var n = 0
         while (flushPos < limit) {
             val cell = (flushPos % OUT_CAP).toInt()
-            if (flushPos >= MAX_SHIFT && emitted < totalFrames) {
+            // No `emitted < totalFrames` cap any more (A3): every caller passes `limit <= endPos`, so the
+            // walk stops at the last real input position on its own and `emitted` lands on [framesFed].
+            if (flushPos >= MAX_SHIFT) {
                 // The discard for a resume lives HERE, not in the sink: over a skipped span nothing was
                 // accumulated, so wsum is 0 and the divide below would be 0f/0f = NaN. Skipping the whole
                 // computation also avoids millions of pointless divide+softclip pairs and keeps the sink a
@@ -263,6 +457,18 @@ class DemucsSeparator(
 
     companion object {
         /**
+         * The stems this driver keeps, as absolute indices into the graph's four, **ascending**.
+         *
+         * Public because [HtdemucsSession] is constructed with it (A4 — the session copies only these
+         * slices out of ORT) and the driver derives its own block count from it, so there is one
+         * definition and no way for the two to disagree. Ascending matters twice: the session's
+         * `FloatBuffer` reads then only ever walk forward, and compacted index `k` means the same stem in
+         * the spec array and the time array.
+         */
+        fun keptStems(keepOther: Boolean): IntArray =
+            if (keepOther) intArrayOf(OTHER, VOCALS) else intArrayOf(VOCALS)
+
+        /**
          * Segment geometry, fixed by the exported graph — change these only together with a matching
          * `scripts/htdemucs_export.py` re-export, or inference reads garbage.
          *
@@ -280,7 +486,40 @@ class DemucsSeparator(
          * unaffected by segment length (f16 63.4/69.0 dB spec/wave at 2.6 s, vs 61.5/65.9 at 7.8 s).
          */
         const val SEG = 114_660            // int(2.6 s × 44100)
-        const val STRIDE = 85_995          // int((1 − 0.25) × SEG) — apply.py truncates, so do we
+
+        /**
+         * **10 % overlap, down from `apply.py`'s 25 % default** (`plan-v2` §5.6, A2). Chunk count scales
+         * as `1/(1 − overlap)`, so this is 16.7 % fewer inferences — a 1.20× throughput win on the stage
+         * that is 55–65 % of a film job, for one constant. `int(0.90 × 114_660) = 103_194` exactly; the
+         * reference truncates, so do we. The overlap-add stays mathematically sound at any overlap below
+         * 50 % because [weight] is normalized and [wsum] divides the window sum out (TRANSITION_POWER = 1).
+         *
+         * The 25 % was inherited unexamined, and the model's own author calls it a guess — the Demucs
+         * README: *"the default of 0.25 … can probably be reduced to 0.1 to improve speed a bit."*
+         * Reference implementations do not agree with each other either (UVR treats 50 % as best quality;
+         * BandIt evaluates at 91.7 % overlap).
+         *
+         * **The §5.6 gate HAS now been run, and its verdict is that the gate itself cannot decide this.**
+         * Wave agreement against the 25 % reference, `test-video.mp4`, whole output, plus a control that
+         * moves the chunk grid while holding the overlap at 25 % ([MAX_SHIFT] 22_050 → 33_075):
+         *
+         *   identical config, re-run          ∞ dB (bit-exact — the pipeline is deterministic)
+         *   25 % overlap, grid phase +0.25 s  18.46 dB   <- CONTROL: overlap unchanged
+         *   20 % overlap                      16.39 dB
+         *   10 % overlap  (shipped)           15.94 dB
+         *
+         * The control is the finding. Moving the grid by a quarter of a second, with the overlap
+         * untouched, already costs 18.5 dB — so "agreement with the 25 % reference" is dominated by
+         * htdemucs' sensitivity to WHERE the chunk boundaries fall, not by how much the chunks overlap.
+         * Dropping to 10 % costs only ~2.5 dB beyond that floor, and 20 % measures the same as 10 % while
+         * buying nothing. A re-gridded reference cannot separate seam quality from grid phase, so the
+         * metric `plan-v2` proposed is not a pass/fail on its own.
+         *
+         * Kept at 10 % on that reading plus the author's own endorsement. What would actually settle it is
+         * a listening test on music with transients and quiet passages — not another dB number. If it ever
+         * fails one, this line is the entire revert; nothing else here hardcodes the overlap.
+         */
+        const val STRIDE = 103_194
         const val MAX_SHIFT = 22_050       // 0.5 s; deterministic shift_offset = 0 draw
         const val BINS = 2048              // NFFT/2 — the model drops the Nyquist bin
         const val LE = 112                 // ceil(SEG / HOP)
@@ -289,11 +528,25 @@ class DemucsSeparator(
         private const val HOP = 1024
         private const val OTHER = 2        // stem order: drums=0, bass=1, other=2, vocals=3
         private const val VOCALS = 3
-        private const val IN_CAP = 2 * SEG          // retains ≥ 1.5×SEG lookback the tail chunks need
-        private const val OUT_CAP = SEG + STRIDE    // unflushed span never exceeds one SEGMENT
 
-        /** ~100 ms at 44.1 kHz — a missing tail this short is inaudible; more means something broke. */
-        const val MAX_SHORTFALL_FRAMES = 4_410L
+        /**
+         * A1 (`plan-v2` §5.5): "never gate off within ±[DILATE] chunks of any music-positive frame". The
+         * decision for chunk `c` therefore cannot be taken until `c + DILATE` has been scored, so the
+         * separator runs [LOOKAHEAD] samples BEHIND the stream — a chunk fires only once the input for
+         * `c + DILATE` is also in the ring.
+         *
+         * Kept unconditional, even with no gate installed. A second firing schedule for the ungated case
+         * would double the surface of the most delicate code in the app to save 1.7 MB of ring and a
+         * 4.8 s lag on the emit stream, neither of which anything downstream can observe.
+         */
+        private const val DILATE = 2
+        private const val LOOKAHEAD = DILATE * STRIDE
+
+        /** Decisions kept for the ±[DILATE] window; anything above `2*DILATE + 1` (=5) works. */
+        private const val GATE_RING = 8
+
+        private const val IN_CAP = 2 * SEG + LOOKAHEAD // worst-case span at a chunk fire — see the init check
+        private const val OUT_CAP = SEG + STRIDE       // exactly the span of the two chunks that can be live
     }
 }
 
@@ -305,12 +558,17 @@ class DemucsSeparator(
  * allocateDirect ~14 MB per call, and that non-movable churn OOMs ART's 256 MB heap mid-job. The
  * returned arrays are REUSED across calls too — the caller must consume them before the next
  * [infer] (DemucsSeparator does, within the same chunk).
+ *
+ * [keep] is the ascending set of stems to read back, from [DemucsSeparator.keptStems]. Only those come
+ * out of ORT and the outputs are compacted to them (A4, `plan-v2` §5.9): the graph emits all four either
+ * way, but drums and bass are 14.7 MB of spec + 3.7 MB of time per chunk that the caller discarded on
+ * arrival, so copying them was pure memcpy for the bin.
  */
-class HtdemucsSession(context: Context) : AutoCloseable {
+class HtdemucsSession(context: Context, private val keep: IntArray) : AutoCloseable {
     private val env: OrtEnvironment = OrtEnvironment.getEnvironment()
     private val session: OrtSession
-    private val specOut = FloatArray(4 * DemucsSeparator.STEM_SPEC)
-    private val timeOut = FloatArray(4 * 2 * DemucsSeparator.SEG)
+    private val specOut = FloatArray(keep.size * DemucsSeparator.STEM_SPEC)
+    private val timeOut = FloatArray(keep.size * 2 * DemucsSeparator.SEG)
     private val wavDirect: FloatBuffer = ByteBuffer.allocateDirect(2 * DemucsSeparator.SEG * 4)
         .order(ByteOrder.nativeOrder()).asFloatBuffer()
     private val specDirect: FloatBuffer = ByteBuffer.allocateDirect(DemucsSeparator.STEM_SPEC * 4)
@@ -344,9 +602,20 @@ class HtdemucsSession(context: Context) : AutoCloseable {
             session.run(feeds).use { result ->
                 for (i in 0 until result.size()) {
                     val tensor = result[i] as OnnxTensor
+                    // One buffer view per output — `floatBuffer` hands back a fresh view each call, so
+                    // taking it once is what makes the position() walk below mean anything. Stems are one
+                    // contiguous block each in both outputs, and [keep] is ascending, so this only ever
+                    // seeks forward.
+                    val fb = tensor.floatBuffer
                     when ((tensor.info as TensorInfo).shape.size) {
-                        5 -> tensor.floatBuffer.get(specOut) // [1,4,4,2048,336] masked spec
-                        4 -> tensor.floatBuffer.get(timeOut) // [1,4,2,343980] time branch
+                        5 -> for (k in keep.indices) {       // [1,4,4,BINS,LE] masked spec
+                            fb.position(keep[k] * DemucsSeparator.STEM_SPEC)
+                            fb.get(specOut, k * DemucsSeparator.STEM_SPEC, DemucsSeparator.STEM_SPEC)
+                        }
+                        4 -> for (k in keep.indices) {       // [1,4,2,SEG] time branch
+                            fb.position(keep[k] * 2 * DemucsSeparator.SEG)
+                            fb.get(timeOut, k * 2 * DemucsSeparator.SEG, 2 * DemucsSeparator.SEG)
+                        }
                         else -> error("unexpected htdemucs output rank")
                     }
                 }

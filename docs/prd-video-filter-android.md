@@ -28,7 +28,12 @@ unaffected and still run in one pass.
 | Blur amount | Slider 0–100 → Gaussian sigma scaled to resolution | Faces + full-frame censor |
 | Grayscale | Toggle, combinable with blur | Faces + full-frame censor |
 | Keep stems | `vocals` (default) \| `vocals+other` | Music removal. Drums/bass never kept. |
-| Blur unknown faces | Advanced toggle, default OFF | Faces with unresolvable gender |
+
+The censor op is **"Censor faces": every detected face is blurred.** `video-performance-plan-v2.md` §5.4
+removed the NudeNet gender vote (AGPL-3.0 in a closed-source APK, and `m0-spikes.md:35` shows it fired
+`FACE_FEMALE` 0.69–0.83 on male portraits, so it already censored ~every face). The "Blur unknown
+faces" advanced toggle went with it — there is no unresolved bucket left. The rest of this document
+still describes the vote and needs the same pass.
 
 ## Models
 | Model | Job | Runtime | Size | Cadence (pass 1) |

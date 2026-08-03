@@ -1,5 +1,6 @@
 package com.haithamassoli.naqi.work
 
+import android.app.ActivityManager
 import android.content.Context
 import android.media.MediaExtractor
 import android.net.Uri
@@ -16,9 +17,11 @@ import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.analysis.FaceTracker
 import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.analysis.NsfwGate
+import com.haithamassoli.naqi.analysis.VideoMeta
 import com.haithamassoli.naqi.audio.AudioPipeline
 import com.haithamassoli.naqi.audio.ConcatAudio
 import com.haithamassoli.naqi.audio.ConcatPart
+import com.haithamassoli.naqi.audio.MuxOut
 import com.haithamassoli.naqi.audio.Remux
 import com.haithamassoli.naqi.audio.TrackSource
 import com.haithamassoli.naqi.audio.concatAudio
@@ -32,21 +35,27 @@ import com.haithamassoli.naqi.ml.Infer
 import com.haithamassoli.naqi.render.RenderPipeline
 import com.haithamassoli.naqi.render.RenderSegment
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.io.File
 
 /**
  * Filtering job. Up to two passes over one source video plus an audio pass, promoted to a foreground
  * service with staged progress and cancellation. Three job shapes:
  *
- * - **Censor-only** (M1's two passes; EDL output unchanged): pass 1 (0..50) decodes at 10 fps — every
- *   frame feeds ML Kit face tracking, every 2nd frame (5 fps) the NSFW gate; firings become hysteresis
- *   censor intervals and face tracks vote gender, together the [Edl]. Pass 2 (50..100) renders with
- *   [RenderPipeline] into a cache temp. Published directly (no mux).
+ * - **Censor-only** (M1's two passes): pass 1 (0..50) decodes at 10 fps — every frame feeds ML Kit face
+ *   tracking, every 2nd frame (5 fps) the NSFW gate; firings become hysteresis censor intervals and
+ *   every face track becomes a censored span (plan-v2 §5.4 removed the gender vote), together the
+ *   [Edl]. Pass 2 (50..100) renders with [RenderPipeline] into a cache temp. Published directly (no mux).
  *   perf-plan Phase 2 dropped sampling to 5 fps and was REVERTED — see `docs/perf-plan.md`. The speedup
  *   in pass 1 is item 1.3's two overlaps, which do not touch which frames are sampled.
  * - **Music-only**: [AudioPipeline.removeMusic] strips music into a temp .m4a (1..93), then
  *   [Remux.mux] copies the ORIGINAL video track verbatim next to the new audio (93..99).
  * - **Combined**: analyze 0..25, render 25..50, separate 50..93, mux the pass-2 video + new audio.
+ *
+ * The two branches of the combined and segmented shapes run CONCURRENTLY on a device with the memory
+ * for it (`plan-v2` §5.8 S1) — see [branches] for why, and for the sequential fallback. The bands above
+ * become shares of the bar rather than time slices; see [reportVideo]/[reportAudio].
  *
  * Every shape preflights the source ([Preflight]: readable, not DRM'd, has the tracks it needs, enough
  * free space) before any foreground work, and failures carry a per-cause message to the UI.
@@ -63,9 +72,24 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     // which meant the default for e.g. KEY_STRICTNESS was written out four times — four places for a
     // future edit to change three of them.
     private val strictness = inputData.getInt(KEY_STRICTNESS, 50)
-    private val blurAmount = inputData.getInt(KEY_BLUR_AMOUNT, 60)
     private val grayscale = inputData.getBoolean(KEY_GRAYSCALE, false)
-    private val blurUnknownFaces = inputData.getBoolean(KEY_BLUR_UNKNOWN, false)
+
+    /**
+     * Correctness item 7.3: `blurAmount = 0` with `grayscale = false` makes [CensorGlEffect] draw the
+     * source pixels back unchanged, so the job spends a full render producing a copy of the input while
+     * telling the user it censored it. On a safety product that is the worst possible silent failure.
+     *
+     * **Coerced rather than failed**, and the deciding reason is prosaic: a per-cause failure needs a
+     * sentence the user can act on, `Preflight`'s taxonomy carries @StringRes ids, and `res/values*` is
+     * not this change's to edit — so "fail" would mean failing a queued job with `err_generic`, which
+     * tells nobody anything. Coercion delivers what the job promised. Read here rather than in the UI
+     * because a queued job carries its own input data and must not be able to bypass the guard.
+     *
+     * Only the exact no-op combination is touched; every other slider position is the user's.
+     */
+    private val blurAmount = inputData.getInt(KEY_BLUR_AMOUNT, 60).let {
+        if (it > 0 || grayscale) it else MIN_EFFECTIVE_BLUR
+    }
     private val keepStems = inputData.getString(KEY_KEEP_STEMS) ?: "vocals"
 
     /**
@@ -87,7 +111,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             inputData.getInt(KEY_STRICTNESS, 50),
             inputData.getInt(KEY_BLUR_AMOUNT, 60),
             inputData.getBoolean(KEY_GRAYSCALE, false),
-            inputData.getBoolean(KEY_BLUR_UNKNOWN, false),
             inputData.getString(KEY_KEEP_STEMS),
             inputData.getString(KEY_FORCE_INTERVALS), // debug hook, but it does change the output
             // Not an input: a plan generation. Segment boundaries moved to sync samples in
@@ -95,7 +118,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // describes a DIFFERENT time window under the same index. Resuming into it would fold analysis
             // into the wrong span and have Remux.concat place rendered frames at the wrong absolute time —
             // silently. Bumping this orphans that directory instead, and the 7-day sweep collects it.
-            "plan2",
+            // plan2 -> plan3: plan-v2 §5.4 dropped the gender vote, so an `an-NNN.json` from an older
+            // build holds only the tracks that voted FEMALE while a new segment holds every face. Mixing
+            // the two on a resume would leave half the film censored under the old semantics. The
+            // blurUnknownFaces input also left the hash in the same change, which moves the key anyway.
+            "plan3",
         )
     }
 
@@ -115,11 +142,15 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         // if that ever shows up as a storage complaint.
         runCatching { JobStore.sweep(applicationContext) }
 
-        // Phase 2: a long source is processed in segments, so an interruption costs one segment instead of
-        // the whole job. An empty plan means "short enough to run in one pass" and every shape below takes
-        // exactly the M1/M2 route it always did. Probed before Preflight because the plan changes how much
-        // scratch the job needs.
-        val durationMs = runCatching { FrameSampler.probe(applicationContext, inputUri).durationMs }.getOrDefault(0L)
+        // ONE probe for the whole job (`plan-v2` §5.9 S3). It used to run 4x for an unsegmented censor job
+        // and N+3 for a segmented one — every call opens a MediaExtractor AND a MediaMetadataRetriever
+        // over the source, i.e. 35-70 container opens per film. Every shape now takes [VideoMeta] as an
+        // argument. (FrameSampler.sample still probes once itself, for the rotation it hands ML Kit;
+        // that one is inside the sampler and stays there.)
+        // Probed before Preflight because the segment plan changes how much scratch the job needs.
+        val probed = runCatching { FrameSampler.probe(applicationContext, inputUri) }
+        val meta = probed.getOrNull()
+        val durationMs = meta?.durationMs ?: 0L
 
         // The fifth job shape: an "Audio only" download has no video track at all. Every other shape
         // assumes one — music removal *copies* it sample-for-sample — so this is detected rather than
@@ -151,7 +182,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         // --- Preflight (BEFORE any heavy setForeground work) ---
         // Runs for EVERY shape, not just music removal: opening the source is the only way to learn
         // it is DRM'd/undecodable, and that throw used to escape doWork with no message at all.
-        // tempCopies: combined writes a render temp AND a mux temp; the single-op shapes write one. The
+        // tempCopies: combined holds the render temp AND the published output at once (S5 removed the
+        // mux temp between them, but the two survivors still coexist); the single-op shapes write one. The
         // segmented shape holds every rendered segment (~1x source) AND the concat output at once.
         Preflight.check(
             applicationContext, inputUri,
@@ -171,14 +203,54 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 (if (audioPlan == ConcatAudio.TRANSCODE) durationMs / 1000 * 24_000 else 0L),
         )?.let { return fail(it) }
 
+        // Every shape but audio-only needs the probe's geometry to render. It used to be re-probed inside
+        // analyze/render, where a failure surfaced as an opaque throw after Preflight had already passed;
+        // now it is one nullable and one per-cause message, at the same moment as every other check.
+        if (meta == null && !audioOnly) {
+            return fail(Preflight.messageFor(probed.exceptionOrNull() ?: IllegalStateException("probe failed")))
+        }
+
         queued { it.copy(state = Queue.State.FILTERING) }
         return when {
             audioOnly -> runAudioOnly(inputUri)
-            segmented -> runSegmented(inputUri, plan, removeMusic, audioPlan, durationMs)
-            removeMusic && censorWomen -> runCombined(inputUri)
+            segmented -> runSegmented(inputUri, plan, removeMusic, audioPlan, durationMs, meta!!)
+            removeMusic && censorWomen -> runCombined(inputUri, meta!!)
             removeMusic -> runMusicOnly(inputUri, durationMs)
-            else -> runCensorOnly(inputUri) // M1's unsegmented path
+            else -> runCensorOnly(inputUri, meta!!) // M1's unsegmented path
         }
+    }
+
+    /**
+     * S1 (`plan-v2` §5.8): may the audio and video branches run at the same time?
+     *
+     * **Measured on a physical S23, 2026-08-03**, 643 s source, both schedules from a rebooted and cooled
+     * device: sequential 616.1 s vs concurrent 549.7 s = **1.12×**, and peak RSS is the SAME either way
+     * (1294 MB vs 1287 MB) because the separator's peak dominates and the video branch has already exited
+     * by the time it arrives. So this buys ~11 % of the wall for no memory.
+     *
+     * Beware the per-stage SOAK lines when comparing the two: under the concurrent schedule
+     * `stats.stage("separate")` only starts after `video()` returns, so that line is the tail alone and
+     * the overlapped audio work is billed into analyze/render. **Total wall is the only valid comparison.**
+     *
+     * The measured peak is 1.29 GB (separate) + 0.53 GB (segmented censor) ≈ 1.82 GB. That is fine on the
+     * 8 GB device it was measured on and **unproven on the 6 GB minimum spec**, and an earlier review
+     * rejected the whole idea over exactly that — so the sequential schedule stays reachable and is keyed
+     * on the device class, not on a flag. `totalMem` rather than `availMem`: available memory swings by
+     * hundreds of MB minute to minute, and this decision has to hold for three hours.
+     *
+     * An 8 GB device reports ~7.4-7.6 GB after carveouts and a 6 GB device ~5.5-5.7, so the threshold
+     * separates the two classes with room on both sides. Those figures are decimal GB; the constant is
+     * binary — see [CONCURRENT_MIN_TOTAL_MEM], which was 7 GiB and so excluded the very device class it
+     * was sized for. Thermal demotion is separate and happens at a chunk boundary — see
+     * `AudioPipeline.thermalYield`.
+     */
+    private fun concurrentBranches(): Boolean {
+        val am = applicationContext.getSystemService(ActivityManager::class.java)
+        val info = ActivityManager.MemoryInfo().also { runCatching { am?.getMemoryInfo(it) } }
+        val ok = am != null && !am.isLowRamDevice && info.totalMem >= CONCURRENT_MIN_TOTAL_MEM
+        Log.i(TAG, "schedule=${if (ok) "concurrent" else "sequential"} totalMem=${info.totalMem / (1 shl 20)}MB " +
+            "lowRam=${am?.isLowRamDevice}")
+        return ok
     }
 
     /** True when the source carries a video track; false for an "Audio only" download's `.m4a`. */
@@ -255,11 +327,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         removeMusic: Boolean,
         audioPlan: ConcatAudio,
         durationMs: Long,
+        meta: VideoMeta,
     ): Result {
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val audioTemp = File(workDir, "audio.m4a")
-        val muxTemp = File(workDir, "mux.mp4")
         // Progress bands: analyze 0..25, render 25..50, separate 50..90, concat 90..99 (combined);
         // without music removal analyze/render get the room the separator would have used.
         val renderBase = if (removeMusic) 25 else 40
@@ -282,21 +354,26 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 AudioPipeline.transcodeToAac(applicationContext, inputUri, part) { isStopped }
                 check(part.renameTo(audioTemp)) { "could not commit the transcoded audio" }
             }
-            val edl = analyzeSegments(inputUri, plan, durationMs, 0, renderBase)
-            renderSegments(inputUri, plan, edl, renderBase, renderSpan)
-
-            val audio = when {
-                removeMusic -> {
-                    val sep = stage(R.string.stage_separating)
-                    stats.stage("separate")
+            // S1: the separator starts at t=0 and the two video passes run alongside it. See [runCombined]
+            // for the reasoning and the failure/cancellation semantics — this is the same shape with the
+            // segmented passes and the segmented bands (video 0..50, audio 0..40, concat 90..99).
+            branches(
+                audio = if (!removeMusic) null else { demote ->
                     AudioPipeline.removeMusic(
                         applicationContext, inputUri, keepStems, audioTemp,
-                        onProgress = { p -> reportBand(sep, p, 50, 40) }, // 0..100 -> 50..90
+                        onProgress = { p -> reportAudio(p, 40) },
                         isCancelled = { isStopped },
                         jobDir = workDir,
+                        demoteWhile = demote,
                     )
-                    TrackSource.FromFile(audioTemp)
-                }
+                },
+            ) {
+                val edl = analyzeSegments(inputUri, plan, durationMs, 0, renderBase)
+                renderSegments(inputUri, plan, edl, meta, renderBase, renderSpan)
+            }
+
+            val audio = when {
+                removeMusic -> TrackSource.FromFile(audioTemp)
                 // The AAC written before analyze. Copied exactly as an AAC source's own track would be:
                 // one continuous track, so no seam can drift against the video.
                 audioPlan == ConcatAudio.TRANSCODE -> TrackSource.FromFile(audioTemp)
@@ -310,16 +387,17 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
             val joining = stage(R.string.stage_muxing)
             stats.stage("concat")
-            Remux.concat(
-                applicationContext,
-                parts = plan.map { ConcatPart(Checkpoint.segmentFile(workDir, it.index), it.startMs) },
-                audio = audio,
-                outFile = muxTemp,
-            ) { p -> reportBand(joining, p, 90, 9) } // 0..100 -> 90..99
-
             val displayName = outputName(inputUri)
-            stats.stage("publish")
-            val outputUri = publish(muxTemp, displayName)
+            // S5: the concat writes straight into the MediaStore row instead of into mux.mp4 that a
+            // separate pass then copied there. `publish` remains for the shapes with a real temp.
+            val outputUri = Publish.muxedVideo(applicationContext, displayName) { fd ->
+                Remux.concat(
+                    applicationContext,
+                    parts = plan.map { ConcatPart(Checkpoint.segmentFile(workDir, it.index), it.startMs) },
+                    audio = audio,
+                    out = MuxOut.ToFd(fd),
+                ) { p -> reportBand(joining, p, 90, 9) } // 0..100 -> 90..99
+            }
             JobStore.delete(applicationContext, jobKey) // succeeded: nothing left to resume
             return succeed(displayName, outputUri, inputUri)
         } catch (c: CancellationException) {
@@ -338,7 +416,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         } finally {
             stats.finish("shape=segmented segments=${plan.size}")
             runCatching { Infer.close() }
-            runCatching { if (muxTemp.exists()) muxTemp.delete() } // published or dead; never resumable
             // audioTemp is deliberately NOT deleted here. On success and on a user cancel JobStore.delete
             // takes the whole directory anyway; what is left is a resumable failure, and that is exactly
             // when both writers of this file want it kept — the transcode to skip redoing ~10 min of work,
@@ -444,37 +521,37 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 Log.i(TAG, "analyze seg-${seg.index}: resumed from checkpoint " +
                     "(${done.firingsMs.size} firings, ${done.edl.faceTracks.size} tracks)")
                 val pct = progressBase + (seg.index + 1) * progressSpan / plan.size
-                if (pct != lastPct) { lastPct = pct; report(stage, pct) }
+                if (pct != lastPct) { lastPct = pct; reportVideo(stage, pct) }
                 continue
             }
             val segFirings = ArrayList<Long>()
             // Fresh per segment: this is what bounds FaceTracker's growth by construction, on top of the
             // per-track eviction Phase 1 added.
-            val tracker = FaceTracker(applicationContext, blurUnknownFaces)
-            var index = 0
+            val tracker = FaceTracker()
             var tDetect = 0L; var tGate = 0L; val tWall = System.nanoTime()
             try {
                 FrameSampler.sample(
                     applicationContext, inputUri, fps = 10f, maxDim = 640,
                     startMs = seg.startMs, endMs = seg.endMs,
-                ) { bitmap, ptsMs ->
+                ) { image, gate, uprightW, uprightH, ptsMs ->
                     // perf-plan 1.3a: ML Kit works on its own executor while the gate runs here, so detect and
                     // gate now OVERLAP — tDetect times the await (the part that still blocks), and detect+gate
-                    // can exceed wall. Awaiting inside the callback is what keeps the bitmap alive for both.
-                    val task = tracker.detect(bitmap)
-                    if (index % 2 == 0) {
+                    // can exceed wall. Awaiting inside the callback is what keeps the sampler's ring buffers
+                    // alive for both. `gate != null` IS the 5 fps cadence: the sampler only fills the tensor on
+                    // the frames it was told the gate would use.
+                    val task = tracker.detect(image)
+                    if (gate != null) {
                         val t1 = System.nanoTime()
-                        val probs = Infer.nsfw(applicationContext, bitmap)
+                        val probs = Infer.nsfw(applicationContext, gate)
                         tGate += System.nanoTime() - t1
                         if (NsfwGate.fires(probs, strictness)) segFirings += ptsMs
                     }
                     val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
-                    tracker.onFaces(faces, bitmap, ptsMs)
-                    index++
+                    tracker.onFaces(faces, uprightW, uprightH, ptsMs)
                     val within = ((ptsMs - seg.startMs).toFloat() / (seg.endMs - seg.startMs).coerceAtLeast(1))
                     val pct = (progressBase + ((seg.index + within.coerceIn(0f, 1f)) * progressSpan / plan.size).toInt())
                         .coerceIn(progressBase, progressBase + progressSpan)
-                    if (pct != lastPct) { lastPct = pct; report(stage, pct) }
+                    if (pct != lastPct) { lastPct = pct; reportVideo(stage, pct) }
                 }
                 // perf-plan 1.2, re-read after 1.3b: decode+convert now runs alongside this callback, so wall
                 // is max(producer, consumer) and no subtraction recovers the convert. These two are the
@@ -486,18 +563,21 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 Checkpoint.writeAnalysis(workDir, seg.index, segFirings, Edl(emptyList(), segTracks))
                 firings += segFirings
                 faceTracks += segTracks
+                // plan-v2 §4.6: `gate=` is now session.run alone — its preprocessing moved into the
+                // sampler and is logged as `gateFill=` on the FrameSampler line just above this one.
                 Log.i(TAG, "analyze seg-${seg.index} [${seg.startMs}..${seg.endMs}): " +
-                    "firings=${segFirings.size} censorTracks=${segTracks.size} ${tracker.retention()} " +
+                    "firings=${segFirings.size} faceTracks=${segTracks.size} ${tracker.retention()} " +
                     "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms")
             } finally {
                 runCatching { tracker.closeDetector() }
             }
         }
         // ONE hysteresis pass over the whole timeline — the reason firings are accumulated rather than
-        // turned into intervals per segment.
-        val intervals = intervalsFor(firings, durationMs)
+        // turned into intervals per segment. The 7.4 overflow promotion also runs once, here, for the same
+        // reason: it needs every segment's tracks to know how many faces overlap across a seam.
+        val intervals = intervalsFor(firings, durationMs) + overflowSpans(faceTracks)
         Log.i(TAG, "pass1 segmented: gateFirings=${firings.size} intervalCount=${intervals.size} " +
-            "censorFaceTracks=${faceTracks.size}")
+            "faceTracks=${faceTracks.size}")
         return Edl(intervals, faceTracks.sortedBy { it.startMs })
     }
 
@@ -506,25 +586,32 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         inputUri: Uri,
         plan: List<RenderSegment>,
         edl: Edl,
+        meta: VideoMeta,
         progressBase: Int,
         progressSpan: Int,
     ) {
         val stage = stage(R.string.stage_rendering)
         stats.stage("render")
-        val meta = FrameSampler.probe(applicationContext, inputUri)
+        // ONE bitrate for the whole job (`plan-v2` §5.9 S3). Hoisted out of the loop because
+        // resolveBitrate opens a MediaExtractor and sometimes a MediaMetadataRetriever — 31 container
+        // opens on a film — and because Remux.concat can only write one track format, so every segment
+        // MUST be encoded identically. Resolving it once makes that an invariant rather than a
+        // coincidence of every call answering the same number.
+        val bitrate = RenderPipeline.resolveBitrate(applicationContext, inputUri)
         for (seg in plan) {
             if (Checkpoint.isRendered(workDir, seg.index)) {
                 Log.i(TAG, "render seg-${seg.index}: already done, skipping")
-                report(stage, progressBase + (seg.index + 1) * progressSpan / plan.size)
+                reportVideo(stage, progressBase + (seg.index + 1) * progressSpan / plan.size)
                 continue
             }
             // Export to `.part` and rename, so a killed export never leaves a file that looks complete.
             val part = File(workDir, "seg-%03d.mp4.part".format(seg.index))
             runCatching { part.delete() }
             RenderPipeline.renderCensor(
-                applicationContext, inputUri, part, edl, blurAmount, grayscale, meta, segment = seg,
+                applicationContext, inputUri, part, edl, blurAmount, grayscale, meta,
+                segment = seg, bitrate = bitrate,
             ) { p ->
-                reportAsync(stage, progressBase + ((seg.index * 100 + p) * progressSpan / (plan.size * 100)))
+                reportVideoAsync(stage, progressBase + ((seg.index * 100 + p) * progressSpan / (plan.size * 100)))
             }
             check(part.renameTo(Checkpoint.segmentFile(workDir, seg.index))) {
                 "could not commit segment ${seg.index}"
@@ -534,14 +621,16 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     }
 
     // ---- Censor-only: M1's shape, extracted into a function ----
-    private suspend fun runCensorOnly(inputUri: Uri): Result {
+    private suspend fun runCensorOnly(inputUri: Uri, meta: VideoMeta): Result {
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val tempFile = File(workDir, "render.mp4")
-        val faceTracker = FaceTracker(applicationContext, blurUnknownFaces)
+        val faceTracker = FaceTracker()
         try {
-            val edl = analyze(inputUri, faceTracker)
-            render(inputUri, tempFile, edl)
+            val edl = analyze(inputUri, faceTracker, meta)
+            // No removeAudio: this file IS the published output, so Transformer transmuxing the source
+            // audio alongside is exactly what is wanted (the M1 no-audio-re-encode fast path).
+            render(inputUri, tempFile, edl, meta)
             val displayName = outputName(inputUri)
             stats.stage("publish")
             val outputUri = publish(tempFile, displayName)
@@ -564,7 +653,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         setForeground(foregroundInfo(stage(R.string.stage_separating), 1))
 
         val audioTemp = File(workDir, "audio.m4a")
-        val muxTemp = File(workDir, "mux.mp4")
         // There is no video pass to segment here, so "long" only buys the resumable separator. Same
         // 30-minute threshold as everything else, so the product has one notion of a long job.
         val resumable = durationMs >= Eta.CONFIRM_THRESHOLD_MS
@@ -580,12 +668,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
             val mux = stage(R.string.stage_muxing)
             stats.stage("mux")
-            Remux.mux(applicationContext, TrackSource.FromUri(inputUri), audioTemp, muxTemp,
-                onProgress = { p -> reportBand(mux, p, 93, 6) })   // 0..100 -> 93..99
-
             val displayName = outputName(inputUri)
-            stats.stage("publish")
-            val outputUri = publish(muxTemp, displayName)
+            val outputUri = Publish.muxedVideo(applicationContext, displayName) { fd ->
+                Remux.mux(applicationContext, TrackSource.FromUri(inputUri), audioTemp, MuxOut.ToFd(fd),
+                    onProgress = { p -> reportBand(mux, p, 93, 6) })   // 0..100 -> 93..99
+            }
             JobStore.delete(applicationContext, jobKey)
             return succeed(displayName, outputUri, inputUri)
         } catch (c: CancellationException) {
@@ -599,38 +686,42 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             return fail(Preflight.messageFor(t))
         } finally {
             stats.finish("shape=music resumable=$resumable")
-            runCatching { if (muxTemp.exists()) muxTemp.delete() }
         }
     }
 
     // ---- Combined: analyze 0..25, render 25..50, separate 50..93, mux 93..99 ----
-    private suspend fun runCombined(inputUri: Uri): Result {
+    private suspend fun runCombined(inputUri: Uri, meta: VideoMeta): Result {
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val renderTemp = File(workDir, "render.mp4")
         val audioTemp = File(workDir, "audio.m4a")
-        val muxTemp = File(workDir, "mux.mp4")
-        val faceTracker = FaceTracker(applicationContext, blurUnknownFaces)
+        val faceTracker = FaceTracker()
         try {
-            val edl = analyze(inputUri, faceTracker, progressBase = 0, progressSpan = 25)
-            render(inputUri, renderTemp, edl, progressBase = 25, progressSpan = 25)
-
-            val sep = stage(R.string.stage_separating)
-            stats.stage("separate")
-            AudioPipeline.removeMusic(
-                applicationContext, inputUri, keepStems, audioTemp,
-                onProgress = { p -> reportBand(sep, p, 50, 43) },  // 0..100 -> 50..93
-                isCancelled = { isStopped },
-            )
+            branches(
+                audio = { demote ->
+                    AudioPipeline.removeMusic(
+                        applicationContext, inputUri, keepStems, audioTemp,
+                        onProgress = { p -> reportAudio(p, 43) },
+                        isCancelled = { isStopped },
+                        demoteWhile = demote,
+                    )
+                },
+            ) {
+                val edl = analyze(inputUri, faceTracker, meta, progressBase = 0, progressSpan = 25)
+                // S2 (`plan-v2` §5.9): render WITHOUT audio. Transformer used to write the source audio
+                // into render.mp4 and Remux.mux below reads only the video track back out of it — a wasted
+                // transmux for an AAC source, and for Opus/AC-3 (which media3 cannot transmux) a full
+                // decode + AAC encode that is thrown away, measured 12.9 s per 193 s track.
+                render(inputUri, renderTemp, edl, meta, removeAudio = true, progressBase = 25, progressSpan = 25)
+            }
 
             val mux = stage(R.string.stage_muxing)
             stats.stage("mux")
-            Remux.mux(applicationContext, TrackSource.FromFile(renderTemp), audioTemp, muxTemp,
-                onProgress = { p -> reportBand(mux, p, 93, 6) })   // 0..100 -> 93..99
-
             val displayName = outputName(inputUri)
-            stats.stage("publish")
-            val outputUri = publish(muxTemp, displayName)
+            val outputUri = Publish.muxedVideo(applicationContext, displayName) { fd ->
+                Remux.mux(applicationContext, TrackSource.FromFile(renderTemp), audioTemp, MuxOut.ToFd(fd),
+                    onProgress = { p -> reportBand(mux, p, 93, 6) })   // 0..100 -> 93..99
+            }
             return succeed(displayName, outputUri, inputUri)
         } catch (c: CancellationException) {
             throw c
@@ -642,6 +733,58 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             runCatching { faceTracker.closeDetector() }
             runCatching { Infer.close() }
             runCatching { JobStore.delete(applicationContext, jobKey) }
+        }
+    }
+
+    /**
+     * S1 (`plan-v2` §5.8): run the audio branch at the same time as analyze → render.
+     *
+     * **The reason is not the obvious one.** Render does use different silicon, but render is 4 % of the
+     * wall. The win is that `separate` holds only 6 of 8 cores for 55-65 % of the job **and cannot use
+     * more** — 8 intra-op threads measured SLOWER than 6 (2244 vs 2136 ms/chunk) because every barrier
+     * waits on the S23's little cores. So two cores sit idle for one to three hours. Ceiling is
+     * `(2/8) x separate`; realistically 15-30 min, because the spare cores are the weak ones, which is
+     * exactly why they are spare.
+     *
+     * **Structure.** [audio] is the `async` child and [video] runs in this coroutine, which is what gives
+     * the required failure semantics for free:
+     * - the video body throws -> `coroutineScope` cancels the audio child and rethrows the body's own
+     *   exception;
+     * - the audio child throws -> the scope is cancelled, the body's next suspension point sees a
+     *   CancellationException, and `coroutineScope` rethrows the CHILD's ORIGINAL cause, not that
+     *   cancellation. Either way `Preflight.messageFor` sees the real failure.
+     * `videoDone` is set in a `finally` rather than after [video] so a failing video branch still releases
+     * an audio branch parked in the thermal demotion below — the scope's cancellation cannot interrupt a
+     * blocking sleep, only that flag can.
+     *
+     * The two branches checkpoint independently, so the failure model itself does not change.
+     */
+    private suspend fun branches(
+        audio: (suspend (demoteWhile: () -> Boolean) -> Unit)?,
+        video: suspend () -> Unit,
+    ) {
+        stageLabel = stage(R.string.stage_analyzing)
+        if (audio == null) { video(); return }
+        if (!concurrentBranches()) {
+            video()
+            stageLabel = stage(R.string.stage_separating)
+            stats.stage("separate")
+            audio { false } // nothing to demote from: this IS the sequential schedule
+            return
+        }
+        coroutineScope {
+            val separating = async { audio { !videoDone } }
+            try {
+                video()
+            } finally {
+                videoDone = true
+            }
+            // From here only the audio branch is left, so the stage the user sees is honest again. The
+            // SOAK line for "separate" measures only this tail; the overlapped part is billed to
+            // analyze/render, which is the one thing a single-threaded stage timer cannot express.
+            stageLabel = stage(R.string.stage_separating)
+            stats.stage("separate")
+            separating.await()
         }
     }
 
@@ -662,54 +805,95 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         reportAsync(stage, (base + sub * span / 100).coerceIn(0, 100))
 
     /**
+     * S1's progress split. Under the concurrent schedule both branches post from different threads, so
+     * neither may post an absolute overall percent — one would stomp the other and the bar would jump
+     * backwards. Each owns a SHARE instead and what goes out is their sum, which is monotonic because
+     * both shares are. The shares are the bands that were already documented: video 0..50 (analyze
+     * 0..25, render 25..50), audio the remainder of its shape's band.
+     *
+     * Under the sequential schedule this is arithmetically identical to the old absolute posts — the
+     * audio branch starts with `videoPct` already at 50 — so both shapes report the same numbers either
+     * way, and the shapes with only one branch (censor-only, music-only) leave the other share at 0.
+     */
+    @Volatile private var videoPct = 0
+
+    @Volatile private var audioPct = 0
+
+    /** The stage the notification names: the video branch's, until [branches] hands it to the audio one. */
+    @Volatile private var stageLabel: String? = null
+
+    /** Set the moment the video branch stops, however it stopped. See [branches]. */
+    @Volatile private var videoDone = false
+
+    private suspend fun reportVideo(stage: String, pct: Int) {
+        stageLabel = stage
+        videoPct = pct
+        report(stage, pct + audioPct)
+    }
+
+    private fun reportVideoAsync(stage: String, pct: Int) {
+        stageLabel = stage
+        videoPct = pct
+        reportAsync(stage, pct + audioPct)
+    }
+
+    /** [sub] is the separator's own 0..100 within a [span]-wide share of the bar. */
+    private fun reportAudio(sub: Int, span: Int) {
+        audioPct = sub * span / 100
+        reportAsync(stageLabel ?: stage(R.string.stage_separating), videoPct + audioPct)
+    }
+
+    /**
      * Pass 1: sample once, run faces and the gate on every sampled frame, build the EDL. [pct]
      * becomes `progressBase + fraction*progressSpan`; the defaults reproduce the M1 0..50 band exactly.
      */
     private suspend fun analyze(
-        uri: Uri, faceTracker: FaceTracker,
+        uri: Uri, faceTracker: FaceTracker, meta: VideoMeta,
         progressBase: Int = 0, progressSpan: Int = 50,
     ): Edl {
-        val durationMs = FrameSampler.probe(applicationContext, uri).durationMs.coerceAtLeast(1L)
+        val durationMs = meta.durationMs
+        // Correctness item 7.2 lives in [intervalsFor]; this one is only the progress denominator, where a
+        // zero would divide by zero and an unknown duration can honestly do nothing better than pin the
+        // bar at its band start until the pass ends.
+        val progressDen = durationMs.coerceAtLeast(1L)
         val stage = stage(R.string.stage_analyzing)
         stats.stage("analyze")
         val firings = ArrayList<Long>()
         var index = 0
         var lastPct = -1
         var tDetect = 0L; var tGate = 0L; val tWall = System.nanoTime()
-        FrameSampler.sample(applicationContext, uri, fps = 10f, maxDim = 640) { bitmap, ptsMs ->
+        FrameSampler.sample(applicationContext, uri, fps = 10f, maxDim = 640) { image, gate, uprightW, uprightH, ptsMs ->
             // Same overlapped sequence as analyzeSegments — see the comment there (perf-plan 1.3a).
-            val task = faceTracker.detect(bitmap)
-            if (index % 2 == 0) {
+            val task = faceTracker.detect(image)
+            if (gate != null) {
                 val t1 = System.nanoTime()
-                val probs = Infer.nsfw(applicationContext, bitmap)
+                val probs = Infer.nsfw(applicationContext, gate)
                 tGate += System.nanoTime() - t1
                 if (NsfwGate.fires(probs, strictness)) firings += ptsMs
             }
             val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
-            faceTracker.onFaces(faces, bitmap, ptsMs)
+            faceTracker.onFaces(faces, uprightW, uprightH, ptsMs)
             index++
-            val pct = (progressBase + (ptsMs.toFloat() / durationMs) * progressSpan)
+            val pct = (progressBase + (ptsMs.toFloat() / progressDen) * progressSpan)
                 .toInt().coerceIn(progressBase, progressBase + progressSpan)
-            if (pct != lastPct) { lastPct = pct; report(stage, pct) }
+            if (pct != lastPct) { lastPct = pct; reportVideo(stage, pct) }
             // Retention, live. On a feature-length film the end-of-pass numbers only arrive 70 minutes
             // in, and never at all if the job is cancelled — this is the line that shows the per-track
-            // eviction actually holding a flat crop count instead of climbing toward the old ~2 900.
+            // eviction actually holding a flat live-track count, and (plan-v2 §7.1) how many detections
+            // ML Kit refused a tracking id, which has never been measured.
             // Every 1 200 sampled frames = every 2 min of source at 10 fps.
             if (index % 1_200 == 0) Log.i(TAG, "pass1 live at=${ptsMs}ms ${faceTracker.retention()}")
         }
-        val wallMs = (System.nanoTime() - tWall) / 1_000_000 // sampling only; the vote below is its own stage
+        val wallMs = (System.nanoTime() - tWall) / 1_000_000
 
-        val intervals = intervalsFor(firings, durationMs)
-        // wall #3 of long-film-plan.md. Tracks now vote and recycle during the pass, so "vote" only
-        // covers the handful still live at the end — it is kept as its own stage because the 2.7 min
-        // this took on the 155-min soak is the before-number this Phase 1 item exists to move.
-        stats.stage("vote")
         val faceTracks = faceTracker.finish()
+        val intervals = intervalsFor(firings, durationMs) + overflowSpans(faceTracks)
         // Counts on their own line: a feature-length film produces hundreds of intervals, and logcat
         // truncates a message at ~4 kB — on the first 155-min soak that silently ate the face counts
         // off the end of the combined line, which were the whole point of logging it.
+        // plan-v2 §4.6: `gate=` is session.run alone now; its preprocessing is the sampler's `gateFill=`.
         Log.i(TAG, "pass1: gateFirings=${firings.size} intervalCount=${intervals.size} " +
-            "censorFaceTracks=${faceTracks.size} ${faceTracker.retention()} " +
+            "faceTracks=${faceTracks.size} ${faceTracker.retention()} " +
             "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms")
         Log.i(TAG, "pass1 intervals=$intervals")
         return Edl(intervals, faceTracks)
@@ -720,27 +904,74 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
      * `progressBase + p*progressSpan/100`. The defaults reproduce the M1 50..100 band exactly.
      */
     private suspend fun render(
-        uri: Uri, tempFile: File, edl: Edl,
+        uri: Uri, tempFile: File, edl: Edl, meta: VideoMeta,
+        removeAudio: Boolean = false,
         progressBase: Int = 50, progressSpan: Int = 50,
     ) {
         val stage = stage(R.string.stage_rendering)
         stats.stage("render")
-        report(stage, progressBase)
-        val meta = FrameSampler.probe(applicationContext, uri)
-        RenderPipeline.renderCensor(applicationContext, uri, tempFile, edl, blurAmount, grayscale, meta) { p ->
-            reportBand(stage, p, progressBase, progressSpan)
+        reportVideo(stage, progressBase)
+        RenderPipeline.renderCensor(
+            applicationContext, uri, tempFile, edl, blurAmount, grayscale, meta, removeAudio = removeAudio,
+        ) { p ->
+            reportVideoAsync(stage, progressBase + p * progressSpan / 100)
         }
     }
 
     /**
      * The gate's hysteresis intervals over the whole timeline, plus the debug E2E hook: `force_intervals`
      * adds full-frame spans so an SFW test asset still exercises pass 2's censoring.
+     *
+     * **Correctness item 7.2.** [NsfwGate.intervals] clamps every span into `[0, durationMs]`, so a source
+     * whose duration the probe could not read — it used to arrive here as `coerceAtLeast(1)` — collapsed
+     * every censor interval to `[0, 1 ms]`: the gate fires, the EDL says it fired, and NOTHING is
+     * censored. An unknown duration must mean "do not clamp the far end", not "clamp it to nothing". The
+     * mapping is here rather than at the two call sites so no third one can reintroduce it.
      */
     private fun intervalsFor(firings: List<Long>, durationMs: Long): List<LongRange> {
-        val intervals = NsfwGate.intervals(firings, durationMs)
-        if (!BuildConfig.DEBUG) return intervals
+        val intervals = NsfwGate.intervals(firings, if (durationMs > 0L) durationMs else Long.MAX_VALUE)
+        if (!BuildConfig.DEBUG_HOOKS) return intervals
         val forced = parseForceIntervals(inputData.getString(KEY_FORCE_INTERVALS))
         return if (forced.isEmpty()) intervals else intervals + forced
+    }
+
+    /**
+     * Correctness item 7.4: spans where more faces are on screen at once than the renderer can composite.
+     *
+     * `CensorEffect` blurs at most [RENDERER_MAX_REGIONS] rects per frame and silently **drops the
+     * smallest** past that — it fails OPEN, on the frames with the most people in them. Promoting those
+     * moments to whole-frame censor intervals fixes it without touching the shader: `Edl.regionsAt`
+     * returns empty under full-frame precedence, so the renderer never sees an overflowing frame at all.
+     * That is the seam `docs/plan-whole-frame-blur.md` §1 already picked for exactly this conversion, and
+     * it lands in the EDL, so a checkpoint resume and a QA diff both reproduce the decision.
+     *
+     * Counted by a sweep over track lifetimes, which OVER-counts slightly against `regionsAt` (a track
+     * with no keyframe near `t` contributes nothing there). Over-counting censors a little more than
+     * strictly needed, which is the safe direction for this bug.
+     */
+    private fun overflowSpans(tracks: List<FaceTrackEdl>): List<LongRange> {
+        if (tracks.size <= RENDERER_MAX_REGIONS) return emptyList()
+        // (time, delta); a track is active over the INCLUSIVE [startMs, endMs] regionsAt tests, so its
+        // end event lands at endMs + 1.
+        val events = ArrayList<Pair<Long, Int>>(tracks.size * 2)
+        for (t in tracks) { events.add(t.startMs to 1); events.add((t.endMs + 1) to -1) }
+        events.sortBy { it.first }
+        val out = ArrayList<LongRange>()
+        var active = 0
+        var from = -1L
+        var i = 0
+        while (i < events.size) {
+            // Every delta at one instant is applied before the count is read: evaluating mid-instant would
+            // invent a one-ms gap wherever one track ends exactly as another begins.
+            val t = events[i].first
+            while (i < events.size && events[i].first == t) { active += events[i].second; i++ }
+            if (active > RENDERER_MAX_REGIONS) { if (from < 0L) from = t } else if (from >= 0L) {
+                out.add(from..(t - 1))
+                from = -1L
+            }
+        }
+        if (out.isNotEmpty()) Log.w(TAG, "7.4: ${out.size} spans over $RENDERER_MAX_REGIONS faces — whole-frame there")
+        return out
     }
 
     /** Copy the temp into `Movies/Naqi` and return its uri — see [Publish] for the cancellation contract. */
@@ -804,12 +1035,22 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
     companion object {
         const val KEY_REMOVE_MUSIC = "remove_music"
+
+        /**
+         * The censor op. The literal is PERSISTED — WorkManager input data on enqueued jobs, and
+         * `Prefs`' SharedPreferences key — so it keeps the "women" spelling even though the feature is
+         * now "censor faces" (plan-v2 §5.4). Renaming the wire string would silently re-default every
+         * queued job and every returning user's toggle.
+         */
         const val KEY_CENSOR_WOMEN = "censor_women"
         const val KEY_INPUT_URI = "input_uri"
         const val KEY_STRICTNESS = "strictness"
         const val KEY_BLUR_AMOUNT = "blur_amount"
         const val KEY_GRAYSCALE = "grayscale"
-        const val KEY_BLUR_UNKNOWN = "blur_unknown_faces"
+
+        // KEY_BLUR_UNKNOWN ("blur_unknown_faces") was deleted with the gender vote (plan-v2 §5.4)
+        // along with FilterOps.blurUnknownFaces. Unlike KEY_CENSOR_WOMEN above, the wire string did NOT
+        // have to be kept: nothing reads it, so an older job's input Data just carries an ignored key.
         const val KEY_KEEP_STEMS = "keep_stems"
         const val KEY_FORCE_INTERVALS = "force_intervals"
 
@@ -839,6 +1080,34 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         const val KEY_QUEUE_ID = "queue_id"
 
         private const val TAG = "FilterWorker"
+
+        /**
+         * What `blurAmount = 0 && !grayscale` becomes (item 7.3). `CensorEffect` derives
+         * `sigma = blurAmount/100 * 40 * (min(w,h)/1080)`, so this is 10 px at 1080p and 4.4 px at 480p —
+         * unambiguously a blur at both, and far enough below the 60 default that nobody who picked a
+         * value on purpose is affected. Only the exact no-op combination reaches it.
+         */
+        private const val MIN_EFFECTIVE_BLUR = 25
+
+        /**
+         * Rects `CensorEffect` can composite in one frame — **must match its private `MAX_REGIONS`**
+         * (`render/CensorEffect.kt:29`), duplicated because it is private there and `render/` is not this
+         * change's to edit. The failure mode of drift is benign in one direction only: if the shader grows
+         * and this does not, [overflowSpans] promotes a few moments to whole-frame that did not need it.
+         * If this grows and the shader does not, 7.4 comes back.
+         */
+        private const val RENDERER_MAX_REGIONS = 8
+
+        /**
+         * Device total RAM below which S1's two branches run sequentially — see [concurrentBranches].
+         *
+         * 6.5 GiB, and the halves matter. This was 7 GiB, written against a carveout figure quoted in
+         * decimal GB ("an 8 GB device reports ~7.4-7.6"): 7.4 GB is 6.91 GiB, so the bar sat *above* the
+         * 8 GB class and S1 fell back to sequential on every device. Measured `totalMem` on the S23 it
+         * was designed for is **7072 MiB**. The 6 GB class reports ~5.5-5.7 GB = ~5.2-5.3 GiB, so 6.5 GiB
+         * still separates the two with ~570 MiB of room on the near side. Concurrent peak is ~1.82 GB.
+         */
+        private const val CONCURRENT_MIN_TOTAL_MEM = 6_656L * 1024 * 1024 // 6.5 GiB
 
         /** Parse "startMs-endMs,startMs-endMs"; bad segments are skipped. */
         private fun parseForceIntervals(spec: String?): List<LongRange> {

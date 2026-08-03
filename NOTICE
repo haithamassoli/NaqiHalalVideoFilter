@@ -13,21 +13,13 @@ GPL-3.0. Before the download feature the repository carried no licence at all.
 UNRESOLVED LICENCE ISSUE — READ BEFORE ANY PUBLIC RELEASE
 ======================================================
 
-  NudeNet v3 320n  (app/src/main/assets/models/nudenet_320n.onnx)
-  Source:  github.com/notAI-tech/NudeNet, v3.4-weights release, used unmodified
-  Licence: AGPL-3.0
-
-  The AGPL's network-use clause is not triggered by an app that performs all
-  inference on the user's own device, but the copyleft obligation itself is
-  real and is stricter than the GPL-3.0 this project now carries.
-
-  This is a PRE-EXISTING issue, flagged since M0 (docs/m0-spikes.md,
-  scripts/fetch-models.sh, docs/tasks.md). It must be resolved, the model must
-  be replaced, or the terms must be knowingly accepted, BEFORE the app is
-  distributed. Shipping is blocked on it, not on this file.
-
   The NSFW gate (nsfw_mnv2_140_f32.onnx, from GantMan/nsfw_model 1.2.0) is
-  marked NOASSERTION upstream and needs the same review.
+  marked NOASSERTION upstream and still needs review before distribution.
+
+  RESOLVED: NudeNet v3 320n (AGPL-3.0) has been removed from the app. It
+  powered the per-face gender vote; face censoring no longer classifies, so
+  the model, its download and its bundled artifact are all gone. The AGPL
+  obligation that blocked shipping went with it.
 
 ======================================================
 THIRD-PARTY COMPONENTS
@@ -64,9 +56,6 @@ ONNX Runtime — github.com/microsoft/onnxruntime
 Demucs (htdemucs) — github.com/facebookresearch/demucs
   MIT. Weights re-exported to ONNX at a 2.6 s segment via
   github.com/sevagh/demucs.onnx. Used for music removal.
-
-NudeNet v3 320n — github.com/notAI-tech/NudeNet
-  AGPL-3.0. See the unresolved-licence section above.
 
 nsfw_model (MobileNetV2 1.4-224) — github.com/GantMan/nsfw_model
   NOASSERTION upstream. See the unresolved-licence section above.

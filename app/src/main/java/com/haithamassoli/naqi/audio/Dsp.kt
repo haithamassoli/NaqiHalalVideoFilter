@@ -11,6 +11,17 @@ import kotlin.math.sqrt
  * cached per size (only 64 and 4096 occur in M2); the sample data stays f32. [inverse] folds in the
  * `1/n` scaling exactly once — do NOT add a second `1/n` anywhere downstream (dsp-spec.md §8c gotcha 1).
  *
+ * **The double twiddles and the per-butterfly promotion below stay, deliberately.** `plan-v2` §5.9 (A5)
+ * proposes float tables and float butterflies to delete the conversions; the gate that change has to
+ * clear is [DspTest], and DspTest has no room for it. A 4096-point radix-2 carried entirely in f32 lands
+ * around 1e-4 relative error against ~1e-7 with the tables in double — and FOUR independent assertions
+ * sit exactly AT 1e-4: `fftInverseRoundTrips` (atol 1e-4 on unit-magnitude data at n = 4096), both
+ * golden comparisons (atol 1e-4 against the numpy f64 reference), and `fullSizeInteriorRoundTripHighSnr`
+ * (> 80 dB interior SNR, and 80 dB *is* 1e-4). That is 1× of headroom, not the ~100× a numerics change
+ * needs before it can be taken sight-unseen, and a tolerance is a gate, not a dial. The other half of
+ * A5 — [Stft.forward]'s reused scratch — is taken, and is the bulk of the win. Revisit this half only
+ * with a measured golden diff in hand, never by loosening the tolerance.
+ *
  * Contract: driven by one [Stft] on one thread at a time (thread-confined, like [com.haithamassoli.naqi.ml.Infer]).
  */
 object Fft {
@@ -49,6 +60,7 @@ object Fft {
                     val wi = if (inverse) -sinT[idx] else sinT[idx]
                     val a = base + k
                     val b = a + half
+                    // Promotion kept — see the accuracy arithmetic in this object's KDoc (A5, declined half).
                     val vr0 = re[b].toDouble()
                     val vi0 = im[b].toDouble()
                     val vr = vr0 * wr - vi0 * wi
@@ -128,13 +140,21 @@ class Stft(val nfft: Int = 4096, val hop: Int = 1024) {
      * Planar segment (`ch0`/`ch1`, each length `T`) -> CaC spec `[4][bins][le]` flattened C-order:
      * channel-major, real-before-imag `[ch0.re, ch0.im, ch1.re, ch1.im]`, `1/sqrt(nfft)`-normalized,
      * Nyquist bin dropped, frames sliced `[2 : 2+le]`.
+     *
+     * **The returned array is this instance's per-`T` scratch, NOT a fresh allocation — consume it before
+     * the next [forward] on the same instance.** That is a real contract change (a pure function became a
+     * reused-buffer one) and it is worth it: this used to be `FloatArray(4 * bins * le)` per call, 3.67 MB
+     * at the production size, ~17.5 GB of large-object churn over a feature film (`plan-v2` §5.9, A5).
+     * Safe because every one of the `4 * bins * le` cells is overwritten on every call — both channels,
+     * all bins, all kept frames — so nothing stale can survive, and because the sole production consumer
+     * ([DemucsSeparator.inferChunk]) hands it straight to `infer`, whose first act is to copy it into a
+     * direct buffer. The value is dead well before this method can run again.
      */
     fun forward(ch0: FloatArray, ch1: FloatArray, T: Int): FloatArray {
         val s = scratch(T)
-        val cac = FloatArray(4 * bins * s.le)
-        forwardChannel(ch0, reChan = 0, s, cac)
-        forwardChannel(ch1, reChan = 2, s, cac)
-        return cac
+        forwardChannel(ch0, reChan = 0, s, s.cac)
+        forwardChannel(ch1, reChan = 2, s, s.cac)
+        return s.cac
     }
 
     /**
@@ -229,6 +249,7 @@ class Stft(val nfft: Int = 4096, val hop: Int = 1024) {
         val frameIm = FloatArray(nfft)
         val ola = DoubleArray(paddedSeg + nfft)
         val env = DoubleArray(paddedSeg + nfft)
+        val cac = FloatArray(4 * bins * le)                    // [forward]'s output, reused — see its KDoc
 
         init {
             for (f in 0 until nframes) {                       // window sum-of-squares over ALL frames

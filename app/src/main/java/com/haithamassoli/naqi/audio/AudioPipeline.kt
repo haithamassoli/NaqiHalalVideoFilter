@@ -15,14 +15,16 @@ import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
  * M2 music-removal entry point — the single seam `work/` sees for the audio side. Composes the
- * audio package (AudioDecoder → DemucsSeparator ← HtdemucsSession → AacWriter) into a two-pass
- * decode: a stats pass computes the whole-track mono-mix mean/std the demucs driver needs, then a
- * streaming pass feeds interleaved f32 stereo 44.1k into the chunked overlap-add separator, whose
- * kept-stem output is resampled and AAC-encoded into [File] tempM4a.
+ * audio package (AudioDecoder → DemucsSeparator ← HtdemucsSession → AacWriter, gated by MusicGate)
+ * into a sampled stats pass for the mono-mix mean/std the demucs driver needs, then a streaming pass
+ * that feeds interleaved f32 stereo 44.1k into the chunked overlap-add separator, whose kept-stem
+ * output is AAC-encoded into [File] tempM4a. 44.1 kHz end to end since A6 — nothing in this package
+ * resamples on egress.
  *
  * Progress is chunk-count-driven (the natural unit — htdemucs chunks dominate wall time): [onProgress]
  * reports 2 after the stats pass, 2..98 across separation chunks, 100 at the end. [isCancelled] is
@@ -33,13 +35,22 @@ object AudioPipeline {
 
     private const val TAG = "AudioPipeline"
 
+    /** ~1 s at 44.1 kHz. Container durations are routinely loose by a few hundred ms; a second is not. */
+    private const val LENGTH_WARN_FRAMES = 44_100L
+
     /**
      * PRD "Thermal: chunked work yields between segments; no hard fail on throttle, just slower."
      * Called between htdemucs chunks — the only natural seam, since one chunk is an uninterruptible
      * ONNX run. Blocking sleep is the point: the CPU must go idle for the SoC to shed heat, and this
      * thread has nothing else to do.
+     *
+     * [demoteWhile] is S1's thermal demotion (`plan-v2` §5.8). Once a video branch runs alongside this
+     * one, a 2 s yield no longer idles the SoC — the sibling simply takes the cores back, so the pause
+     * buys nothing and the device keeps heating. At SEVERE the separator therefore blocks at this chunk
+     * boundary until the caller says the sibling is done, which IS the demotion to sequential the plan
+     * asks for, using the seam that already exists rather than a new one.
      */
-    private fun thermalYield(context: Context, isCancelled: () -> Boolean) {
+    private fun thermalYield(context: Context, isCancelled: () -> Boolean, demoteWhile: () -> Boolean) {
         if (isCancelled()) return
         val pm = context.getSystemService(PowerManager::class.java) ?: return
         val pause = when (pm.currentThermalStatus) {
@@ -47,14 +58,57 @@ object AudioPipeline {
             PowerManager.THERMAL_STATUS_MODERATE -> 500L
             else -> 2_000L // SEVERE and above: back off hard rather than let the system kill us
         }
+        if (pm.currentThermalStatus >= PowerManager.THERMAL_STATUS_SEVERE && demoteWhile()) {
+            Log.w(TAG, "thermal status ${pm.currentThermalStatus} — demoting to sequential at this chunk")
+            while (demoteWhile() && !isCancelled()) runCatching { Thread.sleep(500L) }
+        }
         Log.i(TAG, "thermal status ${pm.currentThermalStatus} — yielding ${pause}ms")
         runCatching { Thread.sleep(pause) }
     }
 
     /**
-     * Decode [uri]'s audio → htdemucs chunked overlap-add → keep only [keepStems] ("vocals" |
-     * "vocals_other") → AAC-LC 48 kHz 192 kbps into [tempM4a]. Empty/undecodable audio (stats.frames
-     * == 0) fails with a clear message rather than emitting a silent .m4a.
+     * The one number `plan-v2` §5.9 says has to exist before anyone ranks A5: how the separate stage
+     * actually splits between the Kotlin STFT, ORT, and the iSTFT + overlap-add. Logged at the end of a
+     * run rather than per chunk — the separator cannot be referenced from inside its own constructor's
+     * `onChunk`, and a resumed run logs its own segment's split anyway.
+     */
+    private fun logStageSplit(s: DemucsSeparator) {
+        Log.i(
+            TAG,
+            "separate split: stft=${s.stftNs / 1_000_000}ms ort=${s.inferNs / 1_000_000}ms " +
+                "istft+ola=${s.olaNs / 1_000_000}ms (rest of wall = ring gather, flush, decode, thermal)",
+        )
+    }
+
+    /**
+     * The three things only the caller can say about a finished separator run:
+     *
+     * - **the A1 skip rate**, which is the number that tells the next person whether the gate was worth
+     *   it on real content (`plan-v2` §4.5 measured the duty cycle on a corpus; this measures THIS film);
+     * - **non-finite samples**, tolerated by the separator and silenced, so otherwise invisible;
+     * - **correctness item 7.5** — the stream delivered a different number of frames than the container
+     *   claimed. Since A3 that shortens the output honestly instead of zero-padding it to the declared
+     *   length, so this is a warning and not a failure: [estFrames] is an estimate and a source whose
+     *   container duration is loose must not lose a job over it.
+     */
+    private fun logRun(s: DemucsSeparator, estFrames: Long) {
+        val pct = if (s.chunksDone > 0) 100 * s.skippedChunks / s.chunksDone else 0
+        Log.i(TAG, "music gate: skipped ${s.skippedChunks}/${s.chunksDone} chunks ($pct%) fed=${s.framesFed} frames")
+        if (s.nonFinite > 0) Log.w(TAG, "separator produced ${s.nonFinite} non-finite samples (silenced)")
+        val delta = s.framesFed - estFrames
+        if (estFrames > 0 && abs(delta) > LENGTH_WARN_FRAMES) {
+            Log.w(TAG, "stream delivered ${s.framesFed} frames, container said $estFrames (delta $delta)")
+        }
+        logStageSplit(s)
+    }
+
+    /**
+     * Decode [uri]'s audio → the A1 music gate → htdemucs chunked overlap-add → keep only [keepStems]
+     * ("vocals" | "vocals_other") → AAC-LC 44.1 kHz 192 kbps into [tempM4a]. Empty/undecodable audio
+     * fails with a clear message rather than emitting a silent .m4a — from the stats pass when it can
+     * decode nothing at all, and from the frame count the separator was actually fed otherwise.
+     *
+     * [demoteWhile] is S1's hook and defaults to "no sibling branch"; see [thermalYield].
      */
     suspend fun removeMusic(
         context: Context,
@@ -64,55 +118,74 @@ object AudioPipeline {
         onProgress: (Int) -> Unit,
         isCancelled: () -> Boolean,
         jobDir: File? = null,
+        demoteWhile: () -> Boolean = { false },
     ) = withContext(Dispatchers.Default) {
         if (jobDir != null) {
-            removeMusicResumable(context, uri, keepStems, tempM4a, onProgress, isCancelled, jobDir)
+            removeMusicResumable(context, uri, keepStems, tempM4a, onProgress, isCancelled, jobDir, demoteWhile)
             return@withContext
         }
         val stats = AudioDecoder.stats(context, uri, isCancelled)
-        if (stats.frames == 0L) error("Could not decode any audio from this video.")
-        Log.i(TAG, "stats: frames=${stats.frames} mean=${stats.mean} std=${stats.std} firstPtsUs=${stats.firstPtsUs}")
-        onProgress(2)
+        val estFrames = AudioDecoder.estimateFrames(context, uri)
+        Log.i(TAG, "stats: mean=${stats.mean} std=${stats.std} firstPtsUs=${stats.firstPtsUs} estFrames=$estFrames")
+        var lastPct = 2
+        onProgress(lastPct)
 
-        HtdemucsSession(context).use { session ->
-            // Sources with an AAC priming edit report a small NEGATIVE first PTS; MediaMuxer rejects
-            // negative sample times, and our re-encode introduces its own priming anyway — clamp to 0.
-            val writer = AacWriter(tempM4a, stats.firstPtsUs.coerceAtLeast(0L))
-            try {
-                // Reset AFTER thermalYield, so a throttle pause is not billed to the next chunk.
-                var tChunk = System.nanoTime()
-                val separator = DemucsSeparator(
-                    keepOther = keepStems == "vocals_other",
-                    mean = stats.mean,
-                    std = stats.std,
-                    totalFrames = stats.frames,
-                    infer = session::infer,
-                    onChunk = { done, total ->
-                        Log.i(TAG, "chunk $done/$total ${(System.nanoTime() - tChunk) / 1_000_000}ms")
-                        onProgress(2 + 96 * done / total) // 0..total -> 2..98
-                        thermalYield(context, isCancelled)
-                        tChunk = System.nanoTime()
-                    },
-                    emit = writer::write,
-                )
-                AudioDecoder.stream(context, uri, isCancelled) { buf, n ->
-                    if (isCancelled()) throw CancellationException()
-                    separator.feed(buf, n)
+        val keepOther = keepStems == "vocals_other"
+        // A1: null when the model is not installed, and then every chunk is separated — see MusicGate.open.
+        val gate = MusicGate.open(context)
+        try {
+            // A4: the session copies only the kept stems out of ORT, so it is built from the same set the
+            // separator keeps — one derivation, no way for the two to disagree about what the arrays hold.
+            HtdemucsSession(context, DemucsSeparator.keptStems(keepOther)).use { session ->
+                // Sources with an AAC priming edit report a small NEGATIVE first PTS; MediaMuxer rejects
+                // negative sample times, and our re-encode introduces its own priming anyway — clamp to 0.
+                val writer = AacWriter(tempM4a, stats.firstPtsUs.coerceAtLeast(0L))
+                try {
+                    // Reset AFTER thermalYield, so a throttle pause is not billed to the next chunk.
+                    var tChunk = System.nanoTime()
+                    val separator = DemucsSeparator(
+                        keepOther = keepOther,
+                        mean = stats.mean,
+                        std = stats.std,
+                        estimatedFrames = estFrames,
+                        infer = session::infer,
+                        onChunk = { done, total ->
+                            Log.i(TAG, "chunk $done/$total ${(System.nanoTime() - tChunk) / 1_000_000}ms")
+                            // Post only when the integer percent actually moves: ~4800 chunks on a film map
+                            // onto 96 distinct values, and every call is a setProgressAsync + a
+                            // setForegroundAsync. The identical bug in analyze measured −12.2 % when fixed
+                            // (`perf-plan.md` 1.1); `plan-v2` §5.9 asks for the same guard here.
+                            val pct = 2 + 96 * done / total // 0..total -> 2..98
+                            if (pct != lastPct) { lastPct = pct; onProgress(pct) }
+                            thermalYield(context, isCancelled, demoteWhile)
+                            tChunk = System.nanoTime()
+                        },
+                        isMusic = gate?.let { it::isMusic },
+                        emit = writer::write,
+                    )
+                    AudioDecoder.stream(context, uri, isCancelled) { buf, n ->
+                        if (isCancelled()) throw CancellationException()
+                        separator.feed(buf, n)
+                    }
+                    separator.finish()
+                    // The stats pass no longer decodes the whole track (A3), so this is where an
+                    // undecodable stream is finally provable — and it costs nothing, since an empty
+                    // stream means the loop above did nothing.
+                    if (separator.framesFed == 0L) error("Could not decode any audio from this video.")
+                    logRun(separator, estFrames)
+                    writer.finish()
+                    onProgress(100)
+                } finally {
+                    runCatching { writer.close() } // safe after finish or on error; don't mask the original throw
                 }
-                separator.finish()
-                // Tolerated by DemucsSeparator.finish, so it would otherwise pass silently.
-                if (separator.shortfall > 0) Log.w(TAG, "separator short by ${separator.shortfall} frames")
-                if (separator.nonFinite > 0) Log.w(TAG, "separator produced ${separator.nonFinite} non-finite samples (silenced)")
-                writer.finish()
-                onProgress(100)
-            } finally {
-                runCatching { writer.close() } // safe after finish or on error; don't mask the original throw
             }
+        } finally {
+            runCatching { gate?.close() }
         }
     }
 
     /**
-     * Transcode [uri]'s audio track to AAC-LC 48 kHz 192 kbps into [tempM4a] — [removeMusic] with the
+     * Transcode [uri]'s audio track to AAC-LC 44.1 kHz 192 kbps into [tempM4a] — [removeMusic] with the
      * separator deleted (`long-film-followups.md` item 1).
      *
      * One caller, one reason: [Remux.concat] copies the audio track sample-for-sample and framework
@@ -134,11 +207,13 @@ object AudioPipeline {
      * BS.775 downmix's peaks into [0.95, 1), and a synthetic 5.1 asset measured +10.7 dBFS before it, so a
      * loud passage loses several dB of dynamics. Still strictly better than the hard clip that would
      * otherwise happen, and a source the muxer CAN copy never comes through here.
-     * (2) A 48 kHz source is resampled 48 -> 44.1 (AudioDecoder) -> 48 (AacWriter) for nothing; 44.1 is
-     * htdemucs's rate and there is no htdemucs here. The upgrade path for both is the same and is a
-     * different shape of change: run this as an audio-only media3 Transformer export, which downmixes
-     * with proper gain and keeps the source rate. Worth it if a real 5.1 film ever sounds wrong — no such
-     * asset exists in `qa-assets/` to measure against today.
+     * (2) A 48 kHz source is still resampled down to 44.1 by [AudioDecoder] for nothing — 44.1 is
+     * htdemucs's rate and there is no htdemucs here — and it is now a one-way trip, since A6 deleted the
+     * 44.1 -> 48 leg on the way back out. Half the damage gone; the remaining half is a decoder-side
+     * change. The upgrade path for both ceilings is the same and is a different shape of change: run this
+     * as an audio-only media3 Transformer export, which downmixes with proper gain and keeps the source
+     * rate. Worth it if a real 5.1 film ever sounds wrong — no such asset exists in `qa-assets/` to
+     * measure against today.
      */
     suspend fun transcodeToAac(
         context: Context,
@@ -211,17 +286,22 @@ object AudioPipeline {
      * - **A kill loses at most one htdemucs chunk.** `audio.json` records how many frames are safely on
      *   disk; on resume [DemucsSeparator] re-runs exactly one chunk before that point to rebuild its
      *   overlap-add ring and everything from there is bit-identical to an uninterrupted run.
-     * - **44.1 kHz, not 48.** Resampling before the scratch would restart the 44.1→48 Sonic session at the
-     *   resume seam — a different interpolation phase, a click, and a rounding-different frame count. At
-     *   44.1 kHz there is exactly ONE uninterrupted Sonic session at the end, and 1 scratch frame == 1
-     *   separator frame, which is what makes `framesEmitted * 4` an exact byte offset.
+     * - **The scratch is 44.1 kHz because that is the separator's rate.** Nothing converts it: since A6
+     *   the whole chain is 44.1 in and 44.1 out. So 1 scratch frame == 1 separator frame, which is what
+     *   makes `framesEmitted * 4` an exact byte offset and the resume seam a plain file append.
      *
      * int16 costs 635 MB per hour of source (measured 87.3 dB round-trip SNR, ~50 dB below what AAC-LC at
      * 192 kbps discards); f32 would double that for nothing, and disk is wall #4.
      *
      * The stats pass is skipped on resume: `mean`/`std` normalize on feed and are inverted on emit, so
-     * re-deriving them from a decode that differed by one frame would step the level mid-film, and
-     * `totalFrames` fixes the entire chunk grid.
+     * re-deriving them from a sample that drew different windows would step the level mid-film.
+     *
+     * **`stats.frames` is the completion marker** (A3). It used to be the whole-track frame count from a
+     * full stats decode; the sampled pass cannot count frames, so it writes 0 and the true total is the
+     * one [DemucsSeparator.framesFed] learns from the stream, persisted here the moment a COMPLETE run
+     * resolves it. Reading 0 therefore means "the separator still owes work", which is the only safe
+     * direction: re-running a finished separator costs one audio decode with every chunk skipped, while
+     * skipping an unfinished one truncates the user's film. The estimate is never used for that decision.
      */
     private suspend fun removeMusicResumable(
         context: Context,
@@ -231,11 +311,11 @@ object AudioPipeline {
         onProgress: (Int) -> Unit,
         isCancelled: () -> Boolean,
         jobDir: File,
+        demoteWhile: () -> Boolean,
     ) {
         val pcm = File(jobDir, "audio.pcm")
         val saved = Checkpoint.readAudio(jobDir)
         val stats = saved?.stats ?: AudioDecoder.stats(context, uri, isCancelled).also {
-            if (it.frames == 0L) error("Could not decode any audio from this video.")
             Checkpoint.writeAudio(jobDir, 0L, it)
         }
         // The checkpoint is authoritative, but never claim more than the file actually holds: a power loss
@@ -244,61 +324,80 @@ object AudioPipeline {
         if (pcm.length() != written * 4) {
             RandomAccessFile(pcm, "rw").use { it.setLength(written * 4) }
         }
-        Log.i(TAG, "resumable audio: frames=${stats.frames} alreadyWritten=$written pcm=${pcm.length()}B")
+        // Cosmetic only, and recomputed rather than persisted: once `stats.frames` is non-zero it IS the
+        // true length, and before that the container's word for it is all there is.
+        val estFrames = if (stats.frames > 0L) stats.frames else AudioDecoder.estimateFrames(context, uri)
+        Log.i(TAG, "resumable audio: total=${stats.frames} est=$estFrames alreadyWritten=$written pcm=${pcm.length()}B")
         // Start the bar where the previous run left off, not at 2%. The skip phase re-decodes without
         // reporting anything (it must not — see DemucsSeparator.processChunk), which on a film is a couple
         // of minutes; from 2% that reads as a hang, from the resumed percentage it reads as resuming.
-        onProgress((2 + 88 * written / stats.frames.coerceAtLeast(1)).toInt())
+        // Doubles as the seed for the per-chunk guard below, so resuming never re-posts this same value.
+        var lastPct = (2 + 88 * written / estFrames.coerceAtLeast(1)).toInt().coerceIn(2, 90)
+        onProgress(lastPct)
 
-        if (written < stats.frames) {
-            HtdemucsSession(context).use { session ->
-                FileOutputStream(pcm, /* append = */ true).use { out ->
-                    val quantized = ByteArray(4 * DemucsSeparator.STRIDE) // one flush batch, one write
-                    // As above; discard the first line of a RESUMED run — skipped chunks report nothing.
-                    var tChunk = System.nanoTime()
-                    val separator = DemucsSeparator(
-                        keepOther = keepStems == "vocals_other",
-                        mean = stats.mean,
-                        std = stats.std,
-                        totalFrames = stats.frames,
-                        infer = session::infer,
-                        onChunk = { done, total ->
-                            Log.i(TAG, "chunk $done/$total ${(System.nanoTime() - tChunk) / 1_000_000}ms")
-                            onProgress(2 + 88 * done / total) // 0..total -> 2..90; 90..100 is the AAC pass
-                            // After the flush, so `written` is current. Skipped while stopping, so a cancel
-                            // that is racing JobStore.delete cannot re-create the file it just removed.
-                            if (!isCancelled()) Checkpoint.writeAudio(jobDir, written, stats)
-                            thermalYield(context, isCancelled)
-                            tChunk = System.nanoTime()
-                        },
-                        emit = { interleaved, frames ->
-                            var b = 0
-                            for (i in 0 until 2 * frames) {
-                                val s = (interleaved[i] * 32767f).roundToInt().coerceIn(-32768, 32767)
-                                quantized[b++] = (s and 0xFF).toByte()
-                                quantized[b++] = ((s shr 8) and 0xFF).toByte()
-                            }
-                            out.write(quantized, 0, b) // unbuffered: in the page cache once this returns
-                            written += frames
-                        },
-                        resumeFrames = written,
-                    )
-                    AudioDecoder.stream(context, uri, isCancelled) { buf, n ->
-                        if (isCancelled()) throw CancellationException()
-                        separator.feed(buf, n) // skipped chunks cost ~0; the ring still fills from real input
+        var total = stats.frames
+        if (total == 0L || written < total) {
+            val keepOther = keepStems == "vocals_other"
+            val gate = MusicGate.open(context) // A1; null => separate everything, see MusicGate.open
+            try {
+                HtdemucsSession(context, DemucsSeparator.keptStems(keepOther)).use { session ->
+                    FileOutputStream(pcm, /* append = */ true).use { out ->
+                        val quantized = ByteArray(4 * DemucsSeparator.STRIDE) // one flush batch, one write
+                        // As above; discard the first line of a RESUMED run — skipped chunks report nothing.
+                        var tChunk = System.nanoTime()
+                        val separator = DemucsSeparator(
+                            keepOther = keepOther,
+                            mean = stats.mean,
+                            std = stats.std,
+                            estimatedFrames = estFrames,
+                            infer = session::infer,
+                            onChunk = { done, t ->
+                                Log.i(TAG, "chunk $done/$t ${(System.nanoTime() - tChunk) / 1_000_000}ms")
+                                // Post only on a real percent change — see removeMusic's onChunk.
+                                val pct = 2 + 88 * done / t // 0..t -> 2..90; 90..100 is the AAC pass
+                                if (pct != lastPct) { lastPct = pct; onProgress(pct) }
+                                // After the flush, so `written` is current. Skipped while stopping, so a
+                                // cancel racing JobStore.delete cannot re-create the file it just removed.
+                                // `stats` still carries frames=0 here — the true length is only written
+                                // once the run below completes.
+                                if (!isCancelled()) Checkpoint.writeAudio(jobDir, written, stats)
+                                thermalYield(context, isCancelled, demoteWhile)
+                                tChunk = System.nanoTime()
+                            },
+                            resumeFrames = written,
+                            isMusic = gate?.let { it::isMusic },
+                            emit = { interleaved, frames ->
+                                var b = 0
+                                for (i in 0 until 2 * frames) {
+                                    val s = (interleaved[i] * 32767f).roundToInt().coerceIn(-32768, 32767)
+                                    quantized[b++] = (s and 0xFF).toByte()
+                                    quantized[b++] = ((s shr 8) and 0xFF).toByte()
+                                }
+                                out.write(quantized, 0, b) // unbuffered: in the page cache once this returns
+                                written += frames
+                            },
+                        )
+                        AudioDecoder.stream(context, uri, isCancelled) { buf, n ->
+                            if (isCancelled()) throw CancellationException()
+                            separator.feed(buf, n) // skipped chunks cost ~0; the ring still fills from real input
+                        }
+                        separator.finish()
+                        if (separator.framesFed == 0L) error("Could not decode any audio from this video.")
+                        logRun(separator, estFrames)
+                        total = separator.framesFed
                     }
-                    separator.finish()
-                    if (separator.shortfall > 0) Log.w(TAG, "separator short by ${separator.shortfall} frames")
-                if (separator.nonFinite > 0) Log.w(TAG, "separator produced ${separator.nonFinite} non-finite samples (silenced)")
                 }
+            } finally {
+                runCatching { gate?.close() }
             }
-            Checkpoint.writeAudio(jobDir, written, stats)
+            // The completion marker, written only here: `total` is now the length the stream actually had.
+            Checkpoint.writeAudio(jobDir, written, AudioDecoder.Stats(total, stats.mean, stats.std, stats.firstPtsUs))
         }
-        // The invariant that can actually catch a short stream pass, unlike the separator's own frame
-        // count (which is pinned to totalFrames by construction — see DemucsSeparator.finish).
-        check(pcm.length() == stats.frames * 4) { "pcm ${pcm.length()} != ${stats.frames * 4}" }
+        // Still the invariant that catches a short scratch — now against the length the separator measured
+        // (this run) or recorded (a previous complete run), rather than against a declared total.
+        check(pcm.length() == total * 4) { "pcm ${pcm.length()} != ${total * 4}" }
 
-        // ONE AAC encode, ONE uninterrupted 44.1 -> 48 kHz Sonic session, at the end.
+        // ONE AAC encode, at the end, over the whole scratch.
         val writer = AacWriter(tempM4a, stats.firstPtsUs.coerceAtLeast(0L))
         try {
             encodePcm(pcm, writer, onProgress, isCancelled)
@@ -309,12 +408,16 @@ object AudioPipeline {
         }
     }
 
-    /** Stream the int16 scratch back through [AacWriter] as f32, unity-gain inverse of the quantizer. */
+    /**
+     * Stream the int16 scratch back through [AacWriter] as f32, unity-gain inverse of the quantizer.
+     * Both sides are 44.1 kHz since A6, so this pass now only quantizes and encodes.
+     */
     private fun encodePcm(pcm: File, writer: AacWriter, onProgress: (Int) -> Unit, isCancelled: () -> Boolean) {
         val bytes = ByteArray(4 * DemucsSeparator.STRIDE)
         val floats = FloatArray(2 * DemucsSeparator.STRIDE)
         val total = pcm.length().coerceAtLeast(1L)
         var done = 0L
+        var lastPct = 89 // this pass only ever posts 90..99; 89 makes the first real value post
         pcm.inputStream().use { ins ->
             while (true) {
                 if (isCancelled()) throw CancellationException()
@@ -330,7 +433,9 @@ object AudioPipeline {
                 for (i in 0 until frames * 2) floats[i] = shorts.get(i) / 32767f
                 writer.write(floats, frames)
                 done += n
-                onProgress((90 + 10 * done / total).toInt().coerceAtMost(99))
+                // Post only on a real percent change — see removeMusic's onChunk.
+                val pct = (90 + 10 * done / total).toInt().coerceAtMost(99)
+                if (pct != lastPct) { lastPct = pct; onProgress(pct) }
             }
         }
     }

@@ -75,7 +75,6 @@ fun OptionsScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var advanced by remember { mutableStateOf(false) }
 
     // Probing opens MediaExtractor + MediaMetadataRetriever, so it never runs in composition. 0 means
     // "no estimate" — either still probing or the probe threw — and a failure here is deliberately
@@ -160,7 +159,7 @@ fun OptionsScreen(
                 .padding(top = NaqiTokens.space2, bottom = NaqiTokens.space5),
         ) {
             if (ops.censorWomen) {
-                SectionHeader(stringResource(R.string.opt_section_censor_women))
+                SectionHeader(stringResource(R.string.opt_section_censor_faces))
                 NaqiCard(contentPadding = 0.dp) {
                     SliderRow(
                         title = stringResource(R.string.opt_strictness_title),
@@ -180,36 +179,9 @@ fun OptionsScreen(
                         checked = ops.grayscale,
                         onCheckedChange = { onOpsChange(ops.copy(grayscale = it)) },
                     )
-                    // Advanced is censor-only today, so it lives inside this card rather than as a
-                    // section of its own that would vanish on a music-only job.
-                    NaqiRowDivider()
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { advanced = !advanced }
-                            .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            stringResource(R.string.opt_advanced_title),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            stringResource(if (advanced) R.string.action_hide else R.string.action_show),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    if (advanced) {
-                        ToggleTile(
-                            title = stringResource(R.string.opt_blur_unknown_faces_title),
-                            desc = stringResource(R.string.opt_blur_unknown_faces_desc),
-                            checked = ops.blurUnknownFaces,
-                            onCheckedChange = { onOpsChange(ops.copy(blurUnknownFaces = it)) },
-                        )
-                    }
+                    // The collapsible "Advanced" row went with plan-v2 §5.4: "Blur unknown faces" was the
+                    // only thing inside it, and once every detected face is censored there is no unknown
+                    // bucket left to open. An expander over nothing is worse than no expander.
                 }
                 Spacer(Modifier.height(NaqiTokens.space5))
             }

@@ -34,8 +34,8 @@
     <!-- Operation cards. -->
     <string name="pick_op_music_title">إزالة الموسيقى</string>
     <string name="pick_op_music_desc">تُزيل الموسيقى التصويرية وتُبقي الحوار.</string>
-    <string name="pick_op_women_title">حجب النساء</string>
-    <string name="pick_op_women_desc">تُموّه وجوه النساء والمشاهد المُخالفة.</string>
+    <string name="pick_op_faces_title">حجب الوجوه</string>
+    <string name="pick_op_faces_desc">تُموّه كل الوجوه والمشاهد المُخالفة.</string>
 
     <!-- Overflow menu on the pick screen; content description of the "⋮" button. -->
     <string name="action_more">المزيد</string>
@@ -62,8 +62,8 @@
     <string name="action_back">رجوع</string>
     <string name="opt_title">الخيارات</string>
 
-    <!-- Censor-women section. Arabic has no case; a short phrase replaces the English caps. -->
-    <string name="opt_section_censor_women">حجب النساء</string>
+    <!-- Censor-faces section. Arabic has no case; a short phrase replaces the English caps. -->
+    <string name="opt_section_censor_faces">حجب الوجوه</string>
     <string name="opt_strictness_title">الصرامة</string>
     <string name="opt_strictness_desc">مدى سهولة حجب المشهد كاملًا. لا يتأثّر تمويه الوجوه بهذا الإعداد.</string>
     <string name="opt_blur_amount_title">شدّة التمويه</string>
@@ -79,12 +79,9 @@
     <string name="opt_keep_vocals_other_title">الأصوات البشرية + المؤثرات</string>
     <string name="opt_keep_vocals_other_desc">يُبقي أيضًا المؤثرات الصوتية وأصوات المحيط؛ وقد يتسرّب شيء من الموسيقى.</string>
 
-    <!-- Collapsible Advanced card (censor-only). action_hide/action_show are the two states of one affordance. -->
-    <string name="opt_advanced_title">خيارات متقدّمة</string>
+    <!-- action_hide/action_show are the two states of one affordance (the about screen's licence block). -->
     <string name="action_hide">إخفاء</string>
     <string name="action_show">إظهار</string>
-    <string name="opt_blur_unknown_faces_title">تمويه الوجوه غير المُصنَّفة</string>
-    <string name="opt_blur_unknown_faces_desc">يحجب الوجوه التي يتعذّر تحديد جنسها. مُعطَّل افتراضيًا لأنه يُموّه الرجال أيضًا.</string>
 
     <!-- Language picker (API 33+). Opens system per-app language settings. -->
     <string name="opt_language">اللغة</string>

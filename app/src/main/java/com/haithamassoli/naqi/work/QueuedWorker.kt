@@ -50,7 +50,7 @@ abstract class QueuedWorker(ctx: Context, params: WorkerParameters) : CoroutineW
 /**
  * The [FilterOps] wire format, in one place.
  *
- * These seven fields were spelled out three times — twice being written in [JobController] and once
+ * These six fields were spelled out three times — twice being written in [JobController] and once
  * being read back in `DownloadWorker` — so adding an option reached whichever copies you remembered.
  * The read and the write now cannot disagree.
  */
@@ -60,7 +60,6 @@ internal fun FilterOps.pairs(): Array<Pair<String, Any?>> = arrayOf(
     FilterWorker.KEY_STRICTNESS to strictness,
     FilterWorker.KEY_BLUR_AMOUNT to blurAmount,
     FilterWorker.KEY_GRAYSCALE to grayscale,
-    FilterWorker.KEY_BLUR_UNKNOWN to blurUnknownFaces,
     FilterWorker.KEY_KEEP_STEMS to keepStems,
 )
 
@@ -71,6 +70,5 @@ internal fun Data.filterOps(): FilterOps = FilterOps(
     strictness = getInt(FilterWorker.KEY_STRICTNESS, 50),
     blurAmount = getInt(FilterWorker.KEY_BLUR_AMOUNT, 60),
     grayscale = getBoolean(FilterWorker.KEY_GRAYSCALE, false),
-    blurUnknownFaces = getBoolean(FilterWorker.KEY_BLUR_UNKNOWN, false),
     keepStems = getString(FilterWorker.KEY_KEEP_STEMS) ?: "vocals",
 )

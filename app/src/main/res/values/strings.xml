@@ -35,8 +35,8 @@
     <!-- Operation cards. -->
     <string name="pick_op_music_title">Remove music</string>
     <string name="pick_op_music_desc">Strip the soundtrack, keep dialogue.</string>
-    <string name="pick_op_women_title">Censor women</string>
-    <string name="pick_op_women_desc">Blur female faces and flagged scenes.</string>
+    <string name="pick_op_faces_title">Censor faces</string>
+    <string name="pick_op_faces_desc">Blur every face and flagged scenes.</string>
 
     <!-- Overflow menu on the pick screen; content description of the "⋮" button. -->
     <string name="action_more">More</string>
@@ -73,8 +73,8 @@
     <string name="action_back">Back</string>
     <string name="opt_title">Options</string>
 
-    <!-- Censor-women section. -->
-    <string name="opt_section_censor_women">Censor women</string>
+    <!-- Censor-faces section. -->
+    <string name="opt_section_censor_faces">Censor faces</string>
     <string name="opt_strictness_title">Strictness</string>
     <string name="opt_strictness_desc">How eagerly whole scenes are censored. Face blurring is never affected.</string>
     <string name="opt_blur_amount_title">Blur amount</string>
@@ -90,12 +90,9 @@
     <string name="opt_keep_vocals_other_title">Voices + sounds</string>
     <string name="opt_keep_vocals_other_desc">Also keeps sound effects and ambience; some music may leak.</string>
 
-    <!-- Collapsible Advanced card (censor-only). action_hide/action_show are the two states of one affordance. -->
-    <string name="opt_advanced_title">Advanced</string>
+    <!-- action_hide/action_show are the two states of one affordance (the about screen's licence block). -->
     <string name="action_hide">Hide</string>
     <string name="action_show">Show</string>
-    <string name="opt_blur_unknown_faces_title">Blur unknown faces</string>
-    <string name="opt_blur_unknown_faces_desc">Censors faces whose gender never resolves. Off by default: it blurs men too.</string>
 
     <!-- Language picker (API 33+). Opens system per-app language settings. -->
     <string name="opt_language">Language</string>

@@ -245,7 +245,7 @@ fun ShareSheet(
                 )
                 NaqiRowDivider()
                 ToggleTile(
-                    title = stringResource(R.string.pick_op_women_title),
+                    title = stringResource(R.string.pick_op_faces_title),
                     icon = NaqiIcons.Shield,
                     checked = effectiveOps.censorWomen,
                     enabled = !audioOnly,

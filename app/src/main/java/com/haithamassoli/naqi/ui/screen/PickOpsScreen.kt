@@ -133,8 +133,8 @@ fun PickOpsScreen(
                 )
                 NaqiRowDivider()
                 ToggleTile(
-                    title = stringResource(R.string.pick_op_women_title),
-                    desc = stringResource(R.string.pick_op_women_desc),
+                    title = stringResource(R.string.pick_op_faces_title),
+                    desc = stringResource(R.string.pick_op_faces_desc),
                     icon = NaqiIcons.Shield,
                     checked = ops.censorWomen,
                     onCheckedChange = { onOpsChange(ops.copy(censorWomen = it)) },

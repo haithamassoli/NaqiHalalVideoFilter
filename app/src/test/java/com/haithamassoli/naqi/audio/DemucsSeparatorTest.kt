@@ -21,13 +21,26 @@ class DemucsSeparatorTest {
     private val MAX_SHIFT = DemucsSeparator.MAX_SHIFT
     private val STEM_SPEC = DemucsSeparator.STEM_SPEC
 
-    /** Fake infer that copies the input spec into [stemWeights] fractions of each stem's block. */
-    private class SpecFake(private val stemWeights: Map<Int, Float>) {
-        val specOut = FloatArray(4 * DemucsSeparator.STEM_SPEC)
-        val timeOut = FloatArray(4 * 2 * DemucsSeparator.SEG)
+    /**
+     * Fake infer that copies the input spec into [stemWeights] fractions of each stem's block.
+     *
+     * [stemWeights] is keyed by ABSOLUTE stem id (drums=0, bass=1, other=2, vocals=3), because that is
+     * how the model is described everywhere — but A4 means the driver now receives only the kept stems,
+     * compacted into `keptStems(keepOther)` order, so this writes at the compacted index and silently
+     * drops a weight for a stem that is not kept. That drop is not a shortcut: it is exactly what the
+     * real [HtdemucsSession] does, which never copies an unkept stem out of ORT at all. One fake per
+     * [keepOther] value, since the array sizes differ.
+     */
+    private class SpecFake(stemWeights: Map<Int, Float>, keepOther: Boolean = false) {
+        private val keep = DemucsSeparator.keptStems(keepOther)
+        private val weights = stemWeights.mapNotNull { (stem, w) ->
+            keep.indexOf(stem).takeIf { it >= 0 }?.let { it to w }
+        }
+        val specOut = FloatArray(keep.size * DemucsSeparator.STEM_SPEC)
+        val timeOut = FloatArray(keep.size * 2 * DemucsSeparator.SEG)
         fun infer(wav: FloatArray, spec: FloatArray): Pair<FloatArray, FloatArray> {
-            for ((stem, w) in stemWeights) {
-                val base = stem * spec.size
+            for ((k, w) in weights) {
+                val base = k * spec.size
                 for (i in spec.indices) specOut[base + i] = w * spec[i]
             }
             return specOut to timeOut
@@ -58,7 +71,14 @@ class DemucsSeparatorTest {
         return 10.0 * log10(s / (se + 1e-30))
     }
 
-    /** Drive a separator over [input] ([frames] interleaved stereo) in ragged batches; returns output. */
+    /**
+     * Drive a separator over [input] ([frames] interleaved stereo) in ragged batches; returns output.
+     *
+     * [estimatedFrames] is what the CONTAINER would have claimed and defaults to the truth. Since A3 it
+     * only drives the progress denominator, and [feedFrames] (default: all of them) is what actually
+     * decides the output length — the two are separate parameters here precisely so a test can disagree
+     * with the container and check which one wins.
+     */
     private fun run(
         input: FloatArray,
         frames: Int,
@@ -66,24 +86,30 @@ class DemucsSeparatorTest {
         infer: (FloatArray, FloatArray) -> Pair<FloatArray, FloatArray>,
         batch: Int = 3333,
         onChunk: (Int, Int) -> Unit = { _, _ -> },
+        estimatedFrames: Int = frames,
+        feedFrames: Int = frames,
+        isMusic: ((FloatArray, Int) -> Boolean)? = null,
     ): FloatArray {
         val (mean, std) = stats(input, frames)
         val out = FloatArray(2 * frames)
         var cursor = 0
-        val sep = DemucsSeparator(keepOther, mean, std, frames.toLong(), infer, onChunk) { buf, n ->
+        val sep = DemucsSeparator(
+            keepOther, mean, std, estimatedFrames.toLong(), infer, onChunk, isMusic = isMusic,
+        ) { buf, n ->
             System.arraycopy(buf, 0, out, cursor, 2 * n)
             cursor += 2 * n
         }
         var fed = 0
         val slice = FloatArray(2 * batch)
-        while (fed < frames) {
-            val n = minOf(batch, frames - fed)
+        while (fed < feedFrames) {
+            val n = minOf(batch, feedFrames - fed)
             System.arraycopy(input, 2 * fed, slice, 0, 2 * n)
             sep.feed(slice, n)
             fed += n
         }
         sep.finish()
-        assertEquals(2 * frames, cursor)
+        assertEquals("emits exactly what it was fed", 2 * feedFrames, cursor)
+        assertEquals(feedFrames.toLong(), sep.framesFed)
         return out
     }
 
@@ -136,11 +162,13 @@ class DemucsSeparatorTest {
     fun keepOtherSumsBothStems() {
         val n = 400_000
         val input = noise(n, seed = 11)
-        val fake = SpecFake(mapOf(2 to 0.25f, 3 to 0.75f))
-        val both = run(input, n, keepOther = true, infer = fake::infer)
+        val weights = mapOf(2 to 0.25f, 3 to 0.75f)
+        val both = run(input, n, keepOther = true, infer = SpecFake(weights, keepOther = true)::infer)
         assertTrue("vocals+other SNR", snrDb(input, both, 2 * n) > 60.0)
 
-        val vocalsOnly = run(input, n, keepOther = false, infer = fake::infer)
+        // Same weights, vocals-only: `other`'s 0.25 is never read back out of the session (A4), so the
+        // driver must reconstruct exactly 0.75x the input.
+        val vocalsOnly = run(input, n, keepOther = false, infer = SpecFake(weights, keepOther = false)::infer)
         assertTrue("vocals-only 0.75x SNR", snrDb(input, vocalsOnly, 2 * n, refScale = 0.75f) > 60.0)
     }
 
@@ -160,15 +188,101 @@ class DemucsSeparatorTest {
     fun timeBranchPassesThrough() {
         val n = 500_000
         val input = noise(n, seed = 5)
-        val specOut = FloatArray(4 * STEM_SPEC) // stays zero
-        val timeOut = FloatArray(4 * 2 * SEG)
+        // One kept stem (vocals), so A4's compaction puts it at block 0 — not at the graph's stem 3.
+        val specOut = FloatArray(STEM_SPEC) // stays zero
+        val timeOut = FloatArray(2 * SEG)
         val infer = { wav: FloatArray, _: FloatArray ->
-            System.arraycopy(wav, 0, timeOut, (2 * 3) * SEG, SEG)      // vocals ch0
-            System.arraycopy(wav, SEG, timeOut, (2 * 3 + 1) * SEG, SEG) // vocals ch1
+            System.arraycopy(wav, 0, timeOut, 0, SEG)     // vocals ch0
+            System.arraycopy(wav, SEG, timeOut, SEG, SEG) // vocals ch1
             specOut to timeOut
         }
         val out = run(input, n, keepOther = false, infer = infer)
         assertTrue("time-branch SNR", snrDb(input, out, 2 * n) > 60.0)
+    }
+
+    // ---- A3 / correctness item 7.5: the length comes from the stream, not from the container ----
+
+    /**
+     * The bug 7.5 names: a stream that stops early used to be zero-padded up to the DECLARED total, so a
+     * truncated decode produced a full-length file with silence on the end and nothing said so. The
+     * output must now be exactly as long as what arrived, and the frames it does contain must be the same
+     * ones an honest run would have produced.
+     */
+    @Test
+    fun shortStreamIsNotZeroPadded() {
+        val n = 700_000
+        val fed = 500_000
+        val input = noise(n, seed = 31)
+        val out = run(input, n, keepOther = false, infer = SpecFake(mapOf(3 to 1f))::infer,
+            estimatedFrames = n, feedFrames = fed)
+        // run() already asserted the emitted count; this asserts the content is real audio and not the
+        // padding it used to be — the tail is the loudest place a silence pad would show up.
+        assertTrue("short-stream SNR", snrDb(input, out, 2 * fed) > 60.0)
+    }
+
+    /** The opposite direction: a container that under-reports must not truncate the real stream. */
+    @Test
+    fun longStreamIsNotTruncated() {
+        val n = 500_000
+        val input = noise(n, seed = 32)
+        val out = run(input, n, keepOther = false, infer = SpecFake(mapOf(3 to 1f))::infer,
+            estimatedFrames = n / 2)
+        assertTrue("under-reported SNR", snrDb(input, out, 2 * n) > 60.0)
+    }
+
+    // ---- A1: the music gate's passthrough (`plan-v2` §5.5) ----
+
+    /**
+     * The load-bearing claim of the passthrough: it writes into the SAME overlap-add accumulator under
+     * the SAME triangular weights, so `Σ g·x / Σ g` returns the input. If the wsum bookkeeping differed
+     * from [DemucsSeparator.inferChunk]'s by so much as one cell, flush would divide by the wrong weight
+     * and this would show up as a seam every STRIDE samples.
+     *
+     * The infer lambda is booby-trapped: with no music anywhere the model must never be called at all.
+     */
+    @Test
+    fun fullySkippedRunReturnsTheInput() {
+        val n = 700_000
+        val input = noise(n, seed = 33)
+        val out = run(
+            input, n, keepOther = false,
+            infer = { _, _ -> throw AssertionError("inference ran on a music-free chunk") },
+            isMusic = { _, _ -> false },
+        )
+        assertTrue("passthrough SNR", snrDb(input, out, 2 * n) > 60.0)
+    }
+
+    /**
+     * Dilation, both directions. One music-positive chunk must force the model over ITSELF and over the
+     * two chunks on each side, and over nothing else.
+     *
+     * The gate is asked about chunks strictly in ascending order, one new one per processed chunk, so a
+     * counter recovers which chunk each question is about without reaching into the separator. The
+     * BACKWARD half is the interesting one: the separator cannot re-read the input ring that far back, so
+     * it has to be answering from remembered decisions — if it were rescoring, chunk 3 could not know
+     * that chunk 5 is music at the moment it decides.
+     */
+    @Test
+    fun dilationForcesTheNeighboursOfAMusicChunk() {
+        val n = 700_000
+        val input = noise(n, seed = 34)
+        val fake = SpecFake(mapOf(3 to 1f))
+        var inferred = 0
+        var asked = 0
+        val musicChunk = 5
+        run(
+            input, n, keepOther = false,
+            infer = { w, s -> inferred++; fake.infer(w, s) },
+            isMusic = { _, len ->
+                assertTrue("scored window is real audio", len > 0)
+                asked++ == musicChunk
+            },
+        )
+        val total = ((n + MAX_SHIFT + STRIDE - 1L) / STRIDE).toInt()
+        val expected = (0 until total).count { c -> musicChunk in (c - 2)..(c + 2) }
+        assertEquals("only the dilated window is separated", expected, inferred)
+        // Chunks past the end of the stream are never handed to the model: they hold no audio to score.
+        assertEquals("scored every chunk that has input, and no others", total, asked)
     }
 
     // ---- Phase 2 resume (`long-film-plan.md`) ----
@@ -190,7 +304,7 @@ class DemucsSeparatorTest {
         val tail = FloatArray(2 * (frames - resumeFrames).toInt())
         var cursor = 0
         val sep = DemucsSeparator(
-            keepOther = false, mean = mean, std = std, totalFrames = frames.toLong(),
+            keepOther = false, mean = mean, std = std, estimatedFrames = frames.toLong(),
             infer = { w, s -> inferCalls++; fake.infer(w, s) },
             onChunk = { _, _ -> chunkCalls++ },
             resumeFrames = resumeFrames,

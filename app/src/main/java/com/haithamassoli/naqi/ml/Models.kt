@@ -35,31 +35,54 @@ enum class NaqiModel(
 ) {
     /**
      * NSFW 5-class gate — GantMan nsfw_model MobileNetV2 1.4-224, converted to ONNX with the
-     * input transposed to NCHW. Kept f32: the f16 variant is rejected on-device by XNNPACK's
-     * fp16 depthwise-conv path (xnn_create_convolution2d_nhwc_fp16 error 2).
-     * Input [1,3,224,224] f32, RGB, scaled 1/255 — no mean/std normalization.
+     * input transposed to NCHW, then **statically quantized to INT8** (V3, `plan-v2` §5.3) by
+     * `scripts/nsfw_int8_quantize.py`: AveragePool[7,7] → GlobalAveragePool (bit-exact, max|Δ| 0),
+     * `quant_pre_process`, then `quantize_static(QDQ, QInt8/QInt8, per_channel=True)` calibrated on 100
+     * real frames. ORT fuses it to 75 nodes / 52 `QLinearConv` — real integer kernels, and XNNPACK
+     * registers `QLinearConv`, so the fast path exists on-device.
+     *
+     * **3.37× faster (8.21 → 2.44 ms) and 17.3 → 5.1 MB, with no new model, licence or dataset.**
+     * Measured off-device on 360 real frames from `test-video-1.webm`: 96.1 % argmax agreement with
+     * fp32, and after [com.haithamassoli.naqi.analysis.NsfwGate]'s hysteresis the censored timeline at
+     * the default strictness 50 is a strict SUPERSET of fp32's — 0 ms missed. Worst point of the
+     * strictness sweep is 95.5 % interval recall at strictness 0. Hysteresis absorbs the per-frame
+     * drift, which is the metric that decides whether a frame gets censored.
+     *
+     * **Validated on a physical S23** (2026-08-03, `benchmark` build), which `plan-v2` §5.3 insists on and
+     * the repo's three fp16-corruption incidents are the reason for. Same 643 s source, same options:
+     *
+     *   fp32   867 firings   400.7 s censored   gate=61745 ms
+     *   INT8   921 firings   416.9 s censored   gate=26844 ms
+     *
+     * **2.30× on the gate itself** (`session.run` alone; the earlier 3.37× was an off-device microbench
+     * with no camera-pipeline contention). INT8 recall of the fp32 censored timeline is **99.20 %** (32 of
+     * 4 010 sampled 100 ms points) and it censors 16.2 s MORE — it errs toward covering, which is the
+     * direction a censoring product wants.
+     *
+     * The number is signal, and there is a control proving it: two INT8 runs on identical input scored
+     * **100.00 % recall, +0.0 s** against each other, so the run-to-run noise floor is zero. It is worth
+     * knowing *why* that control was needed — `intervals` is `intervalsFor(firings) + overflowSpans(faceTracks)`,
+     * and the face half comes from ML Kit, which is NOT deterministic (4786 vs 4550 faces on identical
+     * input across those same two runs). The censored *timeline* is nonetheless bit-stable, so an EDL diff
+     * is a valid gate here even though a face-count diff is not.
+     *
+     * This also closes the XNNPACK question: `QLinearConv` kernel selection on real Snapdragon hardware
+     * does not corrupt the graph — `gateFirings=921` reproduced exactly on three independent S23 runs and
+     * matched the emulator, so the fp16 failure mode does not repeat for INT8.
+     *
+     * The fp32 graph is kept alongside (`nsfw_mnv2_140_f32.onnx`) rather than deleted: swapping
+     * [assetName] and [sha256] back is the whole A/B, and it is what a recall regression is diffed
+     * against. Do not lower the input resolution as a cheaper alternative — measured much worse
+     * (71.7 % agreement @192 vs 91.1 % for INT8@224).
+     *
+     * Contract unchanged and drop-in: input [1,3,224,224] f32, RGB, scaled 1/255 — no mean/std.
      * Output [1,5] softmax. Class order locked in [NSFW_CLASSES] (upstream alphabetical).
      */
     NSFW_GATE(
-        "nsfw_mnv2_140_f32.onnx",
-        "049ce7c51eaf3db429f0ffb22ba23345e7ec2483356432ea67e83446ed5cfe9e",
-        downloadUrl = null, // tf2onnx conversion of GantMan/nsfw_model — no public host yet
+        "nsfw_mnv2_140_int8.onnx",
+        "6070dd6da875025b4c8df960a3a46dff583fb2bf8a499e214f98a8984674bba9",
+        downloadUrl = null, // locally quantized from the tf2onnx GantMan export — no public host yet
         listOf(longArrayOf(1, 3, 224, 224)),
-    ),
-
-    /**
-     * NudeNet v3 320n (YOLOv8n head). Input `images` [1,3,320,320] f32, RGB, scaled 1/255;
-     * upstream preprocessing pads right/bottom to square, then resizes to 320
-     * (cv2 blobFromImage, swapRB=true ⇒ RGB). Output `output0` [1,22,2100]:
-     * rows 0..3 = cx,cy,w,h in 320-space, rows 4..21 = per-class scores in [NUDENET_CLASSES].
-     * Upstream thresholds: keep score ≥ 0.2, NMS score 0.25 / IoU 0.45.
-     */
-    NUDENET(
-        "nudenet_320n.onnx",
-        "c15d8273adad2d0a92f014cc69ab2d6c311a06777a55545f2c4eb46f51911f0f",
-        // Shipped as-is by upstream, so it downloads straight from the release `scripts/fetch-models.sh` uses.
-        "https://github.com/notAI-tech/NudeNet/releases/download/v3.4-weights/320n.onnx",
-        listOf(longArrayOf(1, 3, 320, 320)),
     ),
 
     /**
@@ -77,19 +100,31 @@ enum class NaqiModel(
         downloadUrl = null, // locally re-exported from the demucs.onnx graph — no public host yet
         listOf(longArrayOf(1, 2, 114660), longArrayOf(1, 4, 2048, 112)),
     ),
+
+    /**
+     * YAMNet — Google's Apache-2.0 AudioSet classifier (MobileNet-v1, 4.0 M weights), the music-activity
+     * gate [com.haithamassoli.naqi.audio.MusicGate] runs so the separator can skip music-free chunks
+     * (A1, `plan-v2` §5.5). Converted from Google's own TF2 SavedModel by `scripts/yamnet_export.py`,
+     * opset 15; the upstream embedding and log-mel outputs are trimmed and the input length is pinned.
+     *
+     * Input `waveform` **[15600] f32 — RANK 1, not [1,15600]** — 0.975 s of mono 16 kHz in [-1,1].
+     * Output `output_0` [1,521] f32, per-class scores in `yamnet_class_map.csv` order (the map itself is
+     * deliberately not shipped: the gate needs two hardcoded index ranges, not 15 kB of CSV in the APK).
+     *
+     * **tf2onnx is not byte-reproducible.** Two runs over the same SavedModel produce numerically
+     * identical graphs with different serialized bytes, so re-exporting changes this sha256 — take the
+     * new one from the script's own output rather than assuming a mismatch means a bad artifact.
+     */
+    YAMNET(
+        "yamnet.onnx",
+        "afe82472f2f6250570b63d4f106e7a74b5232cfd17086d39076d80a4273d01f8",
+        downloadUrl = null, // locally converted from the Kaggle SavedModel — no public host yet
+        listOf(longArrayOf(15600)),
+    ),
 }
 
 /** GantMan class order (alphabetical, index-locked). sfw = drawings+neutral; nsfw = the rest. */
 val NSFW_CLASSES = listOf("drawings", "hentai", "neutral", "porn", "sexy")
-
-/** NudeNet v3 label order, index-locked to output rows 4..21. FACE_FEMALE=1, FACE_MALE=12. */
-val NUDENET_CLASSES = listOf(
-    "FEMALE_GENITALIA_COVERED", "FACE_FEMALE", "BUTTOCKS_EXPOSED", "FEMALE_BREAST_EXPOSED",
-    "FEMALE_GENITALIA_EXPOSED", "MALE_BREAST_EXPOSED", "ANUS_EXPOSED", "FEET_EXPOSED",
-    "BELLY_COVERED", "FEET_COVERED", "ARMPITS_COVERED", "ARMPITS_EXPOSED", "FACE_MALE",
-    "BELLY_EXPOSED", "MALE_GENITALIA_EXPOSED", "ANUS_COVERED", "FEMALE_BREAST_COVERED",
-    "BUTTOCKS_COVERED",
-)
 
 data class ModelReport(val model: NaqiModel, val bundled: Boolean, val ok: Boolean, val detail: String)
 
@@ -188,13 +223,36 @@ object ModelSmoke {
 }
 
 /**
+ * Threads handed to the XNNPACK EP (plan-v2 §5.2, "V2"). The STRUCTURE around it — ORT intra-op 1,
+ * spinning off, XNNPACK owning the parallelism — is per ORT's XNNPACK EP guidance and is correct; the
+ * NUMBER was never swept. It used to be `availableProcessors` (8 on an S23), which measured off-device
+ * on this model class as the *worst* option available:
+ *
+ * | XNNPACK threads | inferences/s |
+ * |---|---:|
+ * | 1 | 20.1 |
+ * | 2 | **47.8** |
+ * | 4 | 42.3 |
+ * | 8 *(the old value)* | 19.5 |
+ *
+ * 8 measured **2.4× worse than 2**. The mechanism transfers even if the absolutes do not: an S23's
+ * little cores become stragglers in every parallel conv, the same effect that made 6 beat 8 for
+ * htdemucs. 4 is the compromise pending the on-device A/B — **2 / 4 / 6 still need that A/B**, and
+ * this constant is the whole of the change needed to run it.
+ *
+ * Do NOT batch instead: already tested, batch 2 = 0.65×, batch 4 = 0.87×, batch 8 = 0.47× per frame
+ * against batch 1. Depthwise-separable convnets saturate at batch 1 on CPU.
+ */
+private const val XNNPACK_THREADS = 4
+
+/**
  * The image-model ORT session options, shared by [ModelSmoke]'s load check and [Infer]'s real runs so
  * a model can never smoke-test under different options than it infers under. XNNPACK EP; one intra-op
  * thread with spinning disabled, because these run on a worker that is already saturating the CPU.
- * htdemucs deliberately does NOT use this — see [com.haithamassoli.naqi.audio.HtdemucsSession].
+ * htdemucs deliberately does NOT use this — see `com.haithamassoli.naqi.audio.HtdemucsSession`.
  */
 internal fun imageSessionOptions() = OrtSession.SessionOptions().apply {
     setIntraOpNumThreads(1)
     addConfigEntry("session.intra_op.allow_spinning", "0")
-    addXnnpack(mapOf("intra_op_num_threads" to Runtime.getRuntime().availableProcessors().toString()))
+    addXnnpack(mapOf("intra_op_num_threads" to XNNPACK_THREADS.toString()))
 }

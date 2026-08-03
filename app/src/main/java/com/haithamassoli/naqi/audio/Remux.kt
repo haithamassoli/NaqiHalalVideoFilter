@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileDescriptor
 import java.nio.ByteBuffer
 
 /**
@@ -27,6 +28,25 @@ sealed interface TrackSource {
 
 /** One rendered segment and the absolute source time it starts at, for [Remux.concat]. */
 data class ConcatPart(val file: File, val startMs: Long)
+
+/**
+ * Where a muxed mp4 is written (`plan-v2` §5.9 S5). [ToFd] is what removes one full generation of the
+ * final video: the job used to write `render.mp4`, mux that into `mux.mp4`, then COPY `mux.mp4` into
+ * MediaStore — ~1.7 GB written and read again per film, for a file the muxer could have produced in
+ * place. `MediaMuxer` takes a `FileDescriptor` (API 26; minSdk is 29), and `Publish` already opens one
+ * on the pending MediaStore row, so the middle generation just disappears.
+ *
+ * The two differ in who cleans up a half-written file, which is why this is a type rather than a
+ * nullable parameter. A partial mp4 has no `moov` and must never survive: for [ToFile] this object
+ * deletes it, for [ToFd] it CANNOT — the descriptor's row belongs to [com.haithamassoli.naqi.work.Publish],
+ * which drops it as part of the same contract that already covers a cancelled copy.
+ */
+sealed interface MuxOut {
+    data class ToFile(val file: File) : MuxOut
+
+    /** Descriptor opened "rw", not "w" — `MediaMuxer` seeks back over the file to write `moov`. */
+    data class ToFd(val fd: FileDescriptor) : MuxOut
+}
 
 /** What MPEG-4 `MediaMuxer` will accept as an audio track (framework `MPEG4Writer`). */
 private val MUXABLE_AUDIO = setOf("audio/mp4a-latm", "audio/3gpp", "audio/amr-wb")
@@ -82,14 +102,14 @@ fun concatAudio(context: Context, uri: Uri): ConcatAudio {
 object Remux {
 
     /**
-     * Mux [video]'s video track with [audioM4a]'s audio into [outFile]. [onProgress] reports 0..100
+     * Mux [video]'s video track with [audioM4a]'s audio into [out]. [onProgress] reports 0..100
      * by muxed video-sample fraction (coarse — only on change).
      */
     suspend fun mux(
         context: Context,
         video: TrackSource,
         audioM4a: File,
-        outFile: File,
+        out: MuxOut,
         onProgress: (Int) -> Unit,
     ) = withContext(Dispatchers.IO) {
         val vExt = MediaExtractor()
@@ -110,7 +130,7 @@ object Remux {
             aExt.selectTrack(aTrackIx)
             val aFormat = aExt.getTrackFormat(aTrackIx)
 
-            muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            muxer = out.muxer()
             val videoSrc = Src(vExt, muxer.addTrack(vFormat), allocFor(vFormat))   // CSD (avcC/hvcC) rides in vFormat
             val audioSrc = Src(aExt, muxer.addTrack(aFormat), allocFor(aFormat))
             muxer.setOrientationHint(rotationOf(context, video, vFormat))          // MUST precede start()
@@ -142,7 +162,7 @@ object Remux {
             runCatching { muxer?.release() }
             runCatching { vExt.release() }
             runCatching { aExt.release() }
-            if (failed) runCatching { if (outFile.exists()) outFile.delete() } // never leave a half-written mp4
+            if (failed) out.discard() // never leave a half-written mp4
         }
     }
 
@@ -165,7 +185,7 @@ object Remux {
         context: Context,
         parts: List<ConcatPart>,
         audio: TrackSource?,
-        outFile: File,
+        out: MuxOut,
         onProgress: (Int) -> Unit,
     ) = withContext(Dispatchers.IO) {
         require(parts.isNotEmpty()) { "concat needs at least one segment" }
@@ -179,7 +199,7 @@ object Remux {
             vExt.selectTrack(vTrackIx)
             val vFormat = vExt.getTrackFormat(vTrackIx)
 
-            muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            muxer = out.muxer()
             val videoSrc = Src(vExt, muxer.addTrack(vFormat), allocFor(vFormat)) // CSD rides in vFormat
             val audioSrc = aExt?.let { ext ->
                 when (audio) {
@@ -240,8 +260,18 @@ object Remux {
             runCatching { muxer?.release() }
             runCatching { vExt.release() }
             runCatching { aExt?.release() }
-            if (failed) runCatching { if (outFile.exists()) outFile.delete() }
+            if (failed) out.discard()
         }
+    }
+
+    private fun MuxOut.muxer(): MediaMuxer = when (this) {
+        is MuxOut.ToFile -> MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        is MuxOut.ToFd -> MediaMuxer(fd, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    }
+
+    /** Half-written mp4 cleanup. See [MuxOut] for why the descriptor case is deliberately a no-op. */
+    private fun MuxOut.discard() {
+        if (this is MuxOut.ToFile) runCatching { if (file.exists()) file.delete() }
     }
 
     /**
