@@ -27,6 +27,7 @@ import com.haithamassoli.naqi.audio.TrackSource
 import com.haithamassoli.naqi.audio.concatAudio
 import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.edl.Edl
+import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.edl.FaceTrackEdl
 import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.media.firstTrackIndex
@@ -74,6 +75,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     private val strictness = inputData.getInt(KEY_STRICTNESS, 50)
     private val grayscale = inputData.getBoolean(KEY_GRAYSCALE, false)
 
+    /** Non-zero replaces blur with a flat fill; see [FilterOps.solidColor] for why 0 means blur. */
+    private val solidColor = inputData.getInt(KEY_SOLID_COLOR, FilterOps.BLUR)
+
     /**
      * Correctness item 7.3: `blurAmount = 0` with `grayscale = false` makes [CensorGlEffect] draw the
      * source pixels back unchanged, so the job spends a full render producing a copy of the input while
@@ -85,10 +89,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
      * tells nobody anything. Coercion delivers what the job promised. Read here rather than in the UI
      * because a queued job carries its own input data and must not be able to bypass the guard.
      *
-     * Only the exact no-op combination is touched; every other slider position is the user's.
+     * Only the exact no-op combination is touched; every other slider position is the user's. A solid
+     * fill covers the region on its own, so it takes the combination out of no-op territory too.
      */
     private val blurAmount = inputData.getInt(KEY_BLUR_AMOUNT, 60).let {
-        if (it > 0 || grayscale) it else MIN_EFFECTIVE_BLUR
+        if (it > 0 || grayscale || solidColor != FilterOps.BLUR) it else MIN_EFFECTIVE_BLUR
     }
     private val keepStems = inputData.getString(KEY_KEEP_STEMS) ?: "vocals"
 
@@ -111,6 +116,10 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             inputData.getInt(KEY_STRICTNESS, 50),
             inputData.getInt(KEY_BLUR_AMOUNT, 60),
             inputData.getBoolean(KEY_GRAYSCALE, false),
+            // Adding this moved every existing key once, orphaning any resumable directory left by a
+            // pre-solid build — the same cost as the plan bump below, and unavoidable: a blurred segment
+            // and a solid-filled one must never resume into each other.
+            inputData.getInt(KEY_SOLID_COLOR, FilterOps.BLUR),
             inputData.getString(KEY_KEEP_STEMS),
             inputData.getString(KEY_FORCE_INTERVALS), // debug hook, but it does change the output
             // Not an input: a plan generation. Segment boundaries moved to sync samples in
@@ -608,7 +617,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             val part = File(workDir, "seg-%03d.mp4.part".format(seg.index))
             runCatching { part.delete() }
             RenderPipeline.renderCensor(
-                applicationContext, inputUri, part, edl, blurAmount, grayscale, meta,
+                applicationContext, inputUri, part, edl, blurAmount, grayscale, meta, solidColor,
                 segment = seg, bitrate = bitrate,
             ) { p ->
                 reportVideoAsync(stage, progressBase + ((seg.index * 100 + p) * progressSpan / (plan.size * 100)))
@@ -912,7 +921,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         stats.stage("render")
         reportVideo(stage, progressBase)
         RenderPipeline.renderCensor(
-            applicationContext, uri, tempFile, edl, blurAmount, grayscale, meta, removeAudio = removeAudio,
+            applicationContext, uri, tempFile, edl, blurAmount, grayscale, meta, solidColor,
+            removeAudio = removeAudio,
         ) { p ->
             reportVideoAsync(stage, progressBase + p * progressSpan / 100)
         }
@@ -1047,6 +1057,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         const val KEY_STRICTNESS = "strictness"
         const val KEY_BLUR_AMOUNT = "blur_amount"
         const val KEY_GRAYSCALE = "grayscale"
+        const val KEY_SOLID_COLOR = "solid_color"
 
         // KEY_BLUR_UNKNOWN ("blur_unknown_faces") was deleted with the gender vote (plan-v2 §5.4)
         // along with FilterOps.blurUnknownFaces. Unlike KEY_CENSOR_WOMEN above, the wire string did NOT

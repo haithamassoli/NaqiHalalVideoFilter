@@ -66,6 +66,16 @@
     <string name="opt_section_censor_faces">حجب الوجوه</string>
     <string name="opt_strictness_title">الصرامة</string>
     <string name="opt_strictness_desc">مدى سهولة حجب المشهد كاملًا. لا يتأثّر تمويه الوجوه بهذا الإعداد.</string>
+    <string name="opt_censor_style_title">أسلوب الحجب</string>
+    <string name="opt_censor_style_desc">تمويه المنطقة أو تغطيتها بلون كامل.</string>
+    <string name="opt_style_blur">تمويه</string>
+    <string name="opt_style_solid">لون</string>
+    <!-- Spoken by TalkBack for the color swatches; never shown on screen. -->
+    <string name="opt_solid_gray">رمادي</string>
+    <string name="opt_solid_black">أسود</string>
+    <string name="opt_solid_white">أبيض</string>
+    <string name="opt_solid_navy">كحلي</string>
+    <string name="opt_solid_green">أخضر</string>
     <string name="opt_blur_amount_title">شدّة التمويه</string>
     <string name="opt_blur_amount_desc">مدى قوّة التمويه على الوجوه والمشاهد المحجوبة.</string>
     <string name="opt_grayscale_title">تدرّج الرمادي</string>

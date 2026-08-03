@@ -77,6 +77,16 @@
     <string name="opt_section_censor_faces">Censor faces</string>
     <string name="opt_strictness_title">Strictness</string>
     <string name="opt_strictness_desc">How eagerly whole scenes are censored. Face blurring is never affected.</string>
+    <string name="opt_censor_style_title">Censor style</string>
+    <string name="opt_censor_style_desc">Blur the area, or cover it with a solid color.</string>
+    <string name="opt_style_blur">Blur</string>
+    <string name="opt_style_solid">Solid</string>
+    <!-- Spoken by TalkBack for the color swatches; never shown on screen. -->
+    <string name="opt_solid_gray">Gray</string>
+    <string name="opt_solid_black">Black</string>
+    <string name="opt_solid_white">White</string>
+    <string name="opt_solid_navy">Navy</string>
+    <string name="opt_solid_green">Green</string>
     <string name="opt_blur_amount_title">Blur amount</string>
     <string name="opt_blur_amount_desc">How heavy the blur is on faces and censored scenes.</string>
     <string name="opt_grayscale_title">Grayscale</string>

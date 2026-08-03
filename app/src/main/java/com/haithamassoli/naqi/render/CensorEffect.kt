@@ -15,6 +15,7 @@ import androidx.media3.effect.GlShaderProgram
 import com.haithamassoli.naqi.analysis.NRect
 import com.haithamassoli.naqi.analysis.VideoMeta
 import com.haithamassoli.naqi.edl.Edl
+import com.haithamassoli.naqi.model.FilterOps
 import kotlin.math.ceil
 import kotlin.math.exp
 import kotlin.math.max
@@ -30,7 +31,8 @@ private const val MAX_REGIONS = 8
 
 /**
  * M1 pass-2 render effect. Per output frame the [Edl] selects one of: whole-frame censor, a list of
- * regions, or nothing. Censored pixels are separable-Gaussian blurred (when [blurAmount] > 0) and/or
+ * regions, or nothing. Censored pixels are replaced by a flat [solidColor] (when it is not
+ * [FilterOps.BLUR]), else separable-Gaussian blurred (when [blurAmount] > 0) and/or
  * BT.709 grayscaled (when [grayscale]); original pixels are kept elsewhere. A region's edge is
  * feathered OUTWARD (see [COMPOSITE_FRAGMENT]) so a face fades into the frame instead of sitting in a
  * visible rectangle — the rect itself stays fully censored, only pixels outside it are partially so.
@@ -49,10 +51,24 @@ class CensorGlEffect(
     private val grayscale: Boolean,
     private val meta: VideoMeta,
     private val timeOffsetMs: Long = 0L,
+    private val solidColor: Int = FilterOps.BLUR,
 ) : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram =
-        CensorShaderProgram(edl, blurAmount, grayscale, meta, useHdr, timeOffsetMs)
+        CensorShaderProgram(edl, blurAmount, grayscale, meta, useHdr, timeOffsetMs, solidColor)
 }
+
+/**
+ * ARGB -> the shader's `uSolidColor` (rgb, 0..1). No transfer conversion: media3's SDR pipeline works
+ * in electrical (sRGB) space, which is what a colour picked as a hex value already is.
+ *
+ * ponytail: HDR (`useHdr`) composites in linear, so a fill there lands darker than the swatch shown.
+ * Fix by linearizing here if HDR censoring ever gets QA'd; the fill is still opaque and correct-hued.
+ */
+internal fun solidRgb(argb: Int) = floatArrayOf(
+    ((argb shr 16) and 0xFF) / 255f,
+    ((argb shr 8) and 0xFF) / 255f,
+    (argb and 0xFF) / 255f,
+)
 
 /**
  * Multi-pass shader program behind [CensorGlEffect]. When blur is active it renders two separable
@@ -66,9 +82,14 @@ private class CensorShaderProgram(
     private val meta: VideoMeta,
     private val useHdr: Boolean,
     private val timeOffsetMs: Long,
+    private val solidColor: Int,
 ) : BaseGlShaderProgram(useHdr, /* texturePoolCapacity = */ 1) {
 
-    private val blurEnabled = blurAmount > 0
+    private val solid = solidColor != FilterOps.BLUR
+    private val solidRgb = solidRgb(solidColor)
+
+    /** A solid fill covers every censored pixel, so the two blur passes are skipped outright, not hidden. */
+    private val blurEnabled = blurAmount > 0 && !solid
 
     /** 0 when incoming frames are already upright; the source rotation when they are stored-orientation. */
     private var mapRotation = 0
@@ -190,6 +211,8 @@ private class CensorShaderProgram(
         p.setSamplerTexIdUniform("uBlurTex", if (blurEnabled) scratchTex[1] else inputTexId, /* texUnitIndex = */ 1)
         p.setIntUniform("uCensorAll", if (full) 1 else 0)
         p.setIntUniform("uUseBlur", if (blurEnabled) 1 else 0)
+        p.setIntUniform("uUseSolid", if (solid) 1 else 0)
+        p.setFloatsUniform("uSolidColor", solidRgb)
         p.setIntUniform("uGrayscale", if (grayscale) 1 else 0)
         p.setIntUniform("uRegionCount", regions.size)
         p.bindAttributesAndUniforms()
@@ -313,7 +336,7 @@ private val BLUR_FRAGMENT = """
     }
     """.trimIndent()
 
-// Composite: mix original toward the blurred (or original) base, optionally grayscaled, by a coverage
+// Composite: mix original toward the solid / blurred / original base, optionally grayscaled, by a coverage
 // mask — 1 inside any region, falling to 0 across a feather band outside it. uRegions holds
 // (left, right, yLow, yHigh) in GL y-up coords; loop bound is MAX_REGIONS (8).
 //
@@ -330,6 +353,8 @@ private val COMPOSITE_FRAGMENT = """
     uniform sampler2D uBlurTex;
     uniform int uCensorAll;
     uniform int uUseBlur;
+    uniform int uUseSolid;
+    uniform vec3 uSolidColor;
     uniform int uGrayscale;
     uniform int uRegionCount;
     uniform vec4 uRegions[8];
@@ -356,10 +381,16 @@ private val COMPOSITE_FRAGMENT = """
         gl_FragColor = orig;
         return;
       }
-      vec3 base = (uUseBlur == 1) ? texture2D(uBlurTex, vTexCoord).rgb : orig.rgb;
-      if (uGrayscale == 1) {
-        float luma = dot(base, vec3(0.2126, 0.7152, 0.0722)); // BT.709
-        base = vec3(luma);
+      // Solid wins outright: graying a flat fill would only turn the picked colour into a gray one.
+      vec3 base;
+      if (uUseSolid == 1) {
+        base = uSolidColor;
+      } else {
+        base = (uUseBlur == 1) ? texture2D(uBlurTex, vTexCoord).rgb : orig.rgb;
+        if (uGrayscale == 1) {
+          float luma = dot(base, vec3(0.2126, 0.7152, 0.0722)); // BT.709
+          base = vec3(luma);
+        }
       }
       gl_FragColor = vec4(mix(orig.rgb, base, mask), orig.a);
     }

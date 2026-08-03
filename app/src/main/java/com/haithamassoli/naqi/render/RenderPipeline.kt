@@ -87,6 +87,7 @@ object RenderPipeline {
         blurAmount: Int,
         grayscale: Boolean,
         meta: VideoMeta,
+        solidColor: Int = com.haithamassoli.naqi.model.FilterOps.BLUR,
         segment: RenderSegment? = null,
         removeAudio: Boolean = false,
         bitrate: Int? = null,
@@ -127,7 +128,9 @@ object RenderPipeline {
             .setEffects(
                 if (passthrough) Effects.EMPTY else Effects(
                     /* audioProcessors = */ emptyList(),
-                    listOf<Effect>(CensorGlEffect(edl, blurAmount, grayscale, meta, segment?.startMs ?: 0L)),
+                    listOf<Effect>(
+                        CensorGlEffect(edl, blurAmount, grayscale, meta, segment?.startMs ?: 0L, solidColor),
+                    ),
                 ),
             )
             .build()

@@ -212,6 +212,8 @@ class MainActivity : ComponentActivity() {
             strictness = intent.getIntExtra("strictness", 50),
             blurAmount = intent.getIntExtra("blur", 60),
             grayscale = intent.getBooleanExtra("grayscale", false),
+            // `--ei solid 0xFF000000`-style; 0 (the default) keeps blur.
+            solidColor = intent.getIntExtra("solid", FilterOps.BLUR),
             // `--ez blur_unknown` is gone with the gender vote (plan-v2 §5.4); passing it is now a no-op.
             keepStems = intent.getStringExtra("keep_stems") ?: "vocals",
         )

@@ -142,6 +142,7 @@ internal object Queue {
                 put("strictness", i.ops.strictness)
                 put("blurAmount", i.ops.blurAmount)
                 put("grayscale", i.ops.grayscale)
+                put("solidColor", i.ops.solidColor)
                 put("keepStems", i.ops.keepStems)
             },
         )
@@ -166,6 +167,7 @@ internal object Queue {
                 strictness = ops.optInt("strictness", 50),
                 blurAmount = ops.optInt("blurAmount", 60),
                 grayscale = ops.optBoolean("grayscale", false),
+                solidColor = ops.optInt("solidColor", FilterOps.BLUR),
                 // A "blurUnknownFaces" key written by an older build is simply ignored (plan-v2 §5.4).
                 keepStems = ops.optString("keepStems").ifBlank { "vocals" },
             ),

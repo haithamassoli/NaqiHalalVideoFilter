@@ -8,7 +8,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,13 +19,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,8 +45,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
@@ -57,6 +69,18 @@ import com.haithamassoli.naqi.work.JobController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+
+/** TalkBack names for [FilterOps.SOLID_COLORS], same order. A bare colour circle says nothing aloud. */
+private val SOLID_LABELS = listOf(
+    R.string.opt_solid_gray,
+    R.string.opt_solid_black,
+    R.string.opt_solid_white,
+    R.string.opt_solid_navy,
+    R.string.opt_solid_green,
+)
+
+/** Black: the censor bar everyone already recognizes. */
+private val DEFAULT_SOLID = FilterOps.SOLID_COLORS[1]
 
 /**
  * Step 2: tune the selected operations, then start the job. Every control is shown only when the op it
@@ -167,18 +191,24 @@ fun OptionsScreen(
                         value = ops.strictness,
                     ) { onOpsChange(ops.copy(strictness = it)) }
                     NaqiRowDivider()
-                    SliderRow(
-                        title = stringResource(R.string.opt_blur_amount_title),
-                        desc = stringResource(R.string.opt_blur_amount_desc),
-                        value = ops.blurAmount,
-                    ) { onOpsChange(ops.copy(blurAmount = it)) }
-                    NaqiRowDivider()
-                    ToggleTile(
-                        title = stringResource(R.string.opt_grayscale_title),
-                        desc = stringResource(R.string.opt_grayscale_desc),
-                        checked = ops.grayscale,
-                        onCheckedChange = { onOpsChange(ops.copy(grayscale = it)) },
-                    )
+                    CensorStyleRow(ops.solidColor) { onOpsChange(ops.copy(solidColor = it)) }
+                    // Both only style the blur, and a solid fill has no blur to style — showing them
+                    // under Solid would be two controls that cannot change the output.
+                    if (ops.solidColor == FilterOps.BLUR) {
+                        NaqiRowDivider()
+                        SliderRow(
+                            title = stringResource(R.string.opt_blur_amount_title),
+                            desc = stringResource(R.string.opt_blur_amount_desc),
+                            value = ops.blurAmount,
+                        ) { onOpsChange(ops.copy(blurAmount = it)) }
+                        NaqiRowDivider()
+                        ToggleTile(
+                            title = stringResource(R.string.opt_grayscale_title),
+                            desc = stringResource(R.string.opt_grayscale_desc),
+                            checked = ops.grayscale,
+                            onCheckedChange = { onOpsChange(ops.copy(grayscale = it)) },
+                        )
+                    }
                     // The collapsible "Advanced" row went with plan-v2 §5.4: "Blur unknown faces" was the
                     // only thing inside it, and once every detected face is censored there is no unknown
                     // bucket left to open. An expander over nothing is worse than no expander.
@@ -220,6 +250,63 @@ fun OptionsScreen(
             },
         )
     }
+}
+
+/**
+ * Blur or a flat fill, and which fill. The two live in one row because they are one decision: picking
+ * a swatch IS choosing Solid, so a user who reaches straight for a colour never has to notice the
+ * segmented control at all.
+ *
+ * ponytail: five fixed swatches, no full picker. A censor bar wants to be unremarkable, and the set
+ * covers that; add a picker if anyone actually asks to match a specific palette.
+ */
+@Composable
+private fun CensorStyleRow(color: Int, onChange: (Int) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Column(Modifier.padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3)) {
+        Text(stringResource(R.string.opt_censor_style_title), style = MaterialTheme.typography.titleSmall, color = cs.onSurface)
+        Text(stringResource(R.string.opt_censor_style_desc), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+        Spacer(Modifier.height(NaqiTokens.space3))
+        SingleChoiceSegmentedButtonRow {
+            SegmentedButton(
+                selected = color == FilterOps.BLUR,
+                onClick = { onChange(FilterOps.BLUR) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            ) { Text(stringResource(R.string.opt_style_blur)) }
+            SegmentedButton(
+                // Keeps the colour the user last picked; only a first visit needs a default.
+                selected = color != FilterOps.BLUR,
+                onClick = { if (color == FilterOps.BLUR) onChange(DEFAULT_SOLID) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            ) { Text(stringResource(R.string.opt_style_solid)) }
+        }
+        if (color != FilterOps.BLUR) {
+            Spacer(Modifier.height(NaqiTokens.space3))
+            Row(horizontalArrangement = Arrangement.spacedBy(NaqiTokens.space3)) {
+                FilterOps.SOLID_COLORS.forEachIndexed { i, c ->
+                    Swatch(c, selected = c == color, label = stringResource(SOLID_LABELS[i])) { onChange(c) }
+                }
+            }
+        }
+    }
+}
+
+/** The ring sits OUTSIDE the swatch with a gap, so it reads on black and on white alike. */
+@Composable
+private fun Swatch(color: Int, selected: Boolean, label: String, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .border(2.dp, if (selected) cs.primary else Color.Transparent, CircleShape)
+            .selectable(selected = selected, onClick = onClick)
+            .semantics { contentDescription = label }
+            .padding(4.dp)
+            .clip(CircleShape)
+            .background(Color(color))
+            .border(1.dp, cs.outlineVariant, CircleShape),
+    )
 }
 
 @Composable
