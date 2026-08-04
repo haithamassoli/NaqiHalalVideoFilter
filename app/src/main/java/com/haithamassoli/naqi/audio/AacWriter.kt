@@ -119,8 +119,19 @@ class AacWriter(tempM4a: File, private val firstPtsUs: Long) : AutoCloseable {
     private fun feedEncoder(pcm: ByteArray, size: Int) {
         var off = 0
         while (off < size) {
-            val inIx = encoder.dequeueInputBuffer(TIMEOUT_US)
-            if (inIx < 0) { drainEncoder(false); continue }
+            // C4 (`perf-plan-v4` §5): the sibling below was fixed; this one still paid a blocking 10 ms
+            // wait ~26 times per htdemucs chunk × 276 chunks ≈ 7 000 times per 643 s job, on the
+            // separator's own thread, inside the unsplit residual. An input buffer is almost always
+            // available — so ask for free first, and when it is not, drain (which is what releases one)
+            // before waiting. **The blocking wait has to stay**: nothing else applies backpressure on
+            // this side, unlike [drainEncoder] whose caller supplies it, so dropping it turns the loop
+            // into a spin. Output is unchanged — same buffers, same sizes, same PTS.
+            var inIx = encoder.dequeueInputBuffer(0)
+            if (inIx < 0) {
+                drainEncoder(false)
+                inIx = encoder.dequeueInputBuffer(TIMEOUT_US)
+                if (inIx < 0) continue
+            }
             val ib = encoder.getInputBuffer(inIx)!!
             ib.clear()
             val n = minOf(size - off, ib.remaining()).let { it - it % 4 } // keep whole stereo int16 frames

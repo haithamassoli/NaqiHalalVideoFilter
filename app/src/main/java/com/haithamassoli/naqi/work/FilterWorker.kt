@@ -164,7 +164,12 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // build holds only the tracks that voted FEMALE while a new segment holds every face. Mixing
             // the two on a resume would leave half the film censored under the old semantics. The
             // blurUnknownFaces input also left the hash in the same change, which moves the key anyway.
-            "plan3",
+            // plan3 -> plan4: C1's two-tier music guard changes WHICH chunks a resumed `audio.json` says
+            // were separated — persisted, straddling a resume, and not an input to the hash. (perf-plan-v4
+            // A1 also landed in this build but does NOT belong on this list: it splits the gate fill across
+            // two threads and leaves the tensor bit-identical, so an older `an-NNN.json`'s `firingsMs` is
+            // still valid. A4, which would have changed the gate's pixels, was cut for under-censoring.)
+            "plan4",
         )
     }
 
@@ -539,6 +544,26 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     }
 
     /**
+     * The NSFW gate's `[1,3,224,224]` input. **The consumer owns it now (perf-plan-v4 A1)**: the whole
+     * fill used to run on the sampler's decode coroutine, which was 29 493 ms of a 114 648 ms producer
+     * while this side sat idle for 75 s of the same pass. The sampler still gathers the source bytes
+     * (~2.6 ms/gate-frame it cannot hand over — it is the only side holding the decoder's `Image`); the
+     * ~8.2 ms of BT.601 arithmetic and 150 528 float writes over them happens here. Nothing gets faster,
+     * ~26 s comes off the analyze wall, and the tensor is bit-identical to the pre-A1 one.
+     *
+     * **One buffer for the whole pass**, for exactly [genderVoter]'s reasons: DIRECT + native order
+     * because ORT wraps such a buffer zero-copy and COPIES a heap one on every run (see [Infer.nsfw]),
+     * and `by lazy` rather than per call because [analyzeSegments] builds fresh per-segment state and
+     * would otherwise build a 602 KB buffer per segment. Safe to share for the same reason too: pass 1
+     * is single-threaded, one frame is in the gate at a time, and the tensor is consumed inside the
+     * [Infer.nsfw] call it was filled for.
+     */
+    private val gateInput: FloatBuffer by lazy {
+        ByteBuffer.allocateDirect(3 * FrameSampler.GATE_SIDE * FrameSampler.GATE_SIDE * Float.SIZE_BYTES)
+            .order(ByteOrder.nativeOrder()).asFloatBuffer()
+    }
+
+    /**
      * Pass 1, per segment. Segments already carrying an `an-NNN.json` are skipped entirely — that is the
      * resume. Firings accumulate across every segment and the hysteresis runs ONCE over the whole
      * timeline, so a censor interval that straddles a seam is still one interval.
@@ -571,26 +596,32 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             }
             val segFirings = ArrayList<Long>()
             // Fresh per segment: this is what bounds FaceTracker's growth by construction, on top of the
-            // per-track eviction Phase 1 added. The voter is fresh too, so its buffer lives exactly as
-            // long as the segment's tracker does; the counters it feeds are the worker's and stay
-            // cumulative across segments.
+            // per-track eviction Phase 1 added. Only the TRACKER is fresh — the [genderVoter], its 110 KB
+            // crop buffer and the counters it feeds are all the worker's and outlive every segment, which
+            // is safe only because the segments run in sequence (perf-plan-v4 §10 corrects this comment:
+            // it used to claim the voter was fresh too, contradicting the voter's own KDoc).
             val tracker = FaceTracker(genderVoter, censorWho)
-            var tDetect = 0L; var tGate = 0L; val tWall = System.nanoTime()
+            var tDetect = 0L; var tGateFill = 0L; var tGate = 0L; val tWall = System.nanoTime()
             try {
                 FrameSampler.sample(
                     applicationContext, inputUri, fps = 10f, maxDim = 640,
                     startMs = seg.startMs, endMs = seg.endMs,
-                ) { image, gate, uprightW, uprightH, ptsMs ->
+                ) { image, gateBytes, uprightW, uprightH, ptsMs ->
                     // perf-plan 1.3a: ML Kit works on its own executor while the gate runs here, so detect and
                     // gate now OVERLAP — tDetect times the await (the part that still blocks), and detect+gate
                     // can exceed wall. Awaiting inside the callback is what keeps the sampler's ring buffers
-                    // alive for both. `gate != null` IS the 5 fps cadence: the sampler only fills the tensor on
-                    // the frames it was told the gate would use.
+                    // alive for both. `gateBytes != null` IS the 5 fps cadence: the sampler still decides which
+                    // frames the gate sees and still gathers their source pixels; perf-plan-v4 A1 moved only
+                    // the arithmetic over those bytes onto this side.
                     val task = tracker.detect(image)
-                    if (gate != null) {
+                    if (gateBytes != null) {
+                        // Ring-owned like the NV21 and valid for exactly this callback, so the tensor has to
+                        // be built and consumed before returning — which it is, inside the Infer.nsfw below.
                         val t1 = System.nanoTime()
-                        val probs = Infer.nsfw(applicationContext, gate)
-                        tGate += System.nanoTime() - t1
+                        FrameSampler.gateFromGathered(gateBytes, gateInput)
+                        val t2 = System.nanoTime()
+                        val probs = Infer.nsfw(applicationContext, gateInput)
+                        tGateFill += t2 - t1; tGate += System.nanoTime() - t2
                         if (NsfwGate.fires(probs, strictness)) segFirings += ptsMs
                     }
                     val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
@@ -613,11 +644,13 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 Checkpoint.writeAnalysis(workDir, seg.index, segFirings, Edl(emptyList(), segTracks))
                 firings += segFirings
                 faceTracks += segTracks
-                // plan-v2 §4.6: `gate=` is now session.run alone — its preprocessing moved into the
-                // sampler and is logged as `gateFill=` on the FrameSampler line just above this one.
+                // plan-v2 §4.6: `gate=` is session.run alone and `gateFill=` is its preprocessing. Both are
+                // on this line since perf-plan-v4 A1 moved the fill here from the sampler; they still mean
+                // exactly the two things they meant before.
                 Log.i(TAG, "analyze seg-${seg.index} [${seg.startMs}..${seg.endMs}): " +
                     "firings=${segFirings.size} faceTracks=${segTracks.size} ${tracker.retention()} " +
-                    "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms")
+                    "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms " +
+                    "gateFill=${tGateFill / 1_000_000}ms gate=${tGate / 1_000_000}ms")
             } finally {
                 runCatching { tracker.closeDetector() }
             }
@@ -1046,14 +1079,17 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         val firings = ArrayList<Long>()
         var index = 0
         var lastPct = -1
-        var tDetect = 0L; var tGate = 0L; val tWall = System.nanoTime()
-        FrameSampler.sample(applicationContext, uri, fps = 10f, maxDim = 640) { image, gate, uprightW, uprightH, ptsMs ->
-            // Same overlapped sequence as analyzeSegments — see the comment there (perf-plan 1.3a).
+        var tDetect = 0L; var tGateFill = 0L; var tGate = 0L; val tWall = System.nanoTime()
+        FrameSampler.sample(applicationContext, uri, fps = 10f, maxDim = 640) { image, gateBytes, uprightW, uprightH, ptsMs ->
+            // Same overlapped sequence as analyzeSegments, and the same second half of the gate fill over
+            // the bytes the sampler gathered — see the comments there (perf-plan 1.3a, perf-plan-v4 A1).
             val task = faceTracker.detect(image)
-            if (gate != null) {
+            if (gateBytes != null) {
                 val t1 = System.nanoTime()
-                val probs = Infer.nsfw(applicationContext, gate)
-                tGate += System.nanoTime() - t1
+                FrameSampler.gateFromGathered(gateBytes, gateInput)
+                val t2 = System.nanoTime()
+                val probs = Infer.nsfw(applicationContext, gateInput)
+                tGateFill += t2 - t1; tGate += System.nanoTime() - t2
                 if (NsfwGate.fires(probs, strictness)) firings += ptsMs
             }
             val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
@@ -1078,10 +1114,12 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         // Counts on their own line: a feature-length film produces hundreds of intervals, and logcat
         // truncates a message at ~4 kB — on the first 155-min soak that silently ate the face counts
         // off the end of the combined line, which were the whole point of logging it.
-        // plan-v2 §4.6: `gate=` is session.run alone now; its preprocessing is the sampler's `gateFill=`.
+        // plan-v2 §4.6: `gate=` is session.run alone; `gateFill=` is its preprocessing, which perf-plan-v4
+        // A1 moved off the sampler onto this side. Same two meanings, one line further down.
         Log.i(TAG, "pass1: gateFirings=${firings.size} intervalCount=${intervals.size} " +
             "wholeFrame=$wholeFrameBlur faceTracks=${faceTracks.size} ${faceTracker.retention()} " +
-            "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms gate=${tGate / 1_000_000}ms")
+            "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms " +
+            "gateFill=${tGateFill / 1_000_000}ms gate=${tGate / 1_000_000}ms")
         logVotes("pass1")
         Log.i(TAG, "pass1 intervals=$intervals")
         return Edl(intervals, faceTracks)

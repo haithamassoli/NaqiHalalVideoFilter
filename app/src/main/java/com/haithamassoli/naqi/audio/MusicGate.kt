@@ -25,8 +25,8 @@ import kotlin.math.abs
  * failure the user cannot fix; a spurious separation costs one chunk of wall clock. That is why
  * [THRESHOLD] sits far below the score any real music gets, why the score is a MAX over frames rather
  * than a mean, and why [open] returns null (gate off, separate everything) on any problem at all rather
- * than guessing. The ±2-chunk dilation that goes with it lives in [DemucsSeparator.separateChunk] —
- * this class is stateless.
+ * than guessing. The two-tier ±2-chunk dilation that goes with it lives in
+ * [DemucsSeparator.separateChunk] — this class is stateless.
  *
  * Contract: one worker drives this at a time (thread-confined, like [HtdemucsSession]); [close]
  * releases the session.
@@ -47,28 +47,38 @@ class MusicGate private constructor(private val session: OrtSession) : AutoClose
     private val scores = FloatArray(CLASSES)
 
     /**
-     * True when [frames] samples of mono 44.1 kHz audio contain music — instrumental or sung.
+     * How much music is in [frames] samples of mono 44.1 kHz audio — instrumental or sung. At
+     * [THRESHOLD] or above the window IS music; below it the number is still meaningful, which is the
+     * whole point of returning it.
      *
      * Scored as the max over 0.975 s YAMNet frames tiled across the window with the LAST frame flush
      * against the end, so every sample is covered by at least one frame (a plain 0.975 s stride would
      * leave the last 0.65 s of a 2.6 s chunk unscored, and htdemucs chunks are 2.34 s apart, so that
      * hole would fall between windows too).
+     *
+     * **The early exit at [THRESHOLD] survives C1 unchanged, and cannot change either caller's answer.**
+     * Above the threshold nothing ever asks for more than "≥ THRESHOLD"; below it no frame
+     * short-circuits, so the true max is returned exactly — and below is the only place
+     * [DemucsSeparator]'s far-dilation tier reads it. Silence (peak under [SILENCE_PEAK]) and a window
+     * too short to resample both score 0, i.e. the same "not music" they always did.
      */
-    fun isMusic(mono44k: FloatArray, frames: Int): Boolean {
+    fun score(mono44k: FloatArray, frames: Int): Float {
         val n = resampleTo16k(mono44k, frames)
-        if (n == 0) return false
+        if (n == 0) return 0f
 
         // Silence is free (`plan-v2` §5.5): under the floor there is nothing to separate, and no model
         // run can change that. -60 dBFS peak — anything a listener could hear is well above it, and room
         // tone on a film soundtrack sits around -50.
         var peak = 0f
         for (i in 0 until n) { val a = abs(mono16k[i]); if (a > peak) peak = a }
-        if (peak < SILENCE_PEAK) return false
+        if (peak < SILENCE_PEAK) return 0f
 
+        var best = 0f
         var start = 0
         while (true) {
-            if (score(start, n) >= THRESHOLD) return true
-            if (start + FRAME >= n) return false
+            val s = scoreFrame(start, n)
+            if (s > best) best = s
+            if (best >= THRESHOLD || start + FRAME >= n) return best
             start = minOf(start + FRAME, n - FRAME) // last frame flush with the end
         }
     }
@@ -98,7 +108,7 @@ class MusicGate private constructor(private val session: OrtSession) : AutoClose
     }
 
     /** One YAMNet frame starting at [start], zero-padded when the window ends first. */
-    private fun score(start: Int, n: Int): Float {
+    private fun scoreFrame(start: Int, n: Int): Float {
         input.clear()
         val avail = minOf(FRAME, n - start)
         input.put(mono16k, start, avail)
@@ -146,8 +156,12 @@ class MusicGate private constructor(private val session: OrtSession) : AutoClose
          * above the loudest non-music case measured and ~6x below the quietest music case, i.e. it sits in
          * the empty middle of that distribution — which is what makes the choice not delicate. Move it DOWN
          * if a QA clip ever keeps music; the cost of down is wall clock, the cost of up is the product.
+         *
+         * Not private since C1: [DemucsSeparator] holds SCORES in its dilation ring and so has to apply
+         * this itself. `const`, so the value is inlined at that use site and the separator keeps no
+         * runtime reference to this Android-dependent class — which is what its JVM tests need.
          */
-        private const val THRESHOLD = 0.15f
+        internal const val THRESHOLD = 0.15f
 
         /** -60 dBFS peak. Below this a chunk is silence and needs no model at all. */
         private const val SILENCE_PEAK = 0.001f

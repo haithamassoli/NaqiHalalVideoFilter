@@ -74,6 +74,15 @@ internal fun solidRgb(argb: Int) = floatArrayOf(
  * Multi-pass shader program behind [CensorGlEffect]. When blur is active it renders two separable
  * passes into downscaled scratch framebuffers, then a final composite into Base's output framebuffer;
  * the save/restore of the framebuffer binding + viewport around the scratch passes is mandatory.
+ *
+ * `texturePoolCapacity = 3` is an **untested pipeline-depth experiment, measurement pending**
+ * (`perf-plan-v4` §3, A6) — not a measured win. At capacity 1 [BaseGlShaderProgram] cannot begin
+ * frame N+1 until `FinalShaderProgramWrapper` releases frame N to the encoder surface, and that
+ * serialization is paid per frame across the stage that is 44 % of a short censor job (× 19 267
+ * frames). `perf-plan-v3` §5.2 predicted zero here, but on an ALU/bandwidth argument — a different
+ * question — so v4 rates the gain NOT ESTIMABLE. The cost is real and known: 2 extra full-res output
+ * textures, ~16 MB at 1080p RGBA8888 and double that under [useHdr]. Revert to 1 if an interleaved
+ * A/B in one cooled session does not move render wall.
  */
 private class CensorShaderProgram(
     private val edl: Edl,
@@ -83,7 +92,7 @@ private class CensorShaderProgram(
     private val useHdr: Boolean,
     private val timeOffsetMs: Long,
     private val solidColor: Int,
-) : BaseGlShaderProgram(useHdr, /* texturePoolCapacity = */ 1) {
+) : BaseGlShaderProgram(useHdr, /* texturePoolCapacity = */ 3) {
 
     private val solid = solidColor != FilterOps.BLUR
     private val solidRgb = solidRgb(solidColor)

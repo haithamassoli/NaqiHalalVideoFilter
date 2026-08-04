@@ -71,12 +71,31 @@ object AudioPipeline {
      * actually splits between the Kotlin STFT, ORT, and the iSTFT + overlap-add. Logged at the end of a
      * run rather than per chunk — the separator cannot be referenced from inside its own constructor's
      * `onChunk`, and a resumed run logs its own segment's split anyway.
+     *
+     * M2 (`perf-plan-v4` §2) adds everything after `istft+ola` on the first line and the whole second
+     * one. Those three counters left **110 699 ms (24.6 %) of a 449 376 ms stage unattributed**, and on
+     * a music-removal job the audio branch alone is the wall (§1 shape C), so that residual pays 1:1 —
+     * C2, C3 and C4 are all ranked off what these say. What is still outside every counter: the sampled
+     * stats pass at the top of the run, `writer.finish()`, and for the resumable path [encodePcm].
      */
-    private fun logStageSplit(s: DemucsSeparator) {
+    private fun logStageSplit(
+        s: DemucsSeparator,
+        decodeNs: Long,
+        yieldNs: Long,
+        sessionCreateNs: Long,
+        gateOpenNs: Long,
+    ) {
         Log.i(
             TAG,
             "separate split: stft=${s.stftNs / 1_000_000}ms ort=${s.inferNs / 1_000_000}ms " +
-                "istft+ola=${s.olaNs / 1_000_000}ms (rest of wall = ring gather, flush, decode, thermal)",
+                "istft+ola=${s.olaNs / 1_000_000}ms gate=${s.gateNs / 1_000_000}ms " +
+                "gather=${s.gatherNs / 1_000_000}ms flush=${s.flushNs / 1_000_000}ms " +
+                "encode=${s.encodeNs / 1_000_000}ms",
+        )
+        Log.i(
+            TAG,
+            "separate residual: decode=${decodeNs / 1_000_000}ms yield=${yieldNs / 1_000_000}ms " +
+                "sessionCreateMs=${sessionCreateNs / 1_000_000} gateOpenMs=${gateOpenNs / 1_000_000}",
         )
     }
 
@@ -90,8 +109,17 @@ object AudioPipeline {
      *   claimed. Since A3 that shortens the output honestly instead of zero-padding it to the declared
      *   length, so this is a warning and not a failure: [estFrames] is an estimate and a source whose
      *   container duration is loose must not lose a job over it.
+     *
+     * — plus, since M2, the four wall counters only the caller holds; see [logStageSplit].
      */
-    private fun logRun(s: DemucsSeparator, estFrames: Long) {
+    private fun logRun(
+        s: DemucsSeparator,
+        estFrames: Long,
+        decodeNs: Long,
+        yieldNs: Long,
+        sessionCreateNs: Long,
+        gateOpenNs: Long,
+    ) {
         val pct = if (s.chunksDone > 0) 100 * s.skippedChunks / s.chunksDone else 0
         Log.i(TAG, "music gate: skipped ${s.skippedChunks}/${s.chunksDone} chunks ($pct%) fed=${s.framesFed} frames")
         if (s.nonFinite > 0) Log.w(TAG, "separator produced ${s.nonFinite} non-finite samples (silenced)")
@@ -99,7 +127,7 @@ object AudioPipeline {
         if (estFrames > 0 && abs(delta) > LENGTH_WARN_FRAMES) {
             Log.w(TAG, "stream delivered ${s.framesFed} frames, container said $estFrames (delta $delta)")
         }
-        logStageSplit(s)
+        logStageSplit(s, decodeNs, yieldNs, sessionCreateNs, gateOpenNs)
     }
 
     /**
@@ -132,15 +160,20 @@ object AudioPipeline {
 
         val keepOther = keepStems == "vocals_other"
         // A1: null when the model is not installed, and then every chunk is separated — see MusicGate.open.
+        // Both opens are timed for M2: neither has ever appeared in a counter — see logStageSplit.
+        val tOpen = System.nanoTime()
         val gate = MusicGate.open(context)
+        val tGate = System.nanoTime()
         try {
             // A4: the session copies only the kept stems out of ORT, so it is built from the same set the
             // separator keeps — one derivation, no way for the two to disagree about what the arrays hold.
             HtdemucsSession(context, DemucsSeparator.keptStems(keepOther)).use { session ->
+                val sessionCreateNs = System.nanoTime() - tGate // the ctor ran before use{} was entered
                 // Sources with an AAC priming edit report a small NEGATIVE first PTS; MediaMuxer rejects
                 // negative sample times, and our re-encode introduces its own priming anyway — clamp to 0.
                 val writer = AacWriter(tempM4a, stats.firstPtsUs.coerceAtLeast(0L))
                 try {
+                    var yieldNs = 0L
                     // Reset AFTER thermalYield, so a throttle pause is not billed to the next chunk.
                     var tChunk = System.nanoTime()
                     val separator = DemucsSeparator(
@@ -157,22 +190,35 @@ object AudioPipeline {
                             // (`perf-plan.md` 1.1); `plan-v2` §5.9 asks for the same guard here.
                             val pct = 2 + 96 * done / total // 0..total -> 2..98
                             if (pct != lastPct) { lastPct = pct; onProgress(pct) }
+                            val tYield = System.nanoTime()
                             thermalYield(context, isCancelled, demoteWhile)
                             tChunk = System.nanoTime()
+                            yieldNs += tChunk - tYield // M2: Thread.sleep plus one thermal binder call
                         },
-                        isMusic = gate?.let { it::isMusic },
+                        musicScore = gate?.let { it::score },
                         emit = writer::write,
                     )
+                    // M2 decodeNs: this call's own wall minus the separator work it wraps. Timing `feed`
+                    // and subtracting is the smaller of the two diffs — the sink is the only seam between
+                    // the two, so everything left is decode + channel fold + resample.
+                    var feedNs = 0L
+                    val tStream = System.nanoTime()
                     AudioDecoder.stream(context, uri, isCancelled) { buf, n ->
                         if (isCancelled()) throw CancellationException()
+                        val tFeed = System.nanoTime()
                         separator.feed(buf, n)
+                        feedNs += System.nanoTime() - tFeed
                     }
+                    val decodeNs = System.nanoTime() - tStream - feedNs
                     separator.finish()
                     // The stats pass no longer decodes the whole track (A3), so this is where an
                     // undecodable stream is finally provable — and it costs nothing, since an empty
                     // stream means the loop above did nothing.
                     if (separator.framesFed == 0L) error("Could not decode any audio from this video.")
-                    logRun(separator, estFrames)
+                    logRun(
+                        separator, estFrames, decodeNs = decodeNs, yieldNs = yieldNs,
+                        sessionCreateNs = sessionCreateNs, gateOpenNs = tGate - tOpen,
+                    )
                     writer.finish()
                     onProgress(100)
                 } finally {
@@ -338,11 +384,18 @@ object AudioPipeline {
         var total = stats.frames
         if (total == 0L || written < total) {
             val keepOther = keepStems == "vocals_other"
+            // Same M2 instrumentation as removeMusic, and it is here for a reason: `perf-plan-v4` §2 lists
+            // "whether removeMusicResumable behaves like removeMusic" as still unknown after a year, and
+            // this path being un-instrumented is how it stayed that way.
+            val tOpen = System.nanoTime()
             val gate = MusicGate.open(context) // A1; null => separate everything, see MusicGate.open
+            val tGate = System.nanoTime()
             try {
                 HtdemucsSession(context, DemucsSeparator.keptStems(keepOther)).use { session ->
+                    val sessionCreateNs = System.nanoTime() - tGate // the ctor ran before use{} was entered
                     FileOutputStream(pcm, /* append = */ true).use { out ->
                         val quantized = ByteArray(4 * DemucsSeparator.STRIDE) // one flush batch, one write
+                        var yieldNs = 0L
                         // As above; discard the first line of a RESUMED run — skipped chunks report nothing.
                         var tChunk = System.nanoTime()
                         val separator = DemucsSeparator(
@@ -361,11 +414,13 @@ object AudioPipeline {
                                 // `stats` still carries frames=0 here — the true length is only written
                                 // once the run below completes.
                                 if (!isCancelled()) Checkpoint.writeAudio(jobDir, written, stats)
+                                val tYield = System.nanoTime()
                                 thermalYield(context, isCancelled, demoteWhile)
                                 tChunk = System.nanoTime()
+                                yieldNs += tChunk - tYield // M2: Thread.sleep plus one thermal binder call
                             },
                             resumeFrames = written,
-                            isMusic = gate?.let { it::isMusic },
+                            musicScore = gate?.let { it::score },
                             emit = { interleaved, frames ->
                                 var b = 0
                                 for (i in 0 until 2 * frames) {
@@ -377,13 +432,21 @@ object AudioPipeline {
                                 written += frames
                             },
                         )
+                        var feedNs = 0L // M2 decodeNs, as in removeMusic
+                        val tStream = System.nanoTime()
                         AudioDecoder.stream(context, uri, isCancelled) { buf, n ->
                             if (isCancelled()) throw CancellationException()
+                            val tFeed = System.nanoTime()
                             separator.feed(buf, n) // skipped chunks cost ~0; the ring still fills from real input
+                            feedNs += System.nanoTime() - tFeed
                         }
+                        val decodeNs = System.nanoTime() - tStream - feedNs
                         separator.finish()
                         if (separator.framesFed == 0L) error("Could not decode any audio from this video.")
-                        logRun(separator, estFrames)
+                        logRun(
+                            separator, estFrames, decodeNs = decodeNs, yieldNs = yieldNs,
+                            sessionCreateNs = sessionCreateNs, gateOpenNs = tGate - tOpen,
+                        )
                         total = separator.framesFed
                     }
                 }

@@ -88,13 +88,13 @@ class DemucsSeparatorTest {
         onChunk: (Int, Int) -> Unit = { _, _ -> },
         estimatedFrames: Int = frames,
         feedFrames: Int = frames,
-        isMusic: ((FloatArray, Int) -> Boolean)? = null,
+        musicScore: ((FloatArray, Int) -> Float)? = null,
     ): FloatArray {
         val (mean, std) = stats(input, frames)
         val out = FloatArray(2 * frames)
         var cursor = 0
         val sep = DemucsSeparator(
-            keepOther, mean, std, estimatedFrames.toLong(), infer, onChunk, isMusic = isMusic,
+            keepOther, mean, std, estimatedFrames.toLong(), infer, onChunk, musicScore = musicScore,
         ) { buf, n ->
             System.arraycopy(buf, 0, out, cursor, 2 * n)
             cursor += 2 * n
@@ -247,7 +247,7 @@ class DemucsSeparatorTest {
         val out = run(
             input, n, keepOther = false,
             infer = { _, _ -> throw AssertionError("inference ran on a music-free chunk") },
-            isMusic = { _, _ -> false },
+            musicScore = { _, _ -> 0f },
         )
         assertTrue("passthrough SNR", snrDb(input, out, 2 * n) > 60.0)
     }
@@ -273,9 +273,12 @@ class DemucsSeparatorTest {
         run(
             input, n, keepOther = false,
             infer = { w, s -> inferred++; fake.infer(w, s) },
-            isMusic = { _, len ->
+            musicScore = { _, len ->
                 assertTrue("scored window is real audio", len > 0)
-                asked++ == musicChunk
+                // Every non-music chunk scores above C1's DILATE2_MIN_SCORE, so the far tier stays armed
+                // and this test still measures the dilation WIDTH and nothing else. The two-tier split
+                // has its own test below.
+                if (asked++ == musicChunk) 0.9f else 0.05f
             },
         )
         val total = ((n + MAX_SHIFT + STRIDE - 1L) / STRIDE).toInt()
@@ -283,6 +286,58 @@ class DemucsSeparatorTest {
         assertEquals("only the dilated window is separated", expected, inferred)
         // Chunks past the end of the stream are never handed to the model: they hold no audio to score.
         assertEquals("scored every chunk that has input, and no others", total, asked)
+    }
+
+    // ---- C1: the two-tier dilation (`perf-plan-v4` §5) ----
+
+    /**
+     * Which chunks went to the model, given one gate score per chunk in ask order.
+     *
+     * `onChunk` fires once per processed chunk with `done == chunksDone` already incremented, so
+     * `done - 1` is the chunk that just resolved and a move in the inference counter across that call is
+     * "this chunk was separated". Indexing [scores] by the ask counter is the same trick
+     * [dilationForcesTheNeighboursOfAMusicChunk] uses, and it throws if the separator ever asks about
+     * more chunks than the caller described.
+     */
+    private fun separatedChunks(scores: List<Float>): List<Int> {
+        val n = 700_000
+        val fake = SpecFake(mapOf(3 to 1f))
+        var asked = 0
+        var inferred = 0
+        var seen = 0
+        val hits = ArrayList<Int>()
+        run(
+            noise(n, seed = 35), n, keepOther = false,
+            infer = { w, s -> inferred++; fake.infer(w, s) },
+            onChunk = { done, _ ->
+                if (inferred > seen) hits.add(done - 1)
+                seen = inferred
+            },
+            musicScore = { _, _ -> scores[asked++] },
+        )
+        return hits
+    }
+
+    /**
+     * C1's whole rule, over a synthetic score sequence: chunk 3 is the only music, chunks 2 and 4 are
+     * dead silent, chunk 1 has a little in it and chunk 5 has essentially nothing.
+     *
+     * - **±1 is hard.** Chunks 2 and 4 score 0.0 and are separated anyway — that is the fade case, and
+     *   nothing about the two-tier rule is allowed to weaken it.
+     * - **±2 is conditional.** Chunk 1 (0.05) is rescued; chunk 5 (0.001, an order of magnitude below
+     *   white noise's measured 0.0240) is not. The device measurement behind the 0.02 constant is 20
+     *   dropped chunks all scoring ≤ 0.0139, which is this case.
+     * - chunks 0 and 6 are outside the window entirely and stay skipped in both runs.
+     */
+    @Test
+    fun farDilationOnlyRescuesChunksWithSomethingInThem() {
+        // By chunk: 0=0.0, 1=0.05, 2=0.0, 3=0.9 (the music), 4=0.0, 5=0.001, 6=0.0
+        val quiet = listOf(0f, 0.05f, 0f, 0.9f, 0f, 0.001f, 0f)
+        assertEquals("±1 hard, ±2 conditional", listOf(1, 2, 3, 4), separatedChunks(quiet))
+
+        // The dial, and the only thing that moves: chunk 5 now clears DILATE2_MIN_SCORE.
+        val audible = quiet.toMutableList().also { it[5] = 0.03f }
+        assertEquals("±2 rescues a chunk above the floor", listOf(1, 2, 3, 4, 5), separatedChunks(audible))
     }
 
     // ---- Phase 2 resume (`long-film-plan.md`) ----
@@ -297,6 +352,7 @@ class DemucsSeparatorTest {
         resumeFrames: Long,
         mean: Float,
         std: Float,
+        musicScore: ((FloatArray, Int) -> Float)? = null,
     ): Triple<FloatArray, Int, Int> {
         val fake = SpecFake(mapOf(3 to 1f))
         var inferCalls = 0
@@ -308,6 +364,7 @@ class DemucsSeparatorTest {
             infer = { w, s -> inferCalls++; fake.infer(w, s) },
             onChunk = { _, _ -> chunkCalls++ },
             resumeFrames = resumeFrames,
+            musicScore = musicScore,
         ) { buf, n ->
             System.arraycopy(buf, 0, tail, cursor, 2 * n)
             cursor += 2 * n
@@ -396,6 +453,26 @@ class DemucsSeparatorTest {
         val resumeFrames = 4L * STRIDE - MAX_SHIFT
         val (_, inferCalls, chunkCalls) = runResumed(input, n, resumeFrames, mean, std)
         assertEquals("one onChunk per inferred chunk, plus one at the transition", inferCalls + 1, chunkCalls)
+    }
+
+    /**
+     * The fail-open C1 must not have touched. A resumed run lands mid-film with no gate history, so the
+     * chunks whose BACKWARD ring reaches behind the resume point were never scored — and "never scored"
+     * has to mean "separate", whatever the two-tier rule would otherwise say about a silent chunk.
+     *
+     * With `skipChunks = 3` the first processed chunk is 3, and chunks 3 and 4 are exactly the two that
+     * look back past it. 5 and 6 can see their whole window, the gate calls all of it silence, and they
+     * are skipped — which is what makes this an assertion about the fail-open and not about the gate
+     * being off. That resume costs DILATE (2) chunks of unnecessary separation once, by design.
+     */
+    @Test
+    fun resumeSeparatesTheChunksItHasNoGateHistoryFor() {
+        val n = 700_000
+        val input = noise(n, seed = 36)
+        val (mean, std) = stats(input, n)
+        val resumeFrames = 4L * STRIDE - MAX_SHIFT
+        val (_, inferCalls, _) = runResumed(input, n, resumeFrames, mean, std, musicScore = { _, _ -> 0f })
+        assertEquals("only the chunks with no history separate", 2, inferCalls)
     }
 
     @Test

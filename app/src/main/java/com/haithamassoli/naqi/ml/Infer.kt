@@ -6,6 +6,7 @@ import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.util.Log
 import java.nio.FloatBuffer
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * M1 ORT inference for the image models — the NSFW gate and the face gender vote — per the locked
@@ -16,13 +17,18 @@ import java.nio.FloatBuffer
  * 224² `Bitmap`, an `IntArray(50 176)` and a heap `FloatBuffer.allocate(150 528)` — ~1 MB × 46 500
  * calls ≈ 46 GB of churn on one film — and because `FloatBuffer.allocate` is a HEAP buffer, ORT then
  * copied it into native memory on every `run`. The caller now hands over a reused DIRECT buffer that
- * `FrameSampler.convertToTensor` filled straight from the decoder's YUV planes. Nothing is allocated
- * per call but the tensor view and the 5-float result.
+ * `FrameSampler.gateFromGathered` filled from the source bytes the sampler gathered. Nothing is
+ * allocated per call but the tensor view and the 5-float result.
  *
  * NudeNet is gone entirely (plan-v2 §5.4, "V4"): AGPL-3.0 in a closed-source APK, and the gender vote
  * it powered censored approximately every face anyway.
  *
- * Contract: one worker drives this at a time (thread-confined). [close] releases the session.
+ * Contract: [nsfw] and [genderAge] are safe to call concurrently **as long as each caller owns its own
+ * `input` buffer** — `OrtSession.run` is thread-safe and the session cache is a [ConcurrentHashMap]
+ * resolved through `computeIfAbsent`, so a model is created at most once however many callers race for
+ * it, but the buffer is viewed in place and sharing one across threads corrupts the tensor rather than
+ * failing. [close] is NOT covered either: it is the job-teardown call, and running it against a live
+ * inference closes a session out from under `run`. Call it once, after every caller is done.
  */
 object Infer {
 
@@ -33,7 +39,7 @@ object Infer {
     private val GENDERAGE_SHAPE = longArrayOf(1, 3, 96, 96)
 
     private val env: OrtEnvironment by lazy { OrtEnvironment.getEnvironment() }
-    private val sessions = HashMap<NaqiModel, OrtSession>()
+    private val sessions = ConcurrentHashMap<NaqiModel, OrtSession>()
 
     /** Memoized [genderAgeAvailable]; null until first asked. */
     @Volatile
@@ -70,7 +76,9 @@ object Infer {
      *
      * plan-v2 §4.6: what is left in here IS the model. The preprocessing this call used to hide (the
      * rescale, the getPixels, the 150 528-iteration float loop) is now timed separately by the sampler
-     * as `gateFill=`, so the caller's `gate=` finally measures `session.run`.
+     * as `gateFill=`, so the caller's `gate=` finally measures `session.run`. Since `perf-plan-v4` A1
+     * both counters are the CALLER's — the fill moved off the sampler's producer thread onto the
+     * consumer that runs this — but they still mean preprocessing and model respectively.
      */
     fun nsfw(context: Context, input: FloatBuffer): FloatArray {
         val session = session(context, NaqiModel.NSFW_GATE)
@@ -112,7 +120,12 @@ object Infer {
         sessions.clear()
     }
 
-    private fun session(context: Context, model: NaqiModel): OrtSession = sessions.getOrPut(model) {
+    // computeIfAbsent, NOT getOrPut: Kotlin's getOrPut is get-then-put with no locking even on a
+    // ConcurrentHashMap, so two racing callers would each create a session and the loser would be
+    // overwritten unclosed — a native leak the GC cannot see, since an OrtSession's weights and arenas
+    // live off-heap. computeIfAbsent runs the builder under the bin lock exactly once. An `error()`
+    // inside it propagates and records no mapping, so a missing model still throws on every call.
+    private fun session(context: Context, model: NaqiModel): OrtSession = sessions.computeIfAbsent(model) {
         val file = ModelSmoke.modelFile(context, model) ?: error("model not bundled: ${model.assetName}")
         imageSessionOptions().use { env.createSession(file.absolutePath, it) }
     }

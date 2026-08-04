@@ -199,6 +199,12 @@ branch drops below the video branch** — §0's concurrency trap one level up, a
 is racing is itself producer-bound on CPU pixel work. State the job shape with every audio number or
 the number means nothing.
 
+> **CORRECTION 2026-08-04 (`perf-plan-v4.md` §0, §1).** The bolded sentence is **backwards**, and it has
+> already misaimed work. Measured: `separate` 449 376 ms against a whole video branch of 204 752 ms, so
+> audio is **2.19×** the video branch with 244 s of slack underneath it. Audio ms therefore pay **1:1**
+> all the way down to ~205 s, and it is the **video** savings that buy zero wall on a music-removal job.
+> The discipline this paragraph asks for is right; only the direction it points is inverted.
+
 ### 3.0 — split the 110 699 ms residual first (~10 lines)
 
 Same discipline as §1, same reason. `DemucsSeparator` already has the pattern (`stftNs`/`inferNs`/

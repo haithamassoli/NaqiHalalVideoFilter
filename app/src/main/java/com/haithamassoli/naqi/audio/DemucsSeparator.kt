@@ -34,7 +34,7 @@ import kotlin.math.tanh
  *
  * Two things here are NOT the reference, both from `plan-v2`:
  * - **the track length is learned, not declared** (A3 / item 7.5) — see [estimatedFrames] and [framesFed];
- * - **a chunk with no music passes through** instead of being separated (A1) — see [isMusic] and
+ * - **a chunk with no music passes through** instead of being separated (A1) — see [musicScore] and
  *   [passthroughChunk]. That is a quality change as well as a speed one: in "vocals" mode the sound
  *   effects of every dialogue-only stretch survive instead of being destroyed with the music
  *   (`plan-v2` §5.10, against the tradeoff `prd-video-filter-android.md:80` documents and accepts).
@@ -71,14 +71,16 @@ class DemucsSeparator(
      */
     private val resumeFrames: Long = 0L,
     /**
-     * A1 (`plan-v2` §5.5): "does this window of mono 44.1 kHz audio contain music?" — null disables the
+     * A1 (`plan-v2` §5.5): "how much music is in this window of mono 44.1 kHz audio?" — null disables the
      * gate and every chunk is separated, which is also what happens when the model is not installed.
+     * A SCORE rather than the old boolean since C1, because the far half of the dilation now depends on
+     * how much a chunk has in it and not only on whether it cleared the gate — see [separateChunk].
      *
      * The callback takes DENORMALIZED mono (real amplitudes), because a music classifier and a silence
      * floor both need the signal the user would hear, not this class's unit-variance view of it. It is a
      * lambda rather than a `MusicGate` so this class stays Android-free for its JVM tests.
      */
-    private val isMusic: ((mono: FloatArray, frames: Int) -> Boolean)? = null,
+    private val musicScore: ((mono: FloatArray, frames: Int) -> Float)? = null,
     private val emit: (interleaved: FloatArray, frames: Int) -> Unit,
 ) {
     // A4: the absolute stem ids are the SESSION's business now (it does the compaction on the way out of
@@ -169,10 +171,10 @@ class DemucsSeparator(
         min(i + 1, SEG - i).toFloat() / (SEG / 2).toFloat()
     }
 
-    // A1 gate state. One chunk's window, denormalized and folded to mono, plus the last few decisions.
+    // A1 gate state. One chunk's window, denormalized and folded to mono, plus the last few scores.
     private val gateMono = FloatArray(SEG)
-    private val gateMusic = BooleanArray(GATE_RING)
-    private var gateFrom = Int.MAX_VALUE // lowest chunk index whose decision is in [gateMusic]
+    private val gateScore = FloatArray(GATE_RING)
+    private var gateFrom = Int.MAX_VALUE // lowest chunk index whose score is in [gateScore]
     private var gateTo = -1              // highest, inclusive
 
     /** Chunks the A1 gate passed through instead of separating. Read by the caller for the skip-rate log. */
@@ -224,13 +226,15 @@ class DemucsSeparator(
         private set
 
     /**
-     * Wall nanos spent inside the three phases of a chunk, accumulated over the run and read by the
-     * caller (this class stays Android-free for its JVM tests, so it cannot log them itself).
+     * Wall nanos spent inside each phase of a chunk, accumulated over the run and read by the caller
+     * (this class stays Android-free for its JVM tests, so it cannot log them itself).
      *
-     * `plan-v2` §5.9 asks for exactly this before anyone sizes A5: the STFT sits inside a stage that has
-     * never been timed internally, so its share "could be 2 % or 15 %" and the plan refuses to rank the
-     * work until someone knows which. The remainder of a chunk — the input-ring gather and [flush]'s
-     * divide / soft-clip / emit — is deliberately not counted; it is wall minus these three.
+     * `plan-v2` §5.9 asked for the first three before anyone sized A5: the STFT sits inside a stage that
+     * had never been timed internally, so its share "could be 2 % or 15 %" and the plan refused to rank
+     * the work until someone knew which. M2 (`perf-plan-v4` §2) adds the rest, because those three still
+     * left **110 699 ms unattributed — 24.6 % of a 449 376 ms stage** — and on a music-removal job that
+     * stage alone IS the wall (§1 shape C), so its residual pays 1:1. What is still outside all of them
+     * is the caller's: the decode driving [feed], the thermal yield between chunks, and session creation.
      */
     var stftNs = 0L
         private set
@@ -241,6 +245,25 @@ class DemucsSeparator(
 
     /** iSTFT + the spec sum + the weighted overlap-add loop. See [stftNs]. */
     var olaNs = 0L
+        private set
+
+    /** The A1 gate: [scoreChunk]'s denormalized mono fold plus the YAMNet runs inside it. See [stftNs]. */
+    var gateNs = 0L
+        private set
+
+    /** [inferChunk]'s input-ring gather, i.e. everything it does before the STFT. See [stftNs]. */
+    var gatherNs = 0L
+        private set
+
+    /** [flush]'s divide / soft-clip loop, WITHOUT the [emit] call — that one is [encodeNs]. See [stftNs]. */
+    var flushNs = 0L
+        private set
+
+    /**
+     * Time inside [emit], i.e. the caller's AAC encoder (short clips) or int16 scratch write (films).
+     * Split out of [flushNs] because C4 aims at the encoder and nothing else in flush. See [stftNs].
+     */
+    var encodeNs = 0L
         private set
 
     /** NaN/±Inf out of inference becomes silence, and is counted. See [nonFinite]. */
@@ -296,6 +319,13 @@ class DemucsSeparator(
      * and a missed music chunk is an audible product failure where a spurious separation costs one chunk
      * of wall clock. Everything here fails toward separating.
      *
+     * **The dilation is TWO-TIER since C1** (`perf-plan-v4` §5), and the split is by distance:
+     * - **±1 is hard.** A music chunk one away forces separation whatever [c] itself scored — a fade out
+     *   of music lands here, and so does the chunk boundary in the middle of a sting.
+     * - **±2 only rescues a chunk that has something in it**, i.e. one scoring [DILATE2_MIN_SCORE] or
+     *   more. Two chunks away is 4.7 s; a chunk that quiet, that far from any music, has nothing in it
+     *   for the separator to take out. That constant carries the measurement.
+     *
      * Scoring only ever moves FORWARD, and it has to: [feed] holds `2*SEG + LOOKAHEAD` of input, which at
      * the moment chunk `c` fires covers chunk `c+DILATE`'s window exactly (that is what [LOOKAHEAD] buys)
      * and does NOT reach back to chunk `c-DILATE`'s. The backward half of the dilation is therefore served
@@ -305,18 +335,24 @@ class DemucsSeparator(
      * unnecessary separation once per resume.
      */
     private fun separateChunk(c: Int): Boolean {
-        val gate = isMusic ?: return true
+        val gate = musicScore ?: return true
         var i = maxOf(gateTo + 1, c)
         while (i <= c + DILATE) {
             if (gateFrom == Int.MAX_VALUE) gateFrom = i
-            gateMusic[i % GATE_RING] = scoreChunk(i, gate)
+            val t0 = System.nanoTime()
+            gateScore[i % GATE_RING] = scoreChunk(i, gate)
+            gateNs += System.nanoTime() - t0
             gateTo = i
             i++
         }
         for (k in (c - DILATE)..(c + DILATE)) {
             if (k < 0) continue                 // before the film starts: there is no music there
             if (k < gateFrom) return true       // never scored (start of a run, or a resume) -> separate
-            if (gateMusic[k % GATE_RING]) return true
+            if (gateScore[k % GATE_RING] < MusicGate.THRESHOLD) continue // `const`, so inlined — no Android here
+            // C1's two tiers. Reading [c]'s own score needs no guard: [gateFrom] is the first chunk this
+            // separator was ever asked about, i.e. <= c, so an unscored [c] is impossible here — and a
+            // resume's unscored BACKWARD ring already returned true on the line above.
+            if (k in c - 1..c + 1 || gateScore[c % GATE_RING] >= DILATE2_MIN_SCORE) return true
         }
         return false
     }
@@ -326,10 +362,10 @@ class DemucsSeparator(
      * REAL samples are handed over — a tail chunk hanging past the end of the stream would otherwise be
      * scored mostly on zeros and read as silence.
      */
-    private fun scoreChunk(c: Int, gate: (FloatArray, Int) -> Boolean): Boolean {
+    private fun scoreChunk(c: Int, gate: (FloatArray, Int) -> Float): Float {
         val off = c.toLong() * STRIDE
         val n = min(SEG.toLong(), writePos - off).coerceAtLeast(0L).toInt()
-        if (n == 0) return false // entirely past the end of the stream: nothing there to separate
+        if (n == 0) return 0f // entirely past the end of the stream: nothing there to separate
         for (j in 0 until n) {
             // Denormalize the mono fold in one step: ((l*std+mean) + (r*std+mean)) / 2. The pre-pad
             // positions below MAX_SHIFT are the ring's own zeros and denormalize to `mean`, which is the
@@ -345,6 +381,7 @@ class DemucsSeparator(
         val delta = SEG - clen // > 0 only for tail chunks
         val readStart = off - delta / 2 // TensorChunk.padded: real left context, zeros out of range
 
+        val tg = System.nanoTime()
         for (j in 0 until SEG) {
             val p = readStart + j
             if (p < 0 || p >= writePos) {
@@ -359,9 +396,9 @@ class DemucsSeparator(
         System.arraycopy(segL, 0, wav, 0, SEG)
         System.arraycopy(segR, 0, wav, SEG, SEG)
 
-        // Four nanoTime reads against a ~2 s chunk cost nothing, and they are the only way anyone sizes
-        // A5 for real: `plan-v2` §5.9 flags that this whole stage is un-instrumented internally, so the
-        // STFT work "could be 2 % or 15 %". See [stftNs].
+        // A handful of nanoTime reads against a ~2 s chunk cost nothing, and they are the only way anyone
+        // sizes A5 for real: `plan-v2` §5.9 flags that this whole stage is un-instrumented internally, so
+        // the STFT work "could be 2 % or 15 %". See [stftNs].
         val t0 = System.nanoTime()
         val spec = stft.forward(segL, segR, SEG)
         val t1 = System.nanoTime()
@@ -393,6 +430,7 @@ class DemucsSeparator(
             outR[cell] += g * (waveR[read + j] + tr)
             wsum[cell] += g
         }
+        gatherNs += t0 - tg
         stftNs += t1 - t0
         inferNs += t2 - t1
         olaNs += System.nanoTime() - t2
@@ -429,6 +467,7 @@ class DemucsSeparator(
 
     /** Emit finalized virtual positions [flushPos, limit) ∩ [MAX_SHIFT, endPos), zeroing cells. */
     private fun flush(limit: Long) {
+        val t0 = System.nanoTime()
         var n = 0
         while (flushPos < limit) {
             val cell = (flushPos % OUT_CAP).toInt()
@@ -452,7 +491,9 @@ class DemucsSeparator(
             wsum[cell] = 0f
             flushPos++
         }
-        if (n > 0) emit(emitBuf, n)
+        val t1 = System.nanoTime()
+        flushNs += t1 - t0
+        if (n > 0) { emit(emitBuf, n); encodeNs += System.nanoTime() - t1 }
     }
 
     companion object {
@@ -542,7 +583,32 @@ class DemucsSeparator(
         private const val DILATE = 2
         private const val LOOKAHEAD = DILATE * STRIDE
 
-        /** Decisions kept for the ±[DILATE] window; anything above `2*DILATE + 1` (=5) works. */
+        /**
+         * C1 (`perf-plan-v4` §5): the gate score a chunk needs of its OWN before the ±2 tier of [DILATE]
+         * will rescue it. Below this it is separated only when music sits within ±1. **The ±1 tier is
+         * unconditional and this does not touch it**, which is the half of the dilation that catches
+         * fades. [LOOKAHEAD] is unchanged too — it already covers ±[DILATE] in both tiers.
+         *
+         * **Measured, do not re-derive.** Replicated off-device against the shipped gate on the real audio
+         * of `qa-assets/tv1.webm`: **141/276 chunks skipped against the device's 136/276** (−40 000 ms,
+         * 8.9 % of a 449 376 ms stage) at **271/276 chunk agreement** — i.e. the two rules disagree on
+         * exactly the 5 chunks this tier newly drops, and every one of those scored **≤ 0.0139, below
+         * white noise**, which measures 0.0240 on this exact YAMNet artifact.
+         * ([MusicGate.THRESHOLD], i.e. what counts as music at all, is 0.15.)
+         *
+         * `perf-plan-v4` §5's C1 row says "the 20 extra dropped chunks score ≤ 0.0139". That 20 does not
+         * reconcile with its own 141-vs-136 and 271/276 in the same sentence, both of which give 5; the
+         * bound on the scores is the load-bearing half and is quoted above unchanged. Settle it from the
+         * device's own `music gate: skipped N/276` line rather than from either number.
+         *
+         * This is the miss-rate dial of the product, so it moves in one direction easily and the other
+         * only with a listening test: a missed music chunk is an audible failure the user cannot fix, a
+         * spurious separation costs one chunk of wall clock. Set it to 0f to get the old one-tier
+         * dilation back — that is the whole revert.
+         */
+        private const val DILATE2_MIN_SCORE = 0.02f
+
+        /** Scores kept for the ±[DILATE] window; anything above `2*DILATE + 1` (=5) works. */
         private const val GATE_RING = 8
 
         private const val IN_CAP = 2 * SEG + LOOKAHEAD // worst-case span at a chunk fire — see the init check
@@ -577,6 +643,18 @@ class HtdemucsSession(context: Context, private val keep: IntArray) : AutoClosea
     init {
         val file = ModelSmoke.modelFile(context, NaqiModel.HTDEMUCS)
             ?: error("htdemucs model not bundled — run scripts/fetch-models.sh")
+        // C2 (`perf-plan-v4` §5, setOptimizedModelFilePath) was implemented here and REMOVED after M2
+        // measured what §5 could only call "NOT ESTIMABLE until M2". On an S23 over the 643 s tv1.webm:
+        //
+        //     sessionCreateMs = 881          i.e. 0.23 % of a 385 420 ms `separate` stage
+        //     serialized graph = 157.6 MB    against the 87.9 MB .onnx it is built from
+        //     peak RSS         = 1 267 532 -> 1 401 700 KB
+        //
+        // The graph is nearly 2x the model because ORT demotes the fp16 initializers to fp32 at load
+        // (`perf-plan-v4` §6.1) and serializes the demoted form. So the trade was 157 MB of the user's
+        // storage plus 10.6 % of a RAM budget lmkd has already killed this app over, to save at most
+        // 0.9 s per session create — and even the film path, which pays it once per resume, cannot turn
+        // that into a number worth the disk. Do not re-add it without a measurement that beats these.
         session = sessionOptions().use { env.createSession(file.absolutePath, it) }
     }
 
@@ -641,7 +719,9 @@ class HtdemucsSession(context: Context, private val keep: IntArray) : AutoClosea
         // Arena OFF: with the arena, each run's high-water stays resident across every chunk and
         // Samsung's global memory watchdog kills the app; without it RSS drops back between chunks
         // and long jobs survive. The peak itself is intrinsic to the graph (NOT thread scratch —
-        // 1 thread peaks HIGHER), which is why M3 re-exported at a 3.9 s segment; see [SEG].
+        // 1 thread peaks HIGHER), which is why the graph was re-exported at the 2.6 s [SEG] it ships at
+        // today (M3 first went to 3.9 s; `perf-plan-v4` §6.2 then measured 2.6 s as the OPTIMUM rather
+        // than a RAM compromise — 7.8 s costs +20.6 % compute per second of audio as well as 3.24 GB).
         // Neither of those two is a dial. The two below are — see their declarations.
         setIntraOpNumThreads(INTRA_OP_THREADS)
         addConfigEntry("session.intra_op.allow_spinning", ALLOW_SPINNING)
@@ -650,6 +730,7 @@ class HtdemucsSession(context: Context, private val keep: IntArray) : AutoClosea
     }
 
     companion object {
+
         /**
          * The two dials of this stage, both SWEPT on an S23 2026-07-28 (`perf-plan.md` Phase 3.1/3.2),
          * median per-chunk ms over chunks 3-7:

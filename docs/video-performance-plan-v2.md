@@ -154,6 +154,15 @@ card (requires the face box to be ≥20 % of the image side, caps at ~10 detecti
 detector is a licensing, telemetry and dependency decision that should be made on those grounds when
 someone wants to make it — not a performance item, and not a blocker for anything here.
 
+> **CORRECTION 2026-08-04 (`perf-plan-v4.md` §10, §6.5).** The "InsightFace contamination" clause above
+> is wrong about **YuNet**: opencv_zoo ships it MIT, trained on WIDER FACE via `libfacedetection.train`,
+> with no InsightFace annotations in its lineage. The other three names in that clause are untouched by
+> this. **The conclusion does not change** — the second, independent ground stated in the same paragraph
+> (licensing, telemetry and dependency surface; "not a performance item") stands on its own, and v4 §6.5
+> adds that a YuNet *union* detector is `needs-check` on quality rather than `none`: a second, tighter
+> box distribution feeding `enableTracking()` can re-associate a track and flip a per-track gender vote
+> toward *less* censoring. Parked, not revived.
+
 ---
 
 ## 1. The corrected budget

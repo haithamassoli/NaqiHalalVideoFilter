@@ -22,7 +22,9 @@ import kotlin.math.sqrt
  * A5 — [Stft.forward]'s reused scratch — is taken, and is the bulk of the win. Revisit this half only
  * with a measured golden diff in hand, never by loosening the tolerance.
  *
- * Contract: driven by one [Stft] on one thread at a time (thread-confined, like [com.haithamassoli.naqi.ml.Infer]).
+ * Contract: driven by one [Stft] on one thread at a time (thread-confined). The analogy to
+ * [com.haithamassoli.naqi.ml.Infer] that used to stand here is gone: its session cache became a
+ * ConcurrentHashMap under `perf-plan-v4` §4, so it no longer claims confinement. This still does.
  */
 object Fft {
     /** Forward transform `X[k] = Σ x[n]·exp(-2πi·kn/N)`, in place. */

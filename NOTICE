@@ -60,6 +60,12 @@ Demucs (htdemucs) — github.com/facebookresearch/demucs
 nsfw_model (MobileNetV2 1.4-224) — github.com/GantMan/nsfw_model
   NOASSERTION upstream. See the unresolved-licence section above.
 
+InsightFace (buffalo_l — genderage.onnx) — github.com/deepinsight/insightface
+  Code MIT; the buffalo_l weight pack is published for non-commercial research
+  use, and that restriction was explicitly waived by the owner on 2026-08-03
+  (recorded at the GENDERAGE entry in Models.kt). Shipped verbatim, 1.3 MB, no
+  conversion; powers the per-face gender vote behind the Women/Men picker.
+
 ML Kit Face Detection — developers.google.com/ml-kit
   Google APIs Terms of Service. Face detection only; no data leaves the device.
 

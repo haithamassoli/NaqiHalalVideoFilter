@@ -87,12 +87,19 @@ enum class NaqiModel(
 
     /**
      * htdemucs, f16 weights — demucs.onnx export with STFT/iSTFT kept OUTSIDE the graph, re-exported
-     * at a 3.9 s segment (M3) by `scripts/htdemucs_export.py`; the checkpoint's own 7.8 s segment
-     * peaked ~3.2 GB RSS on device, over the PRD's 1.5 GB budget. Geometry lives in [DemucsSeparator].
-     * Inputs: mix waveform [1,2,171990] f32 (3.9 s stereo @ 44.1 kHz, zero-padded to fit) and
-     * complex-as-channels spectrogram [1,4,2048,168] f32 (nfft 4096, hop 1024).
-     * Outputs: masked spectrogram [1,4,4,2048,168] + time-branch [1,4,2,171990];
+     * at a **2.6 s** segment by `scripts/htdemucs_export.py` (the file name's `s26` is that number).
+     * Geometry lives in [DemucsSeparator]: `SEG = 114_660 = int(2.6 × 44_100)`, `BINS = 2048`,
+     * `LE = 112 = ceil(SEG / 1024)`.
+     * Inputs: mix waveform [1,2,114660] f32 (2.6 s stereo @ 44.1 kHz, zero-padded to fit) and
+     * complex-as-channels spectrogram [1,4,2048,112] f32 (nfft 4096, hop 1024).
+     * Outputs: masked spectrogram [1,4,4,2048,112] + time-branch [1,4,2,114660];
      * stems = istft(spec output) + time branch, computed outside the graph (M2 driver).
+     *
+     * **2.6 s is the measured optimum, not the RAM compromise this KDoc used to imply** (`perf-plan-v4`
+     * §6.2). The graph has a real cross-domain transformer whose attention is O(T²), so segment length
+     * is a compute dial as well as a memory one: going back to the checkpoint's native 7.8 s costs
+     * **+20.6 % compute per second of audio** *and* 3.24 GB RSS, and 3.9 s costs +5.1 %. Shorter is only
+     * −5.1 % before per-chunk fixed costs eat it. Free RAM does not reopen this dial — leave it.
      */
     HTDEMUCS(
         "htdemucs_s26_f16.onnx",

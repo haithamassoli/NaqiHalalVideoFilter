@@ -485,6 +485,13 @@ if 4 workers disappoint, the ceiling is memory bandwidth, and the escalation is 
 - **`maxDim` 640 → 480** — still the top *quality-trading* lever, still ships alone (attribution rule).
   Its value went **up**, not down: it shrinks the gate's input as well as the convert, and the gate is
   now the measured bottleneck.
+
+  > **CORRECTION 2026-08-04 (`perf-plan-v4.md` §10).** `maxDim` does **not** shrink the gate's input —
+  > not here, and not in the verdict box at :408 which says the same thing. `convertToTensor`'s `gx`/`gy`
+  > maps are built over the CROP RECT in `GATE_SIDE` steps (`FrameSampler.kt:346-347`), never over
+  > `dispW`/`dispH`, so the gate tensor is `[1,3,224,224]` stretched from the whole crop at every
+  > `maxDim`. Only `packNv21`'s ML Kit buffer scales with the dial. The lever survives on the convert
+  > and on detect alone — it is v4's A7, ranked last, gated on a rendered-pixel diff.
 - **Hoisting the per-frame `sxMap`/`syMap` allocations** — two ~640-int arrays per frame, noise.
 
 ### Opened by Round 2

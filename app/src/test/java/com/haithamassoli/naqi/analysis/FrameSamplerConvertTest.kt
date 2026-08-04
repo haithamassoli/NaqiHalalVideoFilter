@@ -26,6 +26,12 @@ import java.nio.FloatBuffer
  * (the NV21 above -> genderage's 96² crop), which is where the same rotation indexing is now applied a
  * second time, from the opposite direction.
  *
+ * perf-plan-v4 A1 then SPLIT the gate walk in two — [FrameSampler.gatherGate] on the producer,
+ * [FrameSampler.gateFromGathered] on the consumer — which turns [FrameSampler.convertToTensor] from a
+ * production function into the executable specification of the pair. The equivalence test at the
+ * bottom is this file's centrepiece: it is the only thing standing between the split and A4, the
+ * variant that sampled the packed 640-px NV21 instead and measured 91.24 % censored-timeline recall.
+ *
  * Planes are built with deliberately awkward geometry — `rowStride > width`, a non-zero base, and
  * chroma in both the planar (pixelStride 1) and semi-planar (pixelStride 2, one shared buffer)
  * layouts a `COLOR_FormatYUV420Flexible` decoder can hand over.
@@ -131,21 +137,23 @@ class FrameSamplerConvertTest {
     private val cRow = 9
     private val base = 3  // planes handed over at a non-zero position()
 
-    /** Luma carries its own coordinates so a wrong index is visible; chroma carries its column. */
+    /** Luma AND chroma carry their own coordinates, so a wrong index in either axis is visible. */
     private fun luma(): ByteBuffer = ByteBuffer.allocate(base + yRow * srcH).also { buf ->
         for (sy in 0 until srcH) for (sx in 0 until srcW) buf.put(base + sy * yRow + sx, (10 * sy + sx).toByte())
     }
 
-    private fun uValue(cx: Int) = (10 + cx).toByte()
-    private fun vValue(cx: Int) = (60 + cx).toByte()
+    // Both axes, deliberately: a column-only fixture leaves `cy` unpinned, so a gather that read the
+    // wrong chroma ROW would return the same byte and every equivalence assertion below would still pass.
+    private fun uValue(cx: Int, cy: Int = 0) = (10 + cx + 4 * cy).toByte()
+    private fun vValue(cx: Int, cy: Int = 0) = (60 + cx + 4 * cy).toByte()
 
     /** Fully planar chroma: separate buffers, pixelStride 1. */
     private fun planarChroma(): Pair<ByteBuffer, ByteBuffer> {
         val u = ByteBuffer.allocate(base + cRow * (srcH / 2))
         val v = ByteBuffer.allocate(base + cRow * (srcH / 2))
         for (cy in 0 until srcH / 2) for (cx in 0 until srcW / 2) {
-            u.put(base + cy * cRow + cx, uValue(cx))
-            v.put(base + cy * cRow + cx, vValue(cx))
+            u.put(base + cy * cRow + cx, uValue(cx, cy))
+            v.put(base + cy * cRow + cx, vValue(cx, cy))
         }
         return u to v
     }
@@ -154,8 +162,8 @@ class FrameSamplerConvertTest {
     private fun semiPlanarChroma(): ByteBuffer {
         val uv = ByteBuffer.allocate(base + cRow * (srcH / 2) + 1)
         for (cy in 0 until srcH / 2) for (cx in 0 until srcW / 2) {
-            uv.put(base + cy * cRow + cx * 2, uValue(cx))
-            uv.put(base + cy * cRow + cx * 2 + 1, vValue(cx))
+            uv.put(base + cy * cRow + cx * 2, uValue(cx, cy))
+            uv.put(base + cy * cRow + cx * 2 + 1, vValue(cx, cy))
         }
         return uv
     }
@@ -324,5 +332,95 @@ class FrameSamplerConvertTest {
         for (i in 0 until FrameSampler.CROP_SIDE * FrameSampler.CROP_SIDE) {
             assertEquals("red[$i]", 238f, out.get(i), 1e-3f)
         }
+    }
+
+    // --- the gate walk, split in two (perf-plan-v4 A1) ---
+    //
+    // The centrepiece. A1 moves the arithmetic half of the gate fill onto the consumer, so what the
+    // model sees is now produced by [FrameSampler.gatherGate] followed by [FrameSampler.gateFromGathered]
+    // rather than by [FrameSampler.convertToTensor] — which stays here as the reference the pair is
+    // proved against. It reuses the decoder-plane builders above, at both chroma layouts, on the same
+    // deliberately non-square 8x4 source, at all four rotations.
+    //
+    // Equality is EXACT, not a tolerance. Both paths run the same integer arithmetic, so any difference
+    // at all is a defect — and a tolerance is precisely what would have let A4 through: its 640-px
+    // resample moved single pixels, measured 91.24 % censored-timeline recall against a >= 99.20 % bar,
+    // and under-censored 34.5 s of a 643 s clip.
+
+    /** Whole-crop square stretch to 224², exactly as `toFrame` builds it (crop offset here is 0). */
+    private val gx = IntArray(FrameSampler.GATE_SIDE) { it * srcW / FrameSampler.GATE_SIDE }
+    private val gy = IntArray(FrameSampler.GATE_SIDE) { it * srcH / FrameSampler.GATE_SIDE }
+
+    private fun gathered() =
+        ByteBuffer.allocateDirect(3 * FrameSampler.GATE_SIDE * FrameSampler.GATE_SIDE)
+
+    /** The reference tensor and the two-halves tensor over the same planes, in that order. */
+    private fun bothPaths(planar: Boolean, rotation: Int): Pair<FloatBuffer, FloatBuffer> {
+        val y = luma()
+        val one = tensor(FrameSampler.GATE_SIDE)
+        val two = tensor(FrameSampler.GATE_SIDE)
+        val bytes = gathered()
+        if (planar) {
+            val (u, v) = planarChroma()
+            FrameSampler.convertToTensor(
+                y, yRow, 1, base, u, cRow, 1, base, v, cRow, 1, base, rotation, gx, gy, one,
+            )
+            FrameSampler.gatherGate(
+                y, yRow, 1, base, u, cRow, 1, base, v, cRow, 1, base, rotation, gx, gy, bytes,
+            )
+        } else {
+            val uv = semiPlanarChroma()
+            FrameSampler.convertToTensor(
+                y, yRow, 1, base, uv, cRow, 2, base, uv, cRow, 2, base + 1, rotation, gx, gy, one,
+            )
+            FrameSampler.gatherGate(
+                y, yRow, 1, base, uv, cRow, 2, base, uv, cRow, 2, base + 1, rotation, gx, gy, bytes,
+            )
+        }
+        FrameSampler.gateFromGathered(bytes, two)
+        return one to two
+    }
+
+    /**
+     * The test the split exists to pass: gather-then-convert is the one-pass walk, bit for bit, over all
+     * 150 528 floats. It pins the source ADDRESSES (rotation case table, `sxMap`/`syMap` indexing, the
+     * `shr 1` chroma subsampling) and the BT.601 coefficients together, which is the whole contract —
+     * the gate's QA-tuned `NsfwGate.TABLE` thresholds sit on these exact numbers.
+     */
+    @Test
+    fun `gather then convert is bit-identical to the one-pass walk`() {
+        val n = 3 * FrameSampler.GATE_SIDE * FrameSampler.GATE_SIDE
+        for (planar in booleanArrayOf(true, false)) for (rotation in intArrayOf(0, 90, 180, 270)) {
+            val (one, two) = bothPaths(planar, rotation)
+            assertArrayEquals(
+                "planar=$planar rotation=$rotation",
+                FloatArray(n) { one.get(it) },
+                FloatArray(n) { two.get(it) },
+                0f, // exact: a tolerance would hide the one failure mode that already shipped
+            )
+        }
+    }
+
+    /**
+     * Absolute reads AND writes on both halves, checked from non-zero positions so a relative
+     * `get()`/`put()` cannot pass. Load-bearing: the planes are the decoder's (ML Kit reads them too),
+     * the gathered buffer is a ring slot the producer hands over, and ORT holds a tensor view over the
+     * output for the whole pass.
+     */
+    @Test
+    fun `neither half moves any buffer position`() {
+        val y = luma().apply { position(7) }
+        val (u, v) = planarChroma()
+        u.position(2); v.position(1)
+        val bytes = gathered().apply { position(11) }
+        val out = tensor(FrameSampler.GATE_SIDE).apply { position(5) }
+        FrameSampler.gatherGate(y, yRow, 1, base, u, cRow, 1, base, v, cRow, 1, base, 90, gx, gy, bytes)
+        FrameSampler.gateFromGathered(bytes, out)
+        assertEquals(7, y.position())
+        assertEquals(2, u.position())
+        assertEquals(1, v.position())
+        assertEquals(11, bytes.position())
+        assertEquals(5, out.position())
+        assertEquals(3 * FrameSampler.GATE_SIDE * FrameSampler.GATE_SIDE, out.limit())
     }
 }
