@@ -25,9 +25,6 @@ internal object JobNotifications {
     /** Separate id: the ongoing FGS notification is torn down when the worker returns. */
     private const val DONE_NOTIF_ID = 1002
 
-    /** Downloads run concurrently with filtering, so they need a notification of their own. */
-    private const val DOWNLOAD_NOTIF_ID = 1003
-
     /** Extras on the MainActivity intent behind the "Delete original" action. */
     const val EXTRA_DELETE_ORIGINAL = "delete_original_uri"
     const val EXTRA_DELETE_NAME = "delete_original_name"
@@ -94,29 +91,6 @@ internal object JobNotifications {
             Build.VERSION.SDK_INT >= 34 ->
                 ForegroundInfo(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             else -> ForegroundInfo(NOTIF_ID, notification)
-        }
-    }
-
-    /**
-     * The download's own ongoing notification.
-     *
-     * Its own id, because a download and a filter job run at the same time by design and one would
-     * otherwise overwrite the other's notification. (The PRD asked for 1002; that was already the
-     * "Saved" notification's id, so downloads took the next one.)
-     *
-     * `dataSync`, never `mediaProcessing`: on API 35+ the two foreground-service types draw from
-     * separate 6 h/24 h budgets, so a download does not spend the filter pipeline's allowance.
-     */
-    fun downloadForegroundInfo(context: Context, workId: UUID, title: String, progress: Int): ForegroundInfo {
-        ensureChannel(context)
-        // 1..100, not 0..100: yt-dlp sits at 0 while it resolves formats, and a determinate bar frozen at
-        // zero reads as stuck where an indeterminate one reads as working.
-        val notification =
-            ongoing(context, workId, context.getString(R.string.download_notif_title), title, progress, 1..100)
-        return if (Build.VERSION.SDK_INT >= 34) {
-            ForegroundInfo(DOWNLOAD_NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } else {
-            ForegroundInfo(DOWNLOAD_NOTIF_ID, notification)
         }
     }
 

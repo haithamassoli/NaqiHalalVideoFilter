@@ -6,7 +6,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
-    <!-- Model downloader only ([ModelDownloader]); all inference is on-device and nothing is uploaded. -->
+    <!-- The app's own update check ([AppUpdate]) and the model downloader ([ModelDownloader]). No video
+         ever leaves the device: all filtering and inference is local and nothing is uploaded. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Runtime permission on API 33+; still requested at runtime before starting a job. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -56,16 +57,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Share a link: Naqi downloads it, then filters it. -->
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-
-            <!-- Share a video file: filtered directly, no download, source untouched. -->
+            <!-- Share a video file: filtered directly, source untouched. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
 

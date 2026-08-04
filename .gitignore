@@ -26,3 +26,6 @@ scripts/__pycache__/
 
 # Headless-Chrome scratch from branding/generate.js; the script recreates and deletes it.
 /branding/out/
+
+# Kotlin 2.x compiler session/build-metric scratch, recreated by every Gradle run.
+/.kotlin/

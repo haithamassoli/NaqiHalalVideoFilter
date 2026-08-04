@@ -25,19 +25,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.IntentCompat
 import androidx.core.net.toUri
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
-import com.haithamassoli.naqi.download.Downloader
-import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.spike.SegmentConcatSpike
 import com.haithamassoli.naqi.ui.NaqiApp
 import com.haithamassoli.naqi.ui.screen.ShareSheet
-import com.haithamassoli.naqi.ui.screen.Shared
 import com.haithamassoli.naqi.ui.theme.NaqiTheme
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.JobNotifications
-import com.haithamassoli.naqi.work.Queue
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -45,8 +39,8 @@ class MainActivity : ComponentActivity() {
     /** Set when the "Delete original" notification action opened us; drives the confirm dialog. */
     private var deleteTarget by mutableStateOf<Pair<Uri, String>?>(null)
 
-    /** Set when something was shared into Naqi; drives the share sheet. */
-    private var shared by mutableStateOf<Shared?>(null)
+    /** Set when a video was shared into Naqi; drives the share sheet. */
+    private var shared by mutableStateOf<Uri?>(null)
 
     // API 30+ fallback: the system asks the user itself, the only path that works for media we don't own.
     private val systemDelete =
@@ -60,9 +54,6 @@ class MainActivity : ComponentActivity() {
         if (BuildConfig.DEBUG_HOOKS) maybeAutorun()
         deleteTarget = deleteTargetOf(intent)
         shared = sharedOf(intent)
-        // Weekly yt-dlp check (PRD M4.4). Off the main thread, failure-tolerant, and no-op six days out
-        // of seven — sites change how they serve video far faster than the app ships.
-        lifecycleScope.launch { Downloader.updateIfDue(this@MainActivity) }
         setContent {
             NaqiTheme {
                 NaqiApp(modifier = Modifier.fillMaxSize())
@@ -75,7 +66,7 @@ class MainActivity : ComponentActivity() {
                 }
                 shared?.let {
                     ShareSheet(
-                        shared = it,
+                        uri = it,
                         onDismiss = { shared = null },
                         onQueued = { shared = null },
                     )
@@ -84,63 +75,37 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** The notification action uses CLEAR_TOP, so a running instance is reused rather than recreated. */
+    /** `singleTask`, so a share or a notification action reuses this instance rather than stacking one. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        // Default launchMode means a redelivered intent lands here, not in onCreate — the debug
-        // cancel hook has to be honoured on both paths or `am start --ez autorun_cancel` is a no-op.
+        // A redelivered intent lands here, not in onCreate — the debug cancel hook has to be honoured
+        // on both paths or `am start --ez autorun_cancel` is a no-op.
         if (BuildConfig.DEBUG_HOOKS) maybeAutorun()
         deleteTargetOf(intent)?.let { deleteTarget = it }
         sharedOf(intent)?.let { shared = it }
     }
 
     /**
-     * Parse an `ACTION_SEND`. Two shapes, per the PRD's flows A and B.
+     * Parse an `ACTION_SEND` carrying a video the user already has.
      *
-     * **Link.** The shared text is rarely a bare URL — apps wrap it in "Check this out: <url> via …" —
-     * so the first http(s) URL is scraped out rather than the whole extra being trusted. No match is a
-     * toast and nothing else; so is a URL already in the queue, because sharing twice must not queue
-     * twice.
-     *
-     * **File.** A share grant dies with the receiving task and cannot be persisted, so the read
-     * permission is re-granted to ourselves immediately — that survives until reboot, which is long
-     * enough for a queued job to reach the front. A reboot before then is the case the worker reports as
-     * "Re-share the file".
+     * A share grant dies with the receiving task and cannot be persisted, so the read permission is
+     * re-granted to ourselves immediately — that survives until reboot, which is long enough for a
+     * queued job to reach the front. A reboot before then is the case the worker reports as an
+     * unreadable source.
      */
-    private fun sharedOf(intent: Intent): Shared? {
+    private fun sharedOf(intent: Intent): Uri? {
         if (intent.action != Intent.ACTION_SEND) return null
+        if (!intent.type.orEmpty().startsWith("video/")) return null
+        val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+            ?: return null
         // Consumed, so a configuration change or a redelivered intent cannot re-open the sheet.
-        val type = intent.type.orEmpty()
-
-        if (type.startsWith("video/")) {
-            val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
-                ?: return null
-            intent.removeExtra(Intent.EXTRA_STREAM)
-            runCatching {
-                grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            return Shared.LocalFile(uri, displayNameOf(uri))
+        intent.removeExtra(Intent.EXTRA_STREAM)
+        runCatching {
+            grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-
-        if (!type.startsWith("text/")) return null
-        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
-        intent.removeExtra(Intent.EXTRA_TEXT)
-        val url = URL_IN_TEXT.find(text)?.value
-        if (url == null) {
-            toast(R.string.share_no_url)
-            return null
-        }
-        // Two sources of truth deliberately: queue.json is what the user sees, and the WorkManager tag
-        // covers an item enqueued by the debug intent, which never touches the queue.
-        if (Queue.isActive(this, url) || JobController.isQueued(this, url)) {
-            toast(R.string.share_already_queued)
-            return null
-        }
-        return Shared.Link(url)
+        return uri
     }
-
-    private fun displayNameOf(uri: Uri): String? = displayName(uri) ?: uri.lastPathSegment
 
     private fun deleteTargetOf(intent: Intent): Pair<Uri, String>? {
         if (intent.action != JobNotifications.ACTION_CONFIRM_DELETE) return null
@@ -228,29 +193,6 @@ class MainActivity : ComponentActivity() {
         // something censored. Same reason the E2E hooks exist at all: logcat beats UI scripting here.
         android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur}")
 
-        // `--ez ytdlp_update true` forces the yt-dlp self-update from adb.
-        if (intent.getBooleanExtra("ytdlp_update", false)) {
-            kotlinx.coroutines.MainScope().launch {
-                val status = runCatching { Downloader.update(this@MainActivity) }
-                Toast.makeText(this@MainActivity, "yt-dlp: ${status.getOrNull() ?: status.exceptionOrNull()}", Toast.LENGTH_LONG).show()
-            }
-            return
-        }
-
-        // M4.1 debug entry point, ahead of any UI: `-e download_url <url> [-e quality AUDIO]` runs the
-        // whole download → quarantine → filter → publish chain from adb. The share sheet (M4.2) ends up
-        // calling exactly this, so what this exercises is the real path, not a parallel one.
-        val downloadUrl = intent.getStringExtra("download_url")
-        if (downloadUrl != null) {
-            JobController.download(
-                this, downloadUrl,
-                Downloader.Quality.of(intent.getStringExtra("quality")),
-                ops,
-                intent.getStringExtra("title"),
-            )
-            return
-        }
-
         val path = intent.getStringExtra("autorun_path") ?: return
         JobController.start(
             this, ops, Uri.fromFile(File(path)).toString(),
@@ -260,14 +202,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 }
-
-/**
- * First http(s) URL inside arbitrary shared text. Deliberately permissive about what follows the host
- * and strict about how the match ENDS — a trailing "." or "," in "watch this: <url>." belongs to the
- * sentence, not the link.
- */
-private val URL_IN_TEXT =
-    Regex("""https?://[\w\-]+(\.[\w\-]+)+([\w\-.,@?^=%&:/~+#]*[\w\-@?^=%&/~+#])?""")
 
 @androidx.compose.runtime.Composable
 private fun ConfirmDeleteDialog(name: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {

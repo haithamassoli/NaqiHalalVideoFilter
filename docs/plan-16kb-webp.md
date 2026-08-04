@@ -1,5 +1,10 @@
 # Plan — make bundled ffmpeg link on 16 KB-page devices
 
+> **Status: moot as of 1.3.** `youtubedl-android:ffmpeg` was removed with the link-download feature —
+> this defect is the main reason it was removed rather than fixed. Keep this document: it is the
+> measured evidence, and it is what to re-read if downloads are ever revived from
+> `origin/feat/download-and-share`.
+
 **Goal:** `ffmpeg`/`ffprobe` from `youtubedl-android:ffmpeg:0.18.1` currently cannot link on a 16 KB-page
 device, which kills every DASH merge, `--extract-audio`, and remux. Fix that without giving up quality
 and without forking the AAR.

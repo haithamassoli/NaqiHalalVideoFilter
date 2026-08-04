@@ -12,10 +12,8 @@ import java.io.FileDescriptor
 /**
  * Moving a finished temp into the user's media library — the last step of every job shape.
  *
- * Extracted out of [FilterWorker] because [com.haithamassoli.naqi.download.DownloadWorker] needs the
- * same code path for the "all filters off" case: a download with nothing to filter still has to land
- * in `Movies/Naqi`, and a second copy of the pending-row dance is exactly the kind of duplication that
- * drifts apart.
+ * Extracted out of [FilterWorker] because every job shape ends here — video and audio-only alike — and a
+ * second copy of the pending-row dance is exactly the kind of duplication that drifts apart.
  *
  * The copy has no suspension point, so cancellation is polled by hand, once per buffer: [isStopped] is
  * checked while copying AND again before the output is finalized, and any failure or cancel deletes the

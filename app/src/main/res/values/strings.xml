@@ -212,13 +212,6 @@
     <!-- Catch-all. Also the JobsScreen fallback when a FAILED job carried no message. -->
     <string name="err_generic">Filtering failed.</string>
 
-    <!-- Download failures (M4). Kept separate from the filtering taxonomy above: a download fails for
-         reasons filtering never sees, and "this video uses a codec…" would be nonsense for any of them. -->
-    <string name="err_low_space_download">Not enough free space to download this video. Free up some space and try again.</string>
-    <string name="err_download_unsupported">Naqi can\'t download from this link. The site may not be supported, or the video may be private.</string>
-    <string name="err_download_network">Download failed. Check your connection and try again.</string>
-    <string name="err_download_generic">Download failed.</string>
-
     <!-- ============================================================
          Notifications — job foreground service and the done notification.
          The action_* keys here are shared with JobsScreen and must keep these exact names.
@@ -237,32 +230,19 @@
     <string name="stage_rendering">Pass 2 — rendering</string>
     <string name="stage_separating">Removing music</string>
     <string name="stage_muxing">Finishing up</string>
-    <string name="stage_downloading">Downloading</string>
 
     <!-- ============================================================
-         Share sheet (M4) — shown when a link or a video is shared into Naqi
+         Share sheet — shown when a video is shared into Naqi
          ============================================================ -->
-    <string name="share_loading">Reading video details…</string>
-    <string name="share_info_failed">Couldn\'t read this video. It may be private, region-locked, or the site isn\'t supported.</string>
     <!-- Fallback heading when the source exposes no title at all. -->
     <string name="share_untitled">Shared video</string>
-    <!-- Section labels. -->
-    <string name="share_eyebrow_quality">Quality</string>
+    <!-- Section label. -->
     <string name="share_eyebrow_filters">Filters</string>
-    <string name="share_quality_best">Best</string>
-    <!-- 720p is a format name; it stays Latin in every locale. -->
-    <string name="share_quality_720">720p</string>
-    <string name="share_quality_audio">Audio only</string>
-    <string name="action_download">Download</string>
     <string name="action_filter">Filter</string>
     <string name="action_retry">Retry</string>
-    <!-- Toasts on the share entry path. -->
-    <string name="share_no_url">No link found in what you shared.</string>
-    <string name="share_already_queued">Already in the queue.</string>
 
-    <!-- Share queue (M4). -->
+    <!-- Share queue. -->
     <string name="queue_eyebrow">Queue</string>
-    <string name="queue_state_pending_download">Waiting to download</string>
     <string name="queue_state_pending_filter">Waiting to filter</string>
     <string name="queue_state_filtering">Filtering</string>
     <string name="queue_state_done">Saved</string>
@@ -302,22 +282,11 @@
     <!-- Entry point on the pick screen. -->
     <string name="about_open">About &amp; licenses</string>
 
-    <string name="about_eyebrow_downloader">Downloader</string>
     <string name="about_eyebrow_licenses">Open source</string>
-    <!-- %1$s = a yt-dlp version string like 2026.07.04, or about_ytdlp_unknown. -->
-    <string name="about_ytdlp_version">yt-dlp %1$s</string>
-    <string name="about_ytdlp_unknown">not updated yet</string>
-    <string name="about_ytdlp_desc">Sites change how they serve video every few weeks. Naqi checks for a new downloader once a week; update here if a link stops working.</string>
-    <string name="about_update">Check for update</string>
-    <string name="about_updating">Updating…</string>
-    <string name="about_update_ok">Downloader is up to date.</string>
-    <string name="about_update_failed">Couldn\'t update. Check your connection and try again.</string>
     <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
     <string name="about_notices_title">Open-source notices</string>
     <string name="about_notice_missing">Open-source notices are unavailable in this build.</string>
 
-    <!-- Ongoing notification while a download runs; the second line is the video title. -->
-    <string name="download_notif_title">Downloading video</string>
     <string name="done_notif_title">Filtered copy saved</string>
     <string name="action_open">Open</string>
     <string name="action_share">Share</string>

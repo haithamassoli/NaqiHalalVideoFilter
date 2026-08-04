@@ -21,17 +21,18 @@ unresolvable gender get blurred.
 
 Also included:
 
-- **Download by link** — share a video URL into Naqi and it fetches the file with yt-dlp, then
-  filters it. The download goes to a quarantine directory and is only published once complete.
+- **Share into Naqi** — share a video from any app and it queues for filtering straight away, with
+  the filters you used last time already selected. Share several and they run in order.
 - **Long videos** — feature-length input checkpoints per segment and survives process death, a
   reboot, and the 6-hour foreground-service cap.
 - **English and Arabic**, with per-app language selection on Android 13+.
 
 ## Privacy
 
-All inference runs locally. The app requests `INTERNET` for exactly two things: the optional
-one-time model download and the link-download feature you explicitly invoke. Nothing is uploaded,
-there are no analytics SDKs, and no account is required.
+All inference runs locally — **no video ever leaves the device.** The app requests `INTERNET` for
+exactly two things: checking GitHub Releases for a newer version of Naqi itself, and the optional
+one-time model download. Nothing is uploaded, there are no analytics SDKs, and no account is
+required.
 
 ## Install
 
@@ -100,8 +101,8 @@ same thing.
 
 ## Licence
 
-**GPL-3.0-or-later.** See [`LICENSE`](LICENSE). Naqi links youtubedl-android (GPL-3.0), which is
-what determines the licence of the whole.
+**GPL-3.0-or-later.** See [`LICENSE`](LICENSE). It was originally forced by linking
+youtubedl-android (GPL-3.0); that dependency is gone and the licence is kept deliberately.
 
 ⚠️ Two bundled models carry terms that are **not yet resolved**: NudeNet v3 320n is AGPL-3.0 and
 the NSFW gate weights are NOASSERTION upstream. The details and the reasoning are in

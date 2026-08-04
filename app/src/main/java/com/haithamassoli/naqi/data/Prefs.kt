@@ -1,7 +1,6 @@
 package com.haithamassoli.naqi.data
 
 import android.content.Context
-import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.model.FilterOps
 
 /**
@@ -23,19 +22,14 @@ object Prefs {
 
     /** Read-only legacy: what [KEY_CENSOR_WHO] replaced. Still read so an upgrade keeps the last pick. */
     private const val KEY_CENSOR_WOMEN = "censor_women"
-    private const val KEY_QUALITY = "quality"
-    private const val KEY_LAST_UPDATE_CHECK = "last_update_check"
     private const val KEY_APP_UPDATE_CHECK = "app_update_check"
     private const val KEY_APP_UPDATE_SKIPPED = "app_update_skipped"
     private const val KEY_APP_UPDATE_ID = "app_update_download_id"
     private const val KEY_APP_UPDATE_VERSION = "app_update_version"
 
-    /** Weekly, per the PRD. Long enough not to nag, short enough to beat a broken extractor. */
-    private const val UPDATE_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000
-
     /**
-     * Daily for the app itself, not weekly like yt-dlp: this one costs a single unauthenticated GET
-     * and the thing it catches — a release that fixes something — is worth knowing about sooner.
+     * Daily. It costs a single unauthenticated GET, and the thing it catches — a release that fixes
+     * something — is worth knowing about sooner rather than later.
      */
     private const val APP_UPDATE_INTERVAL_MS = 24L * 60 * 60 * 1000
 
@@ -72,23 +66,11 @@ object Prefs {
         if (who != FilterOps.NONE) prefs(context).edit().putString(KEY_CENSOR_WHO, who).apply()
     }
 
-    fun quality(context: Context): Downloader.Quality =
-        Downloader.Quality.of(prefs(context).getString(KEY_QUALITY, null))
-
-    fun save(context: Context, ops: FilterOps, quality: Downloader.Quality) {
+    fun save(context: Context, ops: FilterOps) {
         prefs(context).edit()
             .putBoolean(KEY_REMOVE_MUSIC, ops.removeMusic)
             .putString(KEY_CENSOR_WHO, ops.censorWho)
-            .putString(KEY_QUALITY, quality.name)
             .apply()
-    }
-
-    /** Has it been a week since the last yt-dlp update check? */
-    fun updateDue(context: Context): Boolean =
-        System.currentTimeMillis() - prefs(context).getLong(KEY_LAST_UPDATE_CHECK, 0L) > UPDATE_INTERVAL_MS
-
-    fun markUpdateChecked(context: Context) {
-        prefs(context).edit().putLong(KEY_LAST_UPDATE_CHECK, System.currentTimeMillis()).apply()
     }
 
     /** Has it been a day since the last GitHub release check? */

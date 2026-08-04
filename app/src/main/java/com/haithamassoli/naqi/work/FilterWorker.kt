@@ -28,7 +28,6 @@ import com.haithamassoli.naqi.audio.MuxOut
 import com.haithamassoli.naqi.audio.Remux
 import com.haithamassoli.naqi.audio.TrackSource
 import com.haithamassoli.naqi.audio.concatAudio
-import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.edl.Edl
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.edl.FaceTrackEdl
@@ -1233,12 +1232,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         inputUri: Uri,
         mime: String = Publish.MIME_MP4,
     ): Result {
-        val quarantined = Downloader.isQuarantined(applicationContext, inputUri)
-        if (quarantined) Downloader.discard(applicationContext, inputUri)
         queued { it.copy(state = Queue.State.DONE, outputUri = outputUri.toString()) }
         JobNotifications.done(
-            applicationContext, displayName, outputUri.toString(),
-            inputUri.toString().takeUnless { quarantined }, mime,
+            applicationContext, displayName, outputUri.toString(), inputUri.toString(), mime,
         )
         return Result.success(workDataOf(KEY_OUTPUT_NAME to displayName, KEY_OUTPUT_URI to outputUri.toString()))
     }

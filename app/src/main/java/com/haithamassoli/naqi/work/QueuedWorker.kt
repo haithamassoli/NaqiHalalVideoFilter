@@ -9,21 +9,17 @@ import androidx.work.workDataOf
 import com.haithamassoli.naqi.model.FilterOps
 
 /**
- * What [FilterWorker] and [com.haithamassoli.naqi.download.DownloadWorker] share: the link back to the
- * queue item that spawned them, and the failure rule that link forces.
+ * The link from a worker back to the queue item that spawned it, and the failure rule that link forces.
  *
  * **A queue-driven run never returns failure.** WorkManager fails every request chained behind a failed
- * one, so a single unfilterable item or dead link would take the rest of the queue with it. The real
- * outcome is recorded in `queue.json`, where the UI reads it; the chain only ever learns that this
- * request finished. The picker/debug path (no [FilterWorker.KEY_QUEUE_ID]) keeps real failures — that is
- * what `JobsScreen` reads, and nothing is chained behind it to kill.
- *
- * This lived twice, once per worker, with the invariant restated in both. Two copies of a rule that must
- * hold in both places is one edit away from holding in neither.
+ * one, so a single unfilterable item would take the rest of the queue with it. The real outcome is
+ * recorded in `queue.json`, where the UI reads it; the chain only ever learns that this request
+ * finished. The picker/debug path (no [FilterWorker.KEY_QUEUE_ID]) keeps real failures — that is what
+ * `JobsScreen` reads, and nothing is chained behind it to kill.
  */
-// Public, not internal: WorkManager instantiates the two subclasses reflectively, so they must stay
-// public — and a public class may not expose an internal supertype. The members below carry the
-// module scoping instead, which is what actually matters (Queue.Item is internal too).
+// Public, not internal: WorkManager instantiates the subclass reflectively, so it must stay public —
+// and a public class may not expose an internal supertype. The members below carry the module scoping
+// instead, which is what actually matters (Queue.Item is internal too).
 abstract class QueuedWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
     /** Non-null when this run came from the share queue rather than the picker or the debug intent. */
@@ -50,9 +46,8 @@ abstract class QueuedWorker(ctx: Context, params: WorkerParameters) : CoroutineW
 /**
  * The [FilterOps] wire format, in one place.
  *
- * These fields were spelled out three times — twice being written in [JobController] and once
- * being read back in `DownloadWorker` — so adding an option reached whichever copies you remembered.
- * The read and the write now cannot disagree.
+ * These fields were spelled out at every enqueue site, so adding an option reached whichever copies you
+ * remembered. The read and the write now cannot disagree.
  */
 internal fun FilterOps.pairs(): Array<Pair<String, Any?>> = arrayOf(
     FilterWorker.KEY_REMOVE_MUSIC to removeMusic,

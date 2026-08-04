@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,7 +19,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,7 +28,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.haithamassoli.naqi.BuildConfig
 import com.haithamassoli.naqi.R
-import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.ml.ModelSmoke
 import com.haithamassoli.naqi.ml.SmokeReport
 import com.haithamassoli.naqi.ui.NaqiCard
@@ -38,13 +35,12 @@ import com.haithamassoli.naqi.ui.NaqiTopBar
 import com.haithamassoli.naqi.ui.SectionHeader
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * About + open-source licences, the only place the user can force a yt-dlp update, and — since this
- * redesign — where the model smoke report lives. That report is a diagnostic: useful when a device
- * misbehaves, noise on the screen where someone is trying to pick a video.
+ * About + open-source licences, and — since this redesign — where the model smoke report lives. That
+ * report is a diagnostic: useful when a device misbehaves, noise on the screen where someone is trying
+ * to pick a video.
  *
  * The attribution text is the repository's own `NOTICE`, copied into assets by the build rather than
  * retyped as a string resource — see `app/build.gradle.kts`. It is deliberately not translated: a
@@ -55,7 +51,6 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     var notice by remember { mutableStateOf("") }
     var showNotice by remember { mutableStateOf(false) }
@@ -68,15 +63,6 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
     var smoke by remember { mutableStateOf<SmokeReport?>(null) }
     LaunchedEffect(Unit) { smoke = withContext(Dispatchers.Default) { ModelSmoke.run(context) } }
-
-    // Null until read; the version only exists once an update has run at least once (it is written by
-    // the updater, not read out of the bundled zipapp).
-    var ytdlpVersion by remember { mutableStateOf<String?>(null) }
-    var updating by remember { mutableStateOf(false) }
-    var updateResult by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
-        ytdlpVersion = withContext(Dispatchers.IO) { Downloader.version(context) }
-    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -115,48 +101,6 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             }
 
             Spacer(Modifier.height(NaqiTokens.space6))
-            SectionHeader(stringResource(R.string.about_eyebrow_downloader))
-            NaqiCard {
-                Text(
-                    stringResource(
-                        R.string.about_ytdlp_version,
-                        ytdlpVersion ?: stringResource(R.string.about_ytdlp_unknown),
-                    ),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Spacer(Modifier.height(NaqiTokens.space1))
-                Text(
-                    stringResource(R.string.about_ytdlp_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                updateResult?.let {
-                    Spacer(Modifier.height(NaqiTokens.space2))
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                }
-                Spacer(Modifier.height(NaqiTokens.space3))
-                OutlinedButton(
-                    enabled = !updating,
-                    shape = NaqiTokens.shapeButton,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        updating = true
-                        updateResult = null
-                        scope.launch {
-                            val status = runCatching { Downloader.update(context) }
-                            ytdlpVersion = withContext(Dispatchers.IO) { Downloader.version(context) }
-                            updateResult = context.getString(
-                                if (status.isSuccess) R.string.about_update_ok else R.string.about_update_failed,
-                            )
-                            updating = false
-                        }
-                    },
-                ) {
-                    Text(stringResource(if (updating) R.string.about_updating else R.string.about_update))
-                }
-            }
-
-            Spacer(Modifier.height(NaqiTokens.space5))
             SectionHeader(stringResource(R.string.pick_diag_title))
             NaqiCard { Diagnostics(smoke) }
 

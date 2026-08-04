@@ -135,7 +135,7 @@ private fun StatusGlyph(state: Queue.State) {
     val cs = MaterialTheme.colorScheme
     Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
         when (state) {
-            Queue.State.DOWNLOADING, Queue.State.FILTERING ->
+            Queue.State.FILTERING ->
                 CircularProgressIndicator(Modifier.size(18.dp), color = cs.primary, strokeWidth = 2.5.dp)
 
             Queue.State.DONE -> Box(
@@ -166,8 +166,6 @@ private fun StatusGlyph(state: Queue.State) {
 }
 
 private fun stateLabel(state: Queue.State) = when (state) {
-    Queue.State.PENDING_DOWNLOAD -> R.string.queue_state_pending_download
-    Queue.State.DOWNLOADING -> R.string.stage_downloading
     Queue.State.PENDING_FILTER -> R.string.queue_state_pending_filter
     Queue.State.FILTERING -> R.string.queue_state_filtering
     Queue.State.DONE -> R.string.queue_state_done

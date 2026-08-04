@@ -6,8 +6,10 @@ the terms of the GNU General Public License as published by the Free Software
 Foundation, either version 3 of the License, or (at your option) any later
 version. See the LICENSE file for the full text.
 
-Naqi is licensed GPL-3.0-or-later because it links youtubedl-android, which is
-GPL-3.0. Before the download feature the repository carried no licence at all.
+GPL-3.0-or-later was originally forced on Naqi by linking youtubedl-android.
+That dependency has since been removed, along with the link-download feature it
+powered; the licence is kept deliberately. Before it the repository carried no
+licence at all.
 
 ======================================================
 UNRESOLVED LICENCE ISSUE — READ BEFORE ANY PUBLIC RELEASE
@@ -24,29 +26,6 @@ UNRESOLVED LICENCE ISSUE — READ BEFORE ANY PUBLIC RELEASE
 ======================================================
 THIRD-PARTY COMPONENTS
 ======================================================
-
---- Download engine
-
-yt-dlp — github.com/yt-dlp/yt-dlp
-  The Unlicense (public domain). Shipped as a zipapp inside youtubedl-android
-  and updated at runtime from the project's GitHub releases.
-
-youtubedl-android — github.com/JunkFood02/youtubedl-android
-  GPL-3.0. This is the dependency that determines Naqi's own licence.
-
-FFmpeg / FFprobe — ffmpeg.org
-  Bundled by youtubedl-android:ffmpeg. FFmpeg is LGPL-2.1-or-later, with
-  GPL-2.0-or-later applying to builds configured with --enable-gpl. The exact
-  configuration of the bundled binaries is set by youtubedl-android; consult
-  that project for the build flags before relying on the weaker licence.
-
-CPython — python.org
-  Python Software Foundation License 2.0. Bundled by youtubedl-android as
-  libpython.so + libpython.zip.so to execute the yt-dlp zipapp.
-
-QuickJS — bellard.org/quickjs
-  MIT. Bundled as libqjs.so; used to solve the JavaScript challenges some
-  sites require before serving media URLs.
 
 --- Machine learning
 
@@ -76,8 +55,6 @@ Apache License 2.0:
   AndroidX WorkManager
   AndroidX Media3 (Transformer, Effect, Common)
   Kotlin standard library and kotlinx.coroutines — JetBrains
-  Jackson (databind, core, annotations) — FasterXML, via youtubedl-android
-  Apache Commons Compress — via youtubedl-android
 
 --- Test-only
 

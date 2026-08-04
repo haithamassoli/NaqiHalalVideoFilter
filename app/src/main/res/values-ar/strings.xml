@@ -209,12 +209,6 @@
     <!-- Catch-all. Also the JobsScreen fallback when a FAILED job carried no message. -->
     <string name="err_generic">فشلت الفلترة.</string>
 
-    <!-- Download failures (M4). -->
-    <string name="err_low_space_download">لا توجد مساحة كافية لتنزيل هذا الفيديو. فرّغ بعض المساحة ثم أعد المحاولة.</string>
-    <string name="err_download_unsupported">لا يستطيع نقي التنزيل من هذا الرابط. قد يكون الموقع غير مدعوم أو الفيديو خاصًا.</string>
-    <string name="err_download_network">فشل التنزيل. تحقّق من اتصالك ثم أعد المحاولة.</string>
-    <string name="err_download_generic">فشل التنزيل.</string>
-
     <!-- ============================================================
          Notifications — job foreground service and the done notification.
          The action_* keys here are shared with JobsScreen and must keep these exact names.
@@ -232,28 +226,17 @@
     <string name="stage_rendering">المرحلة ٢ — المعالجة</string>
     <string name="stage_separating">إزالة الموسيقى</string>
     <string name="stage_muxing">اللمسات الأخيرة</string>
-    <string name="stage_downloading">جارٍ التنزيل</string>
 
     <!-- ============================================================
-         Share sheet (M4)
+         Share sheet
          ============================================================ -->
-    <string name="share_loading">جارٍ قراءة تفاصيل الفيديو…</string>
-    <string name="share_info_failed">تعذّرت قراءة هذا الفيديو. قد يكون خاصًا أو محجوبًا في منطقتك أو الموقع غير مدعوم.</string>
     <string name="share_untitled">فيديو مُشارَك</string>
-    <string name="share_eyebrow_quality">الجودة</string>
     <string name="share_eyebrow_filters">الفلاتر</string>
-    <string name="share_quality_best">الأفضل</string>
-    <string name="share_quality_720">720p</string>
-    <string name="share_quality_audio">الصوت فقط</string>
-    <string name="action_download">تنزيل</string>
     <string name="action_filter">فلترة</string>
     <string name="action_retry">إعادة المحاولة</string>
-    <string name="share_no_url">لم يُعثر على رابط في ما شاركته.</string>
-    <string name="share_already_queued">موجود في القائمة بالفعل.</string>
 
-    <!-- Share queue (M4). -->
+    <!-- Share queue. -->
     <string name="queue_eyebrow">القائمة</string>
-    <string name="queue_state_pending_download">في انتظار التنزيل</string>
     <string name="queue_state_pending_filter">في انتظار الفلترة</string>
     <string name="queue_state_filtering">جارٍ الفلترة</string>
     <string name="queue_state_done">تم الحفظ</string>
@@ -288,21 +271,11 @@
     <string name="about_license">مرخّص بموجب GPL-3.0-or-later.</string>
     <string name="about_open">عن التطبيق والتراخيص</string>
 
-    <string name="about_eyebrow_downloader">أداة التنزيل</string>
     <string name="about_eyebrow_licenses">المصادر المفتوحة</string>
-    <string name="about_ytdlp_version">yt-dlp ‏%1$s</string>
-    <string name="about_ytdlp_unknown">لم يُحدَّث بعد</string>
-    <string name="about_ytdlp_desc">تُغيّر المواقع طريقة تقديم الفيديو كل بضعة أسابيع. يتحقّق نقي من وجود أداة تنزيل أحدث مرة كل أسبوع؛ حدّثها من هنا إذا توقّف رابط عن العمل.</string>
-    <string name="about_update">التحقّق من وجود تحديث</string>
-    <string name="about_updating">جارٍ التحديث…</string>
-    <string name="about_update_ok">أداة التنزيل محدّثة.</string>
-    <string name="about_update_failed">تعذّر التحديث. تحقّق من اتصالك ثم أعد المحاولة.</string>
     <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
     <string name="about_notices_title">إشعارات المصادر المفتوحة</string>
     <string name="about_notice_missing">إشعارات المصادر المفتوحة غير متوفّرة في هذه النسخة.</string>
 
-    <!-- Ongoing notification while a download runs; the second line is the video title. -->
-    <string name="download_notif_title">جارٍ تنزيل الفيديو</string>
     <string name="done_notif_title">تم حفظ النسخة المُفلترة</string>
     <string name="action_open">فتح</string>
     <string name="action_share">مشاركة</string>

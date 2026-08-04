@@ -15,8 +15,8 @@ android {
         applicationId = "com.haithamassoli.naqi"
         minSdk = 29
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.2"
+        versionCode = 8
+        versionName = "1.3"
 
         // Base URL for the M3 model downloader's *converted* artifacts (the NSFW gate and htdemucs —
         // NudeNet carries its own public release URL). Empty by default: no host is published yet, and
@@ -113,18 +113,12 @@ android {
     }
     packaging {
         jniLibs {
-            // TRUE, forced by youtubedl-android: it reads libpython.zip.so out of
-            // applicationInfo.nativeLibraryDir, which holds no real files unless the libs are extracted
-            // at install time. It was false for ONNX Runtime, on the belief that 16 KB-page support
-            // needed in-APK alignment — it does not: 16 KB alignment is a property of the .so's own ELF
-            // LOAD segments, and an extracted lib is mmap'd from the filesystem where APK zip alignment
-            // is irrelevant. See docs/m4-packaging-spike.md. Cost: the libs are stored twice on device.
-            useLegacyPackaging = true
-        }
-        resources {
-            // youtubedl-android pulls in commons-compress + Jackson, which ship the same LICENSE/NOTICE
-            // metadata paths. Nothing in the app reads them; first one wins.
-            excludes += setOf("META-INF/{AL2.0,LGPL2.1,LICENSE*,NOTICE*,DEPENDENCIES}")
+            // FALSE: the libs stay in the APK, uncompressed and page-aligned, and are mmap'd straight
+            // out of it — nothing is extracted at install, so they are stored once instead of twice.
+            // It was flipped to TRUE for youtubedl-android, which reads libpython.zip.so out of
+            // applicationInfo.nativeLibraryDir and therefore needed real files on disk. That dependency
+            // is gone (see NOTICE), so this reverts to the M0–M3 packaging ONNX Runtime shipped under.
+            useLegacyPackaging = false
         }
     }
 }
@@ -170,10 +164,6 @@ dependencies {
     implementation(libs.media3.effect)
     implementation(libs.media3.common)
     implementation(libs.mlkit.face.detection)
-
-    // M4: yt-dlp + a bundled ffmpeg. GPL-3.0 — linking these relicenses the app (see LICENSE).
-    implementation(libs.youtubedl.android)
-    implementation(libs.youtubedl.ffmpeg)
 
     testImplementation(libs.junit)
     testImplementation(libs.json) // real org.json impl so Edl JSON round-trip tests run on the JVM

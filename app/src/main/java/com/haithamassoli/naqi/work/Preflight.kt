@@ -39,7 +39,6 @@ internal object Preflight {
     val NO_VIDEO = R.string.err_no_video
     val NO_AUDIO = R.string.err_no_audio
     val LOW_SPACE = R.string.err_low_space
-    val LOW_SPACE_DOWNLOAD = R.string.err_low_space_download
     val UNSUPPORTED_CODEC = R.string.err_unsupported_codec
     val OUT_OF_SPACE = R.string.err_out_of_space
     val GENERIC = R.string.err_generic
@@ -49,32 +48,16 @@ internal object Preflight {
 
     /**
      * Free space this job needs, in bytes: one working copy per temp the shape writes, plus the
-     * published copy, plus scratch, plus the PRD's headroom. Shared by [check] and
-     * [checkSpaceForDownload], so a picked source and a not-yet-fetched one are sized by one rule.
+     * published copy, plus scratch, plus the PRD's headroom.
      */
     private fun requiredBytes(sourceBytes: Long, tempCopies: Int, extraScratchBytes: Long = 0L): Long =
         (tempCopies + 1) * sourceBytes + extraScratchBytes + SLACK_BYTES // +1 = published copy
 
     /**
      * Working copies a shape writes before publishing: combined writes a render temp AND a mux temp,
-     * the single-op shapes write one. Derived here rather than at each call site — it was spelled out
-     * identically in the share sheet's pre-queue check and in the worker's own.
+     * the single-op shapes write one.
      */
     private fun tempCopiesFor(ops: FilterOps): Int = if (ops.removeMusic && ops.censorFaces) 2 else 1
-
-    /**
-     * Would a source of [sourceBytes] fit? Used before a download starts, where there is no file to
-     * open yet — so it is only the space half of [check], deliberately.
-     *
-     * A download is one copy more than a pick: the quarantined original AND everything filtering it
-     * needs, which is the copy nobody budgets for today (PRD §Storage).
-     */
-    @StringRes
-    fun checkSpaceForDownload(context: Context, sourceBytes: Long, ops: FilterOps): Int? {
-        if (sourceBytes <= 0L) return null // size unknown — DownloadWorker aborts mid-flight instead
-        val required = requiredBytes(sourceBytes, tempCopiesFor(ops) + 1)
-        return if (context.noBackupFilesDir.usableSpace >= required) null else LOW_SPACE_DOWNLOAD
-    }
 
     /**
      * @param needsAudio music removal was requested — a missing audio track is then fatal, not fine.

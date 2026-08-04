@@ -16,14 +16,13 @@ import java.util.UUID
  * The user-visible queue: what was shared, in what order, and how each item actually ended up.
  *
  * **Why this exists next to WorkManager rather than instead of it.** WorkManager is the *scheduler* —
- * the chains give FIFO ordering and survive process death for free, and nothing here re-implements
- * that. What it cannot express is the thing the PRD's scheduling rule forces: a queue-driven run must
- * always return `Result.success()`, because a chained failure fails every request behind it and one bad
- * download would kill the rest of the queue. That makes `WorkInfo.State` useless as an outcome — every
- * item reads SUCCEEDED, including the ones that failed. So the real outcome is recorded here.
+ * the chain gives FIFO ordering and survives process death for free, and nothing here re-implements
+ * that. What it cannot express is the rule the chain forces: a queue-driven run must always return
+ * `Result.success()`, because a chained failure fails every request behind it and one bad item would
+ * kill the rest of the queue. That makes `WorkInfo.State` useless as an outcome — every item reads
+ * SUCCEEDED, including the ones that failed. So the real outcome is recorded here.
  *
- * One JSON file, `@Synchronized`, written to a temp and renamed. Both workers live in the same process,
- * so a monitor plus an atomic rename is the whole concurrency story.
+ * One JSON file, `@Synchronized`, written to a temp and renamed.
  *
  * ponytail: not Room. There is no query, no migration, and no cross-process reader — a list of a dozen
  * items that is rewritten whole on every change. Move to Room the moment any of those three stops being
@@ -35,26 +34,23 @@ internal object Queue {
     private const val FILE = "queue.json"
 
     enum class State {
-        PENDING_DOWNLOAD, DOWNLOADING, PENDING_FILTER, FILTERING, DONE, FAILED;
+        PENDING_FILTER, FILTERING, DONE, FAILED;
 
-        /** Terminal items are history: they no longer block a duplicate share of the same URL. */
+        /** Terminal items are history: they are what "clear finished" clears. */
         val isTerminal: Boolean get() = this == DONE || this == FAILED
     }
 
     /**
-     * @param sourceUri the file being filtered — a `file://` quarantine path for a download, or the
-     *   shared `content://` for a local file. Null until a download produces one.
+     * @param sourceUri the file being filtered — the `content://` the user shared in.
      * @param error a `@StringRes` id, never a message: resource ids re-localize if the app language
      *   changes after the item failed, which a stored sentence cannot.
      */
     data class Item(
+        val sourceUri: String,
         val id: String = UUID.randomUUID().toString(),
-        val url: String? = null,
-        val sourceUri: String? = null,
         val title: String? = null,
-        val state: State = State.PENDING_DOWNLOAD,
+        val state: State = State.PENDING_FILTER,
         val ops: FilterOps = FilterOps(),
-        val quality: String? = null,
         @param:StringRes val error: Int? = null,
         val outputUri: String? = null,
     )
@@ -70,7 +66,7 @@ internal object Queue {
         if (!file.exists()) return emptyList<Item>().also { _items.value = it }
         val parsed = runCatching {
             val array = JSONArray(file.readText())
-            (0 until array.length()).map { fromJson(array.getJSONObject(it)) }
+            (0 until array.length()).mapNotNull { fromJson(array.getJSONObject(it)) }
         }.getOrElse {
             // A truncated or hand-edited file must not brick the queue screen forever.
             Log.w(TAG, "queue.json unreadable, starting empty", it)
@@ -104,13 +100,9 @@ internal object Queue {
         write(context, load(context).filterNot { it.state.isTerminal })
     }
 
-    /** Is this URL already queued and not yet finished? The PRD's "share the same URL twice" rule. */
-    fun isActive(context: Context, url: String): Boolean =
-        load(context).any { it.url == url && !it.state.isTerminal }
-
-    /** Items that have not started yet — what [cancel-repair] has to re-append. */
+    /** Items that have not started yet — what cancel-repair has to re-append. */
     fun pending(context: Context): List<Item> =
-        load(context).filter { it.state == State.PENDING_DOWNLOAD || it.state == State.PENDING_FILTER }
+        load(context).filter { it.state == State.PENDING_FILTER }
 
     private fun write(context: Context, items: List<Item>) {
         val array = JSONArray().apply { items.forEach { put(toJson(it)) } }
@@ -127,11 +119,9 @@ internal object Queue {
 
     private fun toJson(i: Item) = JSONObject().apply {
         put("id", i.id)
-        put("url", i.url)
         put("sourceUri", i.sourceUri)
         put("title", i.title)
         put("state", i.state.name)
-        put("quality", i.quality)
         put("error", i.error ?: JSONObject.NULL)
         put("outputUri", i.outputUri)
         put(
@@ -149,19 +139,25 @@ internal object Queue {
         )
     }
 
-    private fun fromJson(o: JSONObject) = Item(
-        id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
-        url = o.optStringOrNull("url"),
-        sourceUri = o.optStringOrNull("sourceUri"),
-        title = o.optStringOrNull("title"),
-        // An unknown state name means a file written by a newer build; treat it as failed rather
-        // than crashing the screen that is supposed to show the user what went wrong.
-        state = runCatching { State.valueOf(o.optString("state")) }.getOrDefault(State.FAILED),
-        quality = o.optStringOrNull("quality"),
-        error = o.opt("error").let { if (it is Int) it else null },
-        outputUri = o.optStringOrNull("outputUri"),
-        ops = opsFromJson(o.optJSONObject("ops") ?: JSONObject()),
-    )
+    /**
+     * Null for a record with no source to filter. That is how a `queue.json` written by a build with
+     * the link-download flow drops its never-downloaded items on upgrade: there is no file, so there is
+     * nothing to run or retry, and showing it as failed would only invite a retry that cannot work.
+     */
+    private fun fromJson(o: JSONObject): Item? {
+        val sourceUri = o.optStringOrNull("sourceUri") ?: return null
+        return Item(
+            sourceUri = sourceUri,
+            id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
+            title = o.optStringOrNull("title"),
+            // An unknown state name means a file written by another build; treat it as failed rather
+            // than crashing the screen that is supposed to show the user what went wrong.
+            state = runCatching { State.valueOf(o.optString("state")) }.getOrDefault(State.FAILED),
+            error = o.opt("error").let { if (it is Int) it else null },
+            outputUri = o.optStringOrNull("outputUri"),
+            ops = opsFromJson(o.optJSONObject("ops") ?: JSONObject()),
+        )
+    }
 
     /**
      * The ops half of [fromJson], its own `internal` function so a JVM test can exercise the wire

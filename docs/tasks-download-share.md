@@ -1,5 +1,13 @@
 # tasks-download-share.md — Download & Share
 
+> **Status: M4.0, M4.1 and the link half of M4.2–M4.4 were removed in 1.3 (versionCode 8).** What
+> survives is the local-file share: intent-filter, `ShareSheet`, `Prefs`, `Queue`, the always-success
+> rule, cancel-repair and the recalibrated `Eta`. Code for the rest is on
+> `origin/feat/download-and-share`. Rationale in `docs/prd-download-share.md`.
+>
+> The three device tests still open below (SIGKILL mid-queue, force-one-item-to-fail, reboot before a
+> shared file is filtered) all apply to the surviving queue and are still worth running.
+
 Source: `prd-download-share.md`. Milestones are dependency-ordered; M4.0 is a hard gate — nothing below it starts until it passes. Naming note: `tasks.md` already uses M4/M5 for the long-film phases; the M4.x names here follow the PRD and are unrelated to those.
 
 ## M4.0 — Packaging spike (gate) — **PASSED 2026-07-29** (`docs/m4-packaging-spike.md`)

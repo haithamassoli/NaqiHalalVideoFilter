@@ -1,5 +1,18 @@
 # PRD — Download & Share
 
+> **Status: the download half is removed as of 1.3 (versionCode 8).** Only "share a video file"
+> shipped forward — the `ACTION_SEND video/*` entry point, the sheet, and the queue. Everything about
+> links, yt-dlp, quality selection, quarantine and audio-only downloads is gone, and so are the
+> `youtubedl-android` dependencies (−49 MB of native libs). The code is preserved on
+> `origin/feat/download-and-share`.
+>
+> Why: the bundled ffmpeg cannot link on 16 KB-page devices (five `libwebp*` ELFs inside
+> `libffmpeg.zip.so` are `p_align 0x1000` and `libavcodec` needs two of them), 0.18.1 is the newest
+> youtubedl-android so no version bump fixes it, and the bundled yt-dlp needs a runtime self-update
+> before a single YouTube link resolves. See `docs/plan-16kb-webp.md`.
+>
+> Everything below documents the removed design. Read it as history.
+
 Naqi gains two entry points it does not have today: share a **link** from any app and Naqi downloads it via yt-dlp; share a **video file** and Naqi filters it directly. Both land in one sheet that asks quality + which filters (remove music / blur women), remembers the last choice, and adds the item to a FIFO queue that survives process death. Downloaded originals are quarantined in app-private storage — only the filtered output reaches the gallery.
 
 Reference product: [Seal](https://github.com/JunkFood02/Seal). Reference library: `io.github.junkfood02.youtubedl-android`.
