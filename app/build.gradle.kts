@@ -15,8 +15,8 @@ android {
         applicationId = "com.haithamassoli.naqi"
         minSdk = 29
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.3"
+        versionCode = 9
+        versionName = "1.1.1"
 
         // Base URL for the M3 model downloader's *converted* artifacts (the NSFW gate and htdemucs —
         // NudeNet carries its own public release URL). Empty by default: no host is published yet, and

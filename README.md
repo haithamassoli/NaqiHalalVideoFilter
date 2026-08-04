@@ -30,9 +30,9 @@ Also included:
 ## Privacy
 
 All inference runs locally — **no video ever leaves the device.** The app requests `INTERNET` for
-exactly two things: checking GitHub Releases for a newer version of Naqi itself, and the optional
-one-time model download. Nothing is uploaded, there are no analytics SDKs, and no account is
-required.
+exactly one thing: the optional one-time model download. Nothing is uploaded, there are no analytics
+SDKs, and no account is required. Naqi does not install packages and does not update itself — About →
+Updates links out to this repository's Releases page, and that is the whole update mechanism.
 
 ## Install
 

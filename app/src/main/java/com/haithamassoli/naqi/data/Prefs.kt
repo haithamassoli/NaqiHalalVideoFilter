@@ -22,19 +22,6 @@ object Prefs {
 
     /** Read-only legacy: what [KEY_CENSOR_WHO] replaced. Still read so an upgrade keeps the last pick. */
     private const val KEY_CENSOR_WOMEN = "censor_women"
-    private const val KEY_APP_UPDATE_CHECK = "app_update_check"
-    private const val KEY_APP_UPDATE_SKIPPED = "app_update_skipped"
-    private const val KEY_APP_UPDATE_ID = "app_update_download_id"
-    private const val KEY_APP_UPDATE_VERSION = "app_update_version"
-
-    /**
-     * Daily. It costs a single unauthenticated GET, and the thing it catches — a release that fixes
-     * something — is worth knowing about sooner rather than later.
-     */
-    private const val APP_UPDATE_INTERVAL_MS = 24L * 60 * 60 * 1000
-
-    /** No download in flight. -1 is safe: [android.app.DownloadManager] ids start at 1. */
-    const val NO_DOWNLOAD = -1L
 
     /**
      * Last-used ops. Defaults to both filters on — the reason someone installed Naqi — which is why
@@ -73,37 +60,8 @@ object Prefs {
             .apply()
     }
 
-    /** Has it been a day since the last GitHub release check? */
-    fun appUpdateDue(context: Context): Boolean =
-        System.currentTimeMillis() - prefs(context).getLong(KEY_APP_UPDATE_CHECK, 0L) > APP_UPDATE_INTERVAL_MS
-
-    fun markAppUpdateChecked(context: Context) {
-        prefs(context).edit().putLong(KEY_APP_UPDATE_CHECK, System.currentTimeMillis()).apply()
-    }
-
-    /**
-     * The version the user dismissed the update card for, if any. Stored as the version rather than
-     * a boolean so the card comes back on its own for the *next* release — dismissing means "not
-     * this one", not "never again".
-     */
-    fun appUpdateSkipped(context: Context): String? = prefs(context).getString(KEY_APP_UPDATE_SKIPPED, null)
-
-    fun skipAppUpdate(context: Context, version: String) {
-        prefs(context).edit().putString(KEY_APP_UPDATE_SKIPPED, version).apply()
-    }
-
-    /** The in-flight APK download, so a cold start re-attaches to it instead of offering it again. */
-    fun appUpdateDownloadId(context: Context): Long = prefs(context).getLong(KEY_APP_UPDATE_ID, NO_DOWNLOAD)
-
-    fun appUpdateDownloadVersion(context: Context): String? =
-        prefs(context).getString(KEY_APP_UPDATE_VERSION, null)
-
-    fun setAppUpdateDownload(context: Context, id: Long, version: String?) {
-        prefs(context).edit()
-            .putLong(KEY_APP_UPDATE_ID, id)
-            .putString(KEY_APP_UPDATE_VERSION, version)
-            .apply()
-    }
+    // ponytail: the self-updater's four `app_update_*` keys are gone with it, and are not migrated
+    // away on upgrade — orphan scalars in a prefs file cost nothing and a migration would.
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)

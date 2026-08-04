@@ -1,5 +1,6 @@
 package com.haithamassoli.naqi.ui.screen
 
+import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.haithamassoli.naqi.BuildConfig
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.ml.ModelSmoke
@@ -37,6 +40,8 @@ import com.haithamassoli.naqi.ui.theme.NaqiTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private const val RELEASES_URL = "https://github.com/haithamassoli/NaqiHalalVideoFilter/releases"
+
 /**
  * About + open-source licences, and — since this redesign — where the model smoke report lives. That
  * report is a diagnostic: useful when a device misbehaves, noise on the screen where someone is trying
@@ -47,6 +52,11 @@ import kotlinx.coroutines.withContext
  * licence notice is a legal document, and a translated one would be a second, unreviewed version of it.
  * It is collapsed by default: a screen of legal text between the user and everything below it helps
  * nobody, and the obligation is that it be reachable, not that it be unavoidable.
+ *
+ * The Releases row replaced the in-app self-updater. Naqi ships outside Play, so nothing tells an
+ * installed copy that a newer one exists — but the permission that let it install one is not
+ * declarable in a store listing (docs/play-request-install-packages.md), so this points at the page
+ * and stops there.
  */
 @Composable
 fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
@@ -101,6 +111,44 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             }
 
             Spacer(Modifier.height(NaqiTokens.space6))
+            SectionHeader(stringResource(R.string.about_eyebrow_updates))
+            NaqiCard(contentPadding = 0.dp) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            // ponytail: a link, not an updater. Handing the APK to the system
+                            // installer needs REQUEST_INSTALL_PACKAGES, which no store will accept a
+                            // declaration for — see docs/play-request-install-packages.md.
+                            runCatching {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, RELEASES_URL.toUri()))
+                            }
+                        }
+                        .padding(NaqiTokens.space4),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.about_releases_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            stringResource(R.string.about_releases_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(NaqiTokens.space3))
+                    Text(
+                        stringResource(R.string.action_open),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(NaqiTokens.space5))
             SectionHeader(stringResource(R.string.pick_diag_title))
             NaqiCard { Diagnostics(smoke) }
 
