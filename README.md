@@ -5,6 +5,14 @@ women in the picture. No cloud, no accounts, no telemetry. The original file is 
 
 *Naqi (نقي) means "pure" in Arabic.*
 
+<p align="center">
+  <img src="docs/screenshots/01-home.png" width="19%" alt="Pick a video and choose what to filter">
+  <img src="docs/screenshots/02-options.png" width="19%" alt="Censor options: who, strictness, blur">
+  <img src="docs/screenshots/03-jobs.png" width="19%" alt="Two-pass progress with a live estimate">
+  <img src="docs/screenshots/05-link.png" width="19%" alt="Share a link: download and filter in one step">
+  <img src="docs/screenshots/04-about.png" width="19%" alt="About, with the on-device model report">
+</p>
+
 ## What it does
 
 Two independent operations, run alone or together:
@@ -23,6 +31,8 @@ Also included:
 
 - **Download by link** — share a video URL into Naqi and it fetches the file with yt-dlp, then
   filters it. The download goes to a quarantine directory and is only published once complete.
+- **Share into Naqi** — share a video from any app and it queues for filtering straight away, with
+  the filters you used last time already selected. Share several and they run in order.
 - **Long videos** — feature-length input checkpoints per segment and survives process death, a
   reboot, and the 6-hour foreground-service cap.
 - **English and Arabic**, with per-app language selection on Android 13+.
@@ -36,6 +46,11 @@ there are no analytics SDKs, and no account is required.
 ## Install
 
 Grab the APK from [Releases](https://github.com/haithamassoli/NaqiHalalVideoFilter/releases).
+
+**The APK here is the full build.** Download-by-link and share-into-Naqi ship only in this one. A
+Play Store build cannot carry them: yt-dlp fetches and updates executable code at runtime, and the
+in-app updater needs `REQUEST_INSTALL_PACKAGES` — Play's Device and Network Abuse policy allows
+neither. The filtering itself is the same either way.
 
 **Requirements:** Android 10 (API 29) or newer, **arm64-v8a** only. Free space of roughly
 2× the video size. The APK is large because the ONNX models ship inside it.
