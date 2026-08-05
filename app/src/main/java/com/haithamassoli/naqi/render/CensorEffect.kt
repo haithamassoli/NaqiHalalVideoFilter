@@ -26,8 +26,16 @@ private const val TAG = "CensorEffect"
 /** Gaussian half-width cap; the shader's `uWeights` array has [MAX_RADIUS] + 1 entries (center + sides). */
 private const val MAX_RADIUS = 10
 
-/** Shader `uRegions` array size; more active regions than this are dropped, largest kept (never silently). */
-private const val MAX_REGIONS = 8
+/**
+ * Shader `uRegions` array size; more active regions than this are dropped, largest kept (never silently).
+ *
+ * `internal`, and that is load-bearing: `FilterWorker.overflowSpans` promotes the moments where more
+ * faces are on screen than this to whole-frame censoring (correctness item 7.4), and it used to carry
+ * its own copy of the number with a comment explaining that the two must not drift. One constant cannot.
+ * The literal `8` in [COMPOSITE_FRAGMENT]'s loop bound is the third copy and is unavoidable — GLES 100
+ * has no constant expressions in an array declaration.
+ */
+internal const val MAX_REGIONS = 8
 
 /**
  * M1 pass-2 render effect. Per output frame the [Edl] selects one of: whole-frame censor, a list of

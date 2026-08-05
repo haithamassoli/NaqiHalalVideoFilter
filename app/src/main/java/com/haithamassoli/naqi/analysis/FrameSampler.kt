@@ -8,15 +8,15 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.Process
 import android.util.Log
 import com.google.mlkit.vision.common.InputImage
+import com.haithamassoli.naqi.media.intOrNull
+import com.haithamassoli.naqi.media.longOrNull
 import com.haithamassoli.naqi.media.requireTrackIndex
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import java.io.File
 import java.nio.ByteBuffer
 import java.nio.FloatBuffer
 import kotlin.coroutines.coroutineContext
@@ -182,11 +182,6 @@ object FrameSampler {
             // here. Baseline was 10.81 ms/gate-frame for gather + arithmetic together; M1 prices the
             // ~75 kB this reads at ~2.6 ms of it (34.9 µs/kB, from pack's 345 kB in 12.04 ms).
             var gateGatherNs = 0L
-            // M4: this loop is 94.3 s of a 114.6 s wall and nothing in the app ever sets a thread priority,
-            // so where it runs on a 1xX3 + 2xA715 + 2xA710 + 3xA510 SoC is unknown. Probe only — see [lastCpu].
-            val cpuHist = IntArray(Runtime.getRuntime().availableProcessors())
-            var tid = 0
-            var prio = 0
             val extractor = MediaExtractor()
             var codec: MediaCodec? = null
             try {
@@ -284,15 +279,6 @@ object FrameSampler {
                         frames.send(frame) // parks here when the consumer is behind
                         slot = (slot + 1) % RING
                         emitted++
-                        // M4, every 256th frame = ~25 procfs reads on a 643 s clip. tid/prio are re-read each
-                        // time rather than latched once: this loop is a coroutine, so it can resume on a
-                        // different Dispatchers.Default thread after the send above — which is exactly why the
-                        // histogram, not the tid, is the answer.
-                        if (emitted % 256 == 0) {
-                            tid = Process.myTid()
-                            prio = Process.getThreadPriority(tid)
-                            lastCpu().let { if (it in cpuHist.indices) cpuHist[it]++ }
-                        }
                     }
                     if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outputDone = true
                 }
@@ -305,8 +291,6 @@ object FrameSampler {
                     Log.i(TAG, "sample: frames=$emitted getImg=${getImgNs / 1_000_000}ms " +
                         "pack=${packNs / 1_000_000}ms mlkit=${mlkitNs / 1_000_000}ms close=${closeNs / 1_000_000}ms " +
                         "gateGather=${gateGatherNs / 1_000_000}ms")
-                    // Its own line: logcat truncates a message at ~4 kB, and this one is M4's whole answer.
-                    Log.i(TAG, "sample: tid=$tid prio=$prio cpu=${cpuHist.joinToString(",", "[", "]")}")
                 }
                 frames.close() // ends the consumer's loop on ANY exit, cancel included
                 codec?.let {
@@ -412,21 +396,6 @@ object FrameSampler {
         )
     }
 
-    /**
-     * M4 (perf-plan-v4 §2). The last CPU this thread ran on — field 39 (1-indexed) of
-     * `/proc/self/task/<tid>/stat` — or -1 if the kernel will not say.
-     *
-     * **Field 2 (`comm`) is parenthesised and can contain spaces**, so the parse splits on the LAST ')'
-     * and counts from field 3; splitting the whole line on whitespace shifts every index on any thread
-     * whose name has a space in it. Called every 256th emitted frame, never per frame: this is a procfs
-     * read the kernel formats on demand, not a counter. `runCatching` because a kernel that stops
-     * exposing this must not kill a three-hour job.
-     */
-    private fun lastCpu(): Int = runCatching {
-        val stat = File("/proc/self/task/${Process.myTid()}/stat").readText()
-        stat.substring(stat.lastIndexOf(')') + 2).split(' ')[36].toInt() // field 3 is index 0 after comm
-    }.getOrDefault(-1)
-
     /** KEY_FRAME_RATE is stored as a Float on some devices and an Integer on others. */
     private fun frameRate(format: MediaFormat): Float =
         try { format.getFloat(MediaFormat.KEY_FRAME_RATE) }
@@ -442,9 +411,6 @@ object FrameSampler {
         if (format.containsKey("crop-top") && format.containsKey("crop-bottom"))
             format.getInteger("crop-bottom") - format.getInteger("crop-top") + 1
         else format.getInteger(MediaFormat.KEY_HEIGHT)
-
-    private fun MediaFormat.intOrNull(key: String): Int? = if (containsKey(key)) getInteger(key) else null
-    private fun MediaFormat.longOrNull(key: String): Long? = if (containsKey(key)) getLong(key) else null
 
     /**
      * The upright frame size for a [width]x[height] buffer handed to ML Kit with [rotationDegrees]:

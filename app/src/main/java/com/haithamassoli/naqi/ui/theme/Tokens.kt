@@ -16,20 +16,14 @@ object NaqiTokens {
     val space6 = 32.dp
     val space7 = 48.dp
 
-    // M3 Expressive Corner radii scale — soft, organic, friendly
-    val radiusExtraSmall = 8.dp
-    val radiusSmall = 12.dp
-    val radiusMedium = 16.dp
-    val radiusCard = 24.dp
-    val radiusLarge = 28.dp
+    // M3 Expressive Shapes — soft, organic, friendly. Only radiusButton is also reached for on its own
+    // (call sites that clip to it directly); the rest are inlined into the shape, which is what the
+    // scale existed to produce. The four radii nothing used at all are gone.
     val radiusButton = 20.dp
-    val radiusPill = 999.dp
 
-    // Expressive Shapes
-    val shapeCard = RoundedCornerShape(radiusCard)
+    val shapeCard = RoundedCornerShape(24.dp)
     val shapeButton = RoundedCornerShape(radiusButton)
-    val shapeTile = RoundedCornerShape(radiusMedium)
-    val shapePill = RoundedCornerShape(radiusPill)
+    val shapePill = RoundedCornerShape(999.dp)
 
     // M3 Expressive Spring Motion Specs
     fun <T> expressiveSpring(

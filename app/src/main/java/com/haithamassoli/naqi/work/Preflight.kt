@@ -125,9 +125,11 @@ internal object Preflight {
 
         val sourceBytes = sourceSize(context, uri)
         val required = requiredBytes(sourceBytes, tempCopies, extraScratchBytes)
-        // filesDir, not cacheDir: Phase 1 of long-film-plan.md moved the working temps there ([JobStore]).
-        // Same partition on every modern device, so this is about measuring the volume we actually fill.
-        return if (context.filesDir.usableSpace >= required) null else LOW_SPACE
+        // The volume the job actually fills: Phase 1 of long-film-plan.md moved the working temps out of
+        // cacheDir into [JobStore], which is `noBackupFilesDir`. Same partition as filesDir on every
+        // modern device, so this measured the right number even while it named the wrong directory —
+        // matched up here so the two cannot be split apart by a future device without anyone noticing.
+        return if (context.noBackupFilesDir.usableSpace >= required) null else LOW_SPACE
     }
 
     /**

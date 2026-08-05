@@ -30,7 +30,6 @@ import kotlinx.coroutines.launch
 import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.model.FilterOps
-import com.haithamassoli.naqi.spike.SegmentConcatSpike
 import com.haithamassoli.naqi.ui.NaqiApp
 import com.haithamassoli.naqi.ui.screen.ShareSheet
 import com.haithamassoli.naqi.ui.screen.Shared
@@ -189,14 +188,6 @@ class MainActivity : ComponentActivity() {
     private fun maybeAutorun() {
         if (intent.getBooleanExtra("autorun_cancel", false)) {
             JobController.cancel(this)
-            return
-        }
-        // Phase-2 spike: two clipped exports, concatenated and decoded back. Its own thread —
-        // RenderPipeline blocks on a Transformer export, which must not be driven from onCreate.
-        if (intent.getBooleanExtra("segment_concat_probe", false)) {
-            val source = intent.getStringExtra("probe_source")
-                ?: File(filesDir, "test-video.mp4").absolutePath
-            Thread { SegmentConcatSpike.run(applicationContext, source) }.start()
             return
         }
         val removeMusic = intent.getBooleanExtra("remove_music", false)

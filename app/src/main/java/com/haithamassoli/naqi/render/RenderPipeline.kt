@@ -25,6 +25,7 @@ import androidx.media3.transformer.VideoEncoderSettings
 import com.haithamassoli.naqi.analysis.VideoMeta
 import com.haithamassoli.naqi.edl.Edl
 import com.haithamassoli.naqi.media.firstTrackFormat
+import com.haithamassoli.naqi.media.intOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -37,22 +38,22 @@ import kotlin.coroutines.resumeWithException
 import kotlin.math.min
 
 /**
- * M1 pass-2 driver: a Media3 Transformer export that applies [CensorGlEffect] per frame and re-encodes
- * H.264 within a resolution-tiered bitrate cap, tone-mapping HDR to SDR, while transmuxing the source
- * audio untouched (the censor-only audio passthrough fast path). Rotation survives either as
- * pre-rotated frames or as forwarded metadata (decoder-dependent); [CensorGlEffect] detects which
- * from [meta] (FrameSampler.probe) and maps EDL rects accordingly.
- *
- * When the EDL is empty there is nothing to draw, and the whole export collapses to a container copy —
- * see the passthrough guard in [renderCensor].
- */
-/**
  * One slice of the timeline to render on its own (`long-film-plan.md` Phase 2). [index] only names the
  * output file; [startMs]/[endMs] are absolute source times, and [startMs] doubles as the EDL offset
  * because a clipped export's timestamps are rebased to 0 (see [CensorGlEffect.drawFrame]).
  */
 data class RenderSegment(val index: Int, val startMs: Long, val endMs: Long)
 
+/**
+ * M1 pass-2 driver: a Media3 Transformer export that applies [CensorGlEffect] per frame and re-encodes
+ * H.264 within a resolution-tiered bitrate cap, tone-mapping HDR to SDR, while transmuxing the source
+ * audio untouched (the censor-only audio passthrough fast path). Rotation survives either as
+ * pre-rotated frames or as forwarded metadata (decoder-dependent); [CensorGlEffect] detects which
+ * from the probed [VideoMeta] and maps EDL rects accordingly.
+ *
+ * When the EDL is empty there is nothing to draw, and the whole export collapses to a container copy —
+ * see the passthrough guard in [renderCensor].
+ */
 object RenderPipeline {
 
     private const val PROGRESS_POLL_MS = 500L
@@ -266,6 +267,7 @@ object RenderPipeline {
         sourceBitrate?.takeIf { it > 0 }?.let { min((it * GEN2_HEADROOM).toInt(), cap) } ?: cap
     }
 
+
     /**
      * Bitrate cap by output pixel count, set near what phone cameras actually record so a camera
      * original is not halved on the way through. Bounds are widescreen pixel counts so wide/tall
@@ -279,7 +281,4 @@ object RenderPipeline {
         pixels <= 2560L * 1440 -> 24_000_000  // <=1440p
         else -> 45_000_000                    // 4K, vs ~45-50 Mbps camera original
     }
-
-    private fun MediaFormat.intOrNull(key: String): Int? =
-        try { getInteger(key) } catch (_: Exception) { null } // getInteger throws when the key is absent (< API 29)
 }

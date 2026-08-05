@@ -13,6 +13,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
 import com.haithamassoli.naqi.BuildConfig
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.analysis.FaceGenderVoter
@@ -37,6 +38,7 @@ import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.media.firstTrackIndex
 import com.haithamassoli.naqi.media.requireTrackIndex
 import com.haithamassoli.naqi.ml.Infer
+import com.haithamassoli.naqi.render.MAX_REGIONS
 import com.haithamassoli.naqi.render.RenderPipeline
 import com.haithamassoli.naqi.render.RenderSegment
 import kotlinx.coroutines.CancellationException
@@ -78,14 +80,19 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     /** Soak instrumentation + the live ETA source (`long-film-plan.md` Phase 0). */
     private val stats = JobStats(ctx)
 
-    // The tuning knobs, read once. Every shape below used to re-read its own subset out of inputData,
-    // which meant the default for e.g. KEY_STRICTNESS was written out four times — four places for a
-    // future edit to change three of them.
-    private val strictness = inputData.getInt(KEY_STRICTNESS, FilterOps.DEFAULT_STRICTNESS)
-    private val grayscale = inputData.getBoolean(KEY_GRAYSCALE, false)
+    /**
+     * The tuning knobs, read once, through [filterOps] — the one place the wire format and its defaults
+     * live. This used to spell the keys and defaults out again here (and each shape below re-read its
+     * own subset before that), so [KEY_STRICTNESS]'s default existed in two files and the `censorWho`
+     * legacy fallback in three. `DownloadWorker` already read them this way.
+     */
+    private val ops = inputData.filterOps()
+
+    private val strictness = ops.strictness
+    private val grayscale = ops.grayscale
 
     /** Non-zero replaces blur with a flat fill; see [FilterOps.solidColor] for why 0 means blur. */
-    private val solidColor = inputData.getInt(KEY_SOLID_COLOR, FilterOps.BLUR)
+    private val solidColor = ops.solidColor
 
     /**
      * Correctness item 7.3: `blurAmount = 0` with `grayscale = false` makes [CensorGlEffect] draw the
@@ -101,21 +108,20 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
      * Only the exact no-op combination is touched; every other slider position is the user's. A solid
      * fill covers the region on its own, so it takes the combination out of no-op territory too.
      */
-    private val blurAmount = inputData.getInt(KEY_BLUR_AMOUNT, 60).let {
+    private val blurAmount = ops.blurAmount.let {
         if (it > 0 || grayscale || solidColor != FilterOps.BLUR) it else MIN_EFFECTIVE_BLUR
     }
-    private val keepStems = inputData.getString(KEY_KEEP_STEMS) ?: "vocals"
+    private val keepStems = ops.keepStems
 
     /**
      * WHICH faces get censored — one of [FilterOps]' four states (plan-censor-who §1.1). Every branch
      * of [doWork] still asks only *whether* (`!= NONE`); only [genderVoter] and the [FaceTracker]s look
-     * at the value. The fallback keeps a job enqueued before the rename censoring.
+     * at the value.
      */
-    private val censorWho = FilterOps.whoOrNull(inputData.getString(KEY_CENSOR_WHO))
-        ?: FilterOps.whoFromLegacy(inputData.getBoolean(KEY_CENSOR_WOMEN, false))
+    private val censorWho = ops.censorWho
 
     /** [FilterOps.wholeFrameBlur] — read here, applied once per EDL build in [promoteFacesToFullFrame]. */
-    private val wholeFrameBlur = inputData.getBoolean(KEY_WHOLE_FRAME, false)
+    private val wholeFrameBlur = ops.wholeFrameBlur
 
     /**
      * Key for this job's working directory. Derived from the source and every option that changes the
@@ -173,15 +179,15 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         )
     }
 
-    /** `filesDir/naqi-work/<jobKey>/` — see [JobStore] for why not `cacheDir`. */
+    /** `noBackupFilesDir/naqi-work/<jobKey>/` — see [JobStore] for why neither `cacheDir` nor `filesDir`. */
     private val workDir by lazy { JobStore.dir(applicationContext, jobKey) }
 
     override suspend fun doWork(): Result {
-        val removeMusic = inputData.getBoolean(KEY_REMOVE_MUSIC, false)
+        val removeMusic = ops.removeMusic
         // Whether, never which: every branch below asks only whether faces are censored, which is what
         // FilterOps.censorFaces is and why "everyone" is byte for byte the old `true` path. Which faces
         // is [censorWho]'s business, and it reaches only [genderVoter] and the FaceTrackers.
-        val censorFaces = censorWho != FilterOps.NONE
+        val censorFaces = ops.censorFaces
         if (!removeMusic && !censorFaces) return Result.failure()
         val inputUri = (inputData.getString(KEY_INPUT_URI) ?: return Result.failure()).toUri()
 
@@ -564,6 +570,74 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     }
 
     /**
+     * The consumer-side wall of one pass-1 body, and the line both shapes log it on.
+     *
+     * perf-plan 1.2, re-read after 1.3b: decode+convert runs alongside [sampledFrame], so `wall` is
+     * `max(producer, consumer)` and no subtraction recovers the convert. [detectNs]/[gateFillNs]/[gateNs]
+     * are the consumer side ONLY — a pass where detect+gate is under wall is one the decoder is pacing.
+     * plan-v2 §4.6: `gate=` is `session.run` alone and `gateFill=` is its preprocessing; both are on this
+     * line since perf-plan-v4 A1 moved the fill off the sampler, and they still mean what they meant.
+     */
+    private class PassTimers {
+        var detectNs = 0L
+        var gateFillNs = 0L
+        var gateNs = 0L
+        private val startNs = System.nanoTime()
+        private var wallNs = 0L
+
+        /**
+         * Latch `wall` the instant the sampler returns. Called explicitly rather than measured lazily in
+         * [toString], because the log line it feeds sits after `finish()` and the checkpoint write — this
+         * repo already lost a measurement to a timer that bracketed more than its name claimed
+         * (perf-plan-v4 M1, the `nv21=` split), and it is not going to lose a second one for two lines.
+         */
+        fun stop() { wallNs = System.nanoTime() - startNs }
+
+        override fun toString(): String =
+            "wall=${wallNs / 1_000_000}ms detect=${detectNs / 1_000_000}ms " +
+                "gateFill=${gateFillNs / 1_000_000}ms gate=${gateNs / 1_000_000}ms"
+    }
+
+    /**
+     * One sampled frame's analysis, shared by [analyze] and [analyzeSegments] — which differ only in how
+     * they report progress and where the firings go. It lived in both, and both restated the two rules
+     * below; two copies of a rule that has to hold in both places is one edit away from holding in neither.
+     *
+     * perf-plan 1.3a: ML Kit works on its own executor while the gate runs here, so detect and gate
+     * OVERLAP — [PassTimers.detectNs] times the await (the part that still blocks), and detect+gate can
+     * exceed wall. **Awaiting inside this call is what keeps the sampler's ring buffers alive for both.**
+     * `gateBytes != null` IS the 5 fps cadence: the sampler still decides which frames the gate sees and
+     * still gathers their source pixels; perf-plan-v4 A1 moved only the arithmetic onto this side.
+     *
+     * **Both buffers are RING-OWNED and valid for exactly this call.** The gate tensor is therefore built
+     * and consumed before returning (inside [Infer.nsfw]), and [image] is handed to [FaceTracker.onFaces]
+     * — which crops the gender vote out of its NV21 pixels — while it is still live. Nothing here may
+     * retain the image or defer the vote.
+     */
+    private fun sampledFrame(
+        tracker: FaceTracker,
+        image: InputImage,
+        gateBytes: ByteBuffer?,
+        uprightW: Int,
+        uprightH: Int,
+        ptsMs: Long,
+        t: PassTimers,
+        firings: MutableList<Long>,
+    ) {
+        val task = tracker.detect(image)
+        if (gateBytes != null) {
+            val t1 = System.nanoTime()
+            FrameSampler.gateFromGathered(gateBytes, gateInput)
+            val t2 = System.nanoTime()
+            val probs = Infer.nsfw(applicationContext, gateInput)
+            t.gateFillNs += t2 - t1; t.gateNs += System.nanoTime() - t2
+            if (NsfwGate.fires(probs, strictness)) firings += ptsMs
+        }
+        val t0 = System.nanoTime(); val faces = Tasks.await(task); t.detectNs += System.nanoTime() - t0
+        tracker.onFaces(faces, image, uprightW, uprightH, ptsMs)
+    }
+
+    /**
      * Pass 1, per segment. Segments already carrying an `an-NNN.json` are skipped entirely — that is the
      * resume. Firings accumulate across every segment and the hysteresis runs ONCE over the whole
      * timeline, so a censor interval that straddles a seam is still one interval.
@@ -601,56 +675,28 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // is safe only because the segments run in sequence (perf-plan-v4 §10 corrects this comment:
             // it used to claim the voter was fresh too, contradicting the voter's own KDoc).
             val tracker = FaceTracker(genderVoter, censorWho)
-            var tDetect = 0L; var tGateFill = 0L; var tGate = 0L; val tWall = System.nanoTime()
+            val timers = PassTimers()
             try {
                 FrameSampler.sample(
                     applicationContext, inputUri, fps = 10f, maxDim = 640,
                     startMs = seg.startMs, endMs = seg.endMs,
                 ) { image, gateBytes, uprightW, uprightH, ptsMs ->
-                    // perf-plan 1.3a: ML Kit works on its own executor while the gate runs here, so detect and
-                    // gate now OVERLAP — tDetect times the await (the part that still blocks), and detect+gate
-                    // can exceed wall. Awaiting inside the callback is what keeps the sampler's ring buffers
-                    // alive for both. `gateBytes != null` IS the 5 fps cadence: the sampler still decides which
-                    // frames the gate sees and still gathers their source pixels; perf-plan-v4 A1 moved only
-                    // the arithmetic over those bytes onto this side.
-                    val task = tracker.detect(image)
-                    if (gateBytes != null) {
-                        // Ring-owned like the NV21 and valid for exactly this callback, so the tensor has to
-                        // be built and consumed before returning — which it is, inside the Infer.nsfw below.
-                        val t1 = System.nanoTime()
-                        FrameSampler.gateFromGathered(gateBytes, gateInput)
-                        val t2 = System.nanoTime()
-                        val probs = Infer.nsfw(applicationContext, gateInput)
-                        tGateFill += t2 - t1; tGate += System.nanoTime() - t2
-                        if (NsfwGate.fires(probs, strictness)) segFirings += ptsMs
-                    }
-                    val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
-                    // `image` is passed because the gender vote crops from its NV21 pixels. Those pixels
-                    // are RING-OWNED and valid only for the duration of this callback — onFaces runs
-                    // inside it, so this is safe, but nothing may retain the image or defer the vote.
-                    tracker.onFaces(faces, image, uprightW, uprightH, ptsMs)
+                    sampledFrame(tracker, image, gateBytes, uprightW, uprightH, ptsMs, timers, segFirings)
                     val within = ((ptsMs - seg.startMs).toFloat() / (seg.endMs - seg.startMs).coerceAtLeast(1))
                     val pct = (progressBase + ((seg.index + within.coerceIn(0f, 1f)) * progressSpan / plan.size).toInt())
                         .coerceIn(progressBase, progressBase + progressSpan)
                     if (pct != lastPct) { lastPct = pct; reportVideo(stage, pct) }
                 }
-                // perf-plan 1.2, re-read after 1.3b: decode+convert now runs alongside this callback, so wall
-                // is max(producer, consumer) and no subtraction recovers the convert. These two are the
-                // consumer side only — a pass where detect+gate is under wall is one the decoder is pacing.
-                val wallMs = (System.nanoTime() - tWall) / 1_000_000
+                timers.stop()
                 val segTracks = tracker.finish()
                 // The checkpoint goes in only once BOTH halves of this segment's analysis exist, and it is
                 // written atomically — so a file under its final name always means a complete segment.
                 Checkpoint.writeAnalysis(workDir, seg.index, segFirings, Edl(emptyList(), segTracks))
                 firings += segFirings
                 faceTracks += segTracks
-                // plan-v2 §4.6: `gate=` is session.run alone and `gateFill=` is its preprocessing. Both are
-                // on this line since perf-plan-v4 A1 moved the fill here from the sampler; they still mean
-                // exactly the two things they meant before.
                 Log.i(TAG, "analyze seg-${seg.index} [${seg.startMs}..${seg.endMs}): " +
                     "firings=${segFirings.size} faceTracks=${segTracks.size} ${tracker.retention()} " +
-                    "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms " +
-                    "gateFill=${tGateFill / 1_000_000}ms gate=${tGate / 1_000_000}ms")
+                    timers)
             } finally {
                 runCatching { tracker.closeDetector() }
             }
@@ -1079,23 +1125,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         val firings = ArrayList<Long>()
         var index = 0
         var lastPct = -1
-        var tDetect = 0L; var tGateFill = 0L; var tGate = 0L; val tWall = System.nanoTime()
+        val timers = PassTimers()
         FrameSampler.sample(applicationContext, uri, fps = 10f, maxDim = 640) { image, gateBytes, uprightW, uprightH, ptsMs ->
-            // Same overlapped sequence as analyzeSegments, and the same second half of the gate fill over
-            // the bytes the sampler gathered — see the comments there (perf-plan 1.3a, perf-plan-v4 A1).
-            val task = faceTracker.detect(image)
-            if (gateBytes != null) {
-                val t1 = System.nanoTime()
-                FrameSampler.gateFromGathered(gateBytes, gateInput)
-                val t2 = System.nanoTime()
-                val probs = Infer.nsfw(applicationContext, gateInput)
-                tGateFill += t2 - t1; tGate += System.nanoTime() - t2
-                if (NsfwGate.fires(probs, strictness)) firings += ptsMs
-            }
-            val t0 = System.nanoTime(); val faces = Tasks.await(task); tDetect += System.nanoTime() - t0
-            // See analyzeSegments: `image`'s NV21 pixels are ring-owned and valid only inside this
-            // callback, which is where the gender vote crops from them. Nothing may retain the image.
-            faceTracker.onFaces(faces, image, uprightW, uprightH, ptsMs)
+            sampledFrame(faceTracker, image, gateBytes, uprightW, uprightH, ptsMs, timers, firings)
             index++
             val pct = (progressBase + (ptsMs.toFloat() / progressDen) * progressSpan)
                 .toInt().coerceIn(progressBase, progressBase + progressSpan)
@@ -1107,19 +1139,16 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // Every 1 200 sampled frames = every 2 min of source at 10 fps.
             if (index % 1_200 == 0) Log.i(TAG, "pass1 live at=${ptsMs}ms ${faceTracker.retention()}")
         }
-        val wallMs = (System.nanoTime() - tWall) / 1_000_000
+        timers.stop()
 
         val faceTracks = faceTracker.finish()
         val intervals = censorSpans(firings, durationMs, faceTracks)
         // Counts on their own line: a feature-length film produces hundreds of intervals, and logcat
         // truncates a message at ~4 kB — on the first 155-min soak that silently ate the face counts
         // off the end of the combined line, which were the whole point of logging it.
-        // plan-v2 §4.6: `gate=` is session.run alone; `gateFill=` is its preprocessing, which perf-plan-v4
-        // A1 moved off the sampler onto this side. Same two meanings, one line further down.
         Log.i(TAG, "pass1: gateFirings=${firings.size} intervalCount=${intervals.size} " +
             "wholeFrame=$wholeFrameBlur faceTracks=${faceTracks.size} ${faceTracker.retention()} " +
-            "wall=${wallMs}ms detect=${tDetect / 1_000_000}ms " +
-            "gateFill=${tGateFill / 1_000_000}ms gate=${tGate / 1_000_000}ms")
+            timers)
         logVotes("pass1")
         Log.i(TAG, "pass1 intervals=$intervals")
         return Edl(intervals, faceTracks)
@@ -1146,16 +1175,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     }
 
     /**
-     * The gate's hysteresis intervals over the whole timeline, plus the debug E2E hook: `force_intervals`
-     * adds full-frame spans so an SFW test asset still exercises pass 2's censoring.
-     *
-     * **Correctness item 7.2.** [NsfwGate.intervals] clamps every span into `[0, durationMs]`, so a source
-     * whose duration the probe could not read — it used to arrive here as `coerceAtLeast(1)` — collapsed
-     * every censor interval to `[0, 1 ms]`: the gate fires, the EDL says it fired, and NOTHING is
-     * censored. An unknown duration must mean "do not clamp the far end", not "clamp it to nothing". The
-     * mapping is here rather than at the two call sites so no third one can reintroduce it.
-     */
-    /**
      * Every whole-frame span the EDL will carry: the gate's hysteresis intervals, the 7.4 overflow
      * promotion, and — under [wholeFrameBlur] — every censored face track promoted to the whole frame.
      *
@@ -1169,6 +1188,16 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         return if (wholeFrameBlur) promoteFacesToFullFrame(base, tracks) else base
     }
 
+    /**
+     * The gate's hysteresis intervals over the whole timeline, plus the debug E2E hook: `force_intervals`
+     * adds full-frame spans so an SFW test asset still exercises pass 2's censoring.
+     *
+     * **Correctness item 7.2.** [NsfwGate.intervals] clamps every span into `[0, durationMs]`, so a source
+     * whose duration the probe could not read — it used to arrive here as `coerceAtLeast(1)` — collapsed
+     * every censor interval to `[0, 1 ms]`: the gate fires, the EDL says it fired, and NOTHING is
+     * censored. An unknown duration must mean "do not clamp the far end", not "clamp it to nothing". The
+     * mapping is here rather than at the two call sites so no third one can reintroduce it.
+     */
     private fun intervalsFor(firings: List<Long>, durationMs: Long): List<LongRange> {
         val intervals = NsfwGate.intervals(firings, if (durationMs > 0L) durationMs else Long.MAX_VALUE)
         if (!BuildConfig.DEBUG_HOOKS) return intervals
@@ -1179,7 +1208,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     /**
      * Correctness item 7.4: spans where more faces are on screen at once than the renderer can composite.
      *
-     * `CensorEffect` blurs at most [RENDERER_MAX_REGIONS] rects per frame and silently **drops the
+     * `CensorEffect` blurs at most [MAX_REGIONS] rects per frame and silently **drops the
      * smallest** past that — it fails OPEN, on the frames with the most people in them. Promoting those
      * moments to whole-frame censor intervals fixes it without touching the shader: `Edl.regionsAt`
      * returns empty under full-frame precedence, so the renderer never sees an overflowing frame at all.
@@ -1191,7 +1220,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
      * strictly needed, which is the safe direction for this bug.
      */
     private fun overflowSpans(tracks: List<FaceTrackEdl>): List<LongRange> {
-        if (tracks.size <= RENDERER_MAX_REGIONS) return emptyList()
+        if (tracks.size <= MAX_REGIONS) return emptyList()
         // (time, delta); a track is active over the INCLUSIVE [startMs, endMs] regionsAt tests, so its
         // end event lands at endMs + 1.
         val events = ArrayList<Pair<Long, Int>>(tracks.size * 2)
@@ -1206,12 +1235,12 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // invent a one-ms gap wherever one track ends exactly as another begins.
             val t = events[i].first
             while (i < events.size && events[i].first == t) { active += events[i].second; i++ }
-            if (active > RENDERER_MAX_REGIONS) { if (from < 0L) from = t } else if (from >= 0L) {
+            if (active > MAX_REGIONS) { if (from < 0L) from = t } else if (from >= 0L) {
                 out.add(from..(t - 1))
                 from = -1L
             }
         }
-        if (out.isNotEmpty()) Log.w(TAG, "7.4: ${out.size} spans over $RENDERER_MAX_REGIONS faces — whole-frame there")
+        if (out.isNotEmpty()) Log.w(TAG, "7.4: ${out.size} spans over $MAX_REGIONS faces — whole-frame there")
         return out
     }
 
@@ -1286,9 +1315,10 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         /**
          * READ-ONLY legacy — the boolean this op was until the rename above. Nothing writes it any
          * more, but a job enqueued by an older build is sitting in WorkManager's database carrying only
-         * this key, so every read of [KEY_CENSOR_WHO] falls back to it (`filterOps()`, [doWork], the
-         * job key). Dropping it would re-default those jobs to "do not censor" — a full render that
-         * silently returns the input, which is the worst failure this app has.
+         * this key, so every read of [KEY_CENSOR_WHO] falls back to it — [filterOps], which is now the
+         * only reader of the ops, and [jobKey], which re-reads inline for the reason stated there.
+         * Dropping it would re-default those jobs to "do not censor" — a full render that silently
+         * returns the input, which is the worst failure this app has.
          */
         const val KEY_CENSOR_WOMEN = "censor_women"
         const val KEY_INPUT_URI = "input_uri"
@@ -1351,15 +1381,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
         /** Crops [dumpCrop] writes before it stops. Enough to hand-label for §3.3, few enough to `adb pull`. */
         private const val DUMP_CAP = 240
-
-        /**
-         * Rects `CensorEffect` can composite in one frame — **must match its private `MAX_REGIONS`**
-         * (`render/CensorEffect.kt:29`), duplicated because it is private there and `render/` is not this
-         * change's to edit. The failure mode of drift is benign in one direction only: if the shader grows
-         * and this does not, [overflowSpans] promotes a few moments to whole-frame that did not need it.
-         * If this grows and the shader does not, 7.4 comes back.
-         */
-        private const val RENDERER_MAX_REGIONS = 8
 
         /**
          * Device total RAM below which S1's two branches run sequentially — see [concurrentBranches].

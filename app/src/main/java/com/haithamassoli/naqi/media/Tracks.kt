@@ -26,3 +26,12 @@ fun MediaExtractor.firstTrackFormat(mimePrefix: String): MediaFormat? =
 /** Index of the first [mimePrefix] track; throws when the source has none (callers that require one). */
 fun MediaExtractor.requireTrackIndex(mimePrefix: String): Int =
     firstTrackIndex(mimePrefix) ?: throw IllegalArgumentException("no $mimePrefix track")
+
+/**
+ * Optional-key reads. `getInteger`/`getLong` throw on an absent key below API 29 and the two callers
+ * (the sampler's probe and the bitrate probe) each had their own copy of the guard — one of them
+ * `containsKey`, the other a swallowed exception, for the same question.
+ */
+fun MediaFormat.intOrNull(key: String): Int? = if (containsKey(key)) getInteger(key) else null
+
+fun MediaFormat.longOrNull(key: String): Long? = if (containsKey(key)) getLong(key) else null
