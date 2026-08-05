@@ -3,6 +3,7 @@ package com.haithamassoli.naqi.update
 import com.haithamassoli.naqi.update.AppUpdate.parseVersion
 import com.haithamassoli.naqi.update.AppUpdate.pickRelease
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,6 +20,18 @@ import org.junit.Test
 class AppUpdateTest {
 
     private fun v(s: String) = requireNotNull(parseVersion(s))
+
+    /** The card's exit condition: the download the installer already turned into this build. */
+    @Test
+    fun aDownloadThisBuildHasCaughtUpToIsSpent() {
+        val installed = AppUpdate.installed().toString()
+        assertTrue(AppUpdate.isSuperseded(installed))
+        assertTrue(AppUpdate.isSuperseded("0.1"))
+        assertFalse(AppUpdate.isSuperseded("$installed.1"))
+        // Nothing pending, and junk, both mean "no download to drop" rather than "drop it".
+        assertFalse(AppUpdate.isSuperseded(null))
+        assertFalse(AppUpdate.isSuperseded("main"))
+    }
 
     @Test
     fun numbersOrderBeforeAnythingElse() {

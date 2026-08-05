@@ -64,11 +64,21 @@ fun UpdateCard(modifier: Modifier = Modifier) {
     var downloadVersion by remember { mutableStateOf(Prefs.appUpdateDownloadVersion(context)) }
     var dismissed by remember { mutableStateOf(false) }
 
+    fun forget() {
+        AppUpdate.cancel(context)
+        downloadId = Prefs.NO_DOWNLOAD
+        downloadVersion = null
+    }
+
     // Navigating back from the options screen recomposes this; the daily interval inside
     // Prefs.appUpdateDue is what keeps that from being a second request. The clock is only marked
     // when nothing was found, so a pending update survives being reopened instead of vanishing
     // until tomorrow.
     LaunchedEffect(Unit) {
+        // First launch after the install is this app's only chance to notice the update landed:
+        // drop the spent download before anything reads it, or the card comes back offering the
+        // version already running. Clearing it also unblocks the check below.
+        if (AppUpdate.isSuperseded(downloadVersion)) forget()
         if (downloadId == Prefs.NO_DOWNLOAD && Prefs.appUpdateDue(context)) {
             release = AppUpdate.check(context)
         }
@@ -82,12 +92,6 @@ fun UpdateCard(modifier: Modifier = Modifier) {
     if (dismissed) return
     val version = release?.version?.toString() ?: downloadVersion ?: return
     val live = progress.takeIf { downloadId != Prefs.NO_DOWNLOAD }
-
-    fun forget() {
-        AppUpdate.cancel(context)
-        downloadId = Prefs.NO_DOWNLOAD
-        downloadVersion = null
-    }
 
     val skip = { Prefs.skipAppUpdate(context, version); dismissed = true }
 
@@ -115,6 +119,9 @@ fun UpdateCard(modifier: Modifier = Modifier) {
             sub = stringResource(R.string.update_ready_sub),
             action = stringResource(R.string.update_install),
             onAction = { AppUpdate.install(context, downloadId) },
+            // The one state that used to have no way out. If the install is declined — or already
+            // happened somewhere this build cannot see — ✕ is what drops the APK.
+            onDismiss = { forget() },
         )
 
         DownloadManager.STATUS_FAILED -> Shell(

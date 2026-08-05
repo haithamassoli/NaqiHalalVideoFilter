@@ -81,6 +81,19 @@ object AppUpdate {
     /** The running build's version, parsed. Never null: the tag is ours and it always parses. */
     fun installed(): Version = parseVersion(BuildConfig.VERSION_NAME) ?: Version(listOf(0), null)
 
+    /**
+     * True when a downloaded version is one this build has already caught up to.
+     *
+     * The installer relaunches Naqi *as* the build it just installed, and nothing else ever clears a
+     * finished download — so without this the card sits on "Ready to install 1.2.2" on top of 1.2.2
+     * forever, keeping its ~220 MB APK on disk. Written against the version rather than "did the user
+     * tap Install", because a copy picked up any other way ends the offer just the same.
+     */
+    fun isSuperseded(downloadedVersion: String?): Boolean {
+        val downloaded = downloadedVersion?.let { parseVersion(it) } ?: return false
+        return downloaded <= installed()
+    }
+
     /** "v1.2-beta2" → `[1,2]` + "beta2". Null when the tag does not start with a number. */
     fun parseVersion(raw: String): Version? {
         val s = raw.trim().removePrefix("v").removePrefix("V")
