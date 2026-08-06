@@ -5,16 +5,18 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Depth of clean water, lit from where the drop lands. -->
+    <!-- The master's gradient, spanning the 72dp the mask keeps and clamped across the bleed, so the
+         visible tile carries the whole range rather than the muted middle of it. -->
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:type="radial"
-                android:centerX="54"
-                android:centerY="36"
-                android:gradientRadius="80">
-                <item android:color="#FF24805F" android:offset="0" />
-                <item android:color="#FF123A2F" android:offset="0.55" />
+                android:type="linear"
+                android:startX="18"
+                android:startY="18"
+                android:endX="79.2"
+                android:endY="90"
+                android:tileMode="clamp">
+                <item android:color="#FF1E6B58" android:offset="0" />
                 <item android:color="#FF08110E" android:offset="1" />
             </gradient>
         </aapt:attr>

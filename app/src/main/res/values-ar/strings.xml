@@ -15,8 +15,6 @@
     <string name="pick_seal_private">خصوصية تامة</string>
 
     <!-- Brand lockup under the droplet mark. BRAND: identical value in every locale, do not translate. -->
-    <string name="pick_wordmark_ar">نقي</string>
-    <string name="pick_wordmark_latin">Naqi</string>
 
     <!-- Two-line privacy promise under the wordmark; \n is a real line break in the rendered text. -->
     <string name="pick_tagline">تتم الفلترة على جهازك.\nلا تغادر مقاطعك هاتفك أبدًا.</string>
