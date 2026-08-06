@@ -22,7 +22,15 @@ import kotlin.math.roundToInt
  * carries the AudioSpecificConfig); the standalone CODEC_CONFIG buffer is dropped. Encoder-input PTS is a
  * monotonic [RATE] sample counter anchored at [firstPtsUs] (the source's first audio PTS) so the track
  * shares the video epoch in the final mux; the ~2048-sample encoder priming is left uncompensated by
- * convention. Feed with [write], end with [finish], always [close]. Thread-confined.
+ * convention. Feed with [write], end with [finish], always [close].
+ *
+ * **Contract: SERIALIZED, not thread-confined** (perf-plan-v5 C10). This used to say thread-confined,
+ * and `AudioPipeline.removeMusic` now drives [write]/[finish] from a coroutine on a
+ * `limitedParallelism(1)` IO lane, which suspends between batches and so can resume on a different
+ * pool thread. What MediaCodec's synchronous mode and MediaMuxer actually require is that no two calls
+ * overlap and that each sees the last one's writes; a single-parallelism dispatcher gives the first and
+ * coroutine dispatch gives the second. The constructor and [close] run on the caller's own thread,
+ * separated from the lane by `launch` and by its scope's join — the same two happens-before edges.
  */
 class AacWriter(tempM4a: File, private val firstPtsUs: Long) : AutoCloseable {
 

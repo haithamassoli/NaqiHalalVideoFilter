@@ -354,8 +354,11 @@ object FrameSampler {
         val syMap = IntArray(dispH) { crop.top + it * ch / dispH }
         val nv21Size = dispW * dispH * 3 / 2
         val nv21 = nv21Reuse?.takeIf { it.capacity() == nv21Size } ?: ByteBuffer.allocateDirect(nv21Size)
-        // BEFORE the pack, not after: an absolute put() is bounds-checked against limit(), and ML Kit
-        // may have left this slot's buffer with a moved position/limit on its previous trip through.
+        // BEFORE the pack, not after. Since A2 it is the LIMIT restore that carries this, not the
+        // position: [packNv21] forces position(0) on its own duplicate, and its relative bulk puts total
+        // exactly `capacity`, so a limit ML Kit left short throws BufferOverflowException where the old
+        // absolute put() threw IndexOutOfBoundsException. Either way ML Kit may have left this slot's
+        // buffer with a moved position/limit on its previous trip through, and this is the reset.
         nv21.clear()
         val tPack = System.nanoTime()
         packNv21(
@@ -435,11 +438,36 @@ object FrameSampler {
      * the Qualcomm NV12 case) and fully planar (pixelStride 1) differ only in the strides, which are
      * already parameters. Takes primitives only, no [Image], so `FrameSamplerConvertTest` needs no Robolectric.
      *
-     * ponytail: no bulk-move fast path. A plane-sized `put(ByteBuffer)` needs BOTH `scale == 1` and
-     * `rowStride == width`, and the caller always downscales (see [toFrame] — ML Kit's cost scales
-     * with input area), so on real content the fast path is unreachable. The strided gather is ~345 kB
-     * of byte moves per 1080p frame against the 230 400-iteration arithmetic loop it replaces. Add the
-     * fast path only if a source already at or below `maxDim` shows up as a measurement.
+     * **perf-plan-v5 A2: one BULK read per row into a heap scratch, then gather out of the scratch.**
+     * The cost here was never the bytes, it was the per-element `ByteBuffer` calls. Three pure-gather
+     * loops with no arithmetic in any of them, from this repo's own runs:
+     *
+     * | loop | dmabuf bytes | element calls | ms/frame | ns/CALL |
+     * |---|---:|---:|---:|---:|
+     * | `packNv21` pre-A1 (perf-plan-v3 §1) | 345 600 | 691 200 | 10.08 | **14.58** |
+     * | `packNv21` post-A1 (perf-plan-v4 §11) | 345 600 | 691 200 | 10.31 | **14.91** |
+     * | [gatherGate] (perf-plan-v4 §11) | 150 528 | 301 056 | 4.565 | **15.16** |
+     *
+     * Read volume differs 2.30×, luma stride differs 3 B vs 8.57 B, chroma subsampling differs — and
+     * ns/call is flat to 4 %. That is what kills the "the gralloc plane is uncached, so pay per byte"
+     * model: at stride 3 every 64 B line already carries 21 sampled bytes, so a stride-3 read would be
+     * ~2.8× cheaper per byte than a stride-8.57 one if the line were cached at all. It is not — the
+     * CALL is the cost. 691 200 of them per frame become **1 260**.
+     *
+     * The bulk read touches the SAME cache lines and the SAME address range: its first byte is
+     * `sxMap[0]*pix` and its last is `sxMap[w-1]*pix`, the two bytes the strided loop already read, and
+     * stride ≤ 64 B means every line between them was already being fetched. Nothing new is touched, so
+     * a shrunk `limit()` still throws exactly where it threw before.
+     *
+     * ponytail: per-row, not whole-plane. "Copy the rows once" means copying the two intervening rows
+     * too — 3.1 MB/frame into a scratch that blows the X3's L2 and turns 345 600 L1 hits into L2 misses.
+     * Per-row is 6.4 kB, L1-resident, and every array here is under ART's 12 kB large-object threshold
+     * so they are TLAB-allocated and die in eden.
+     *
+     * ponytail: semi-planar chroma reads the interleaved UV row twice (U's span and V's span are the
+     * same 30 lines, one byte apart) — +5 400 line fetches/frame against a 16× drop in transaction
+     * count. Collapsing it needs a `uBuf aliases vBuf` test, which no API exposes. Revisit only if a
+     * chroma-only counter ever shows it.
      */
     internal fun packNv21(
         yBuf: ByteBuffer, yRow: Int, yPix: Int, yBase: Int,
@@ -449,22 +477,48 @@ object FrameSampler {
     ) {
         val w = sxMap.size
         val h = syMap.size
+        // Duplicates, not the originals. Both walks over these planes are contractually ABSOLUTE:
+        // [toFrame] captured yBase/uBase/vBase from these buffers' positions before this call,
+        // [gatherGate] re-reads the same planes after it, and MediaCodec hands the same plane
+        // ByteBuffer back for a recycled output index — so a moved position() would poison the NEXT
+        // frame's bases. ~56 B each, four per frame; `FrameSamplerConvertTest` pins the positions.
+        val ySrc = yBuf.duplicate()
+        val uSrc = uBuf.duplicate()
+        val vSrc = vBuf.duplicate()
+        // Sequential relative puts reproduce the old absolute ones byte for byte: those already wrote
+        // strictly increasing indices 0..w*h*3/2-1 with no gaps (luma `oy*w+ox`, then chroma
+        // `plane+cy*w+cx*2{,+1}`), which is exactly this order.
+        val dst = out.duplicate()
+        dst.position(0)
+
+        val yLo = sxMap[0] * yPix
+        val yRowBuf = ByteArray(sxMap[w - 1] * yPix - yLo + 1)
+        val dstRow = ByteArray(w)
         for (oy in 0 until h) {
-            val src = yBase + syMap[oy] * yRow
-            val dst = oy * w
-            for (ox in 0 until w) out.put(dst + ox, yBuf.get(src + sxMap[ox] * yPix))
+            ySrc.position(yBase + syMap[oy] * yRow + yLo)
+            ySrc.get(yRowBuf, 0, yRowBuf.size)
+            for (ox in 0 until w) dstRow[ox] = yRowBuf[sxMap[ox] * yPix - yLo]
+            dst.put(dstRow, 0, w)
         }
         // 4:2:0 chroma: one V,U pair per 2x2 output block, taken at the block's top-left source pixel —
         // the same `sx shr 1` subsampling the RGB walk uses, so both consumers see the same chroma.
-        val plane = w * h
+        // `w` and `h` are even and ≥ 2 (see [toFrame]), so `sxMap[w - 2]` is the last chroma column read.
+        val uLo = (sxMap[0] shr 1) * uPix
+        val vLo = (sxMap[0] shr 1) * vPix
+        val uRowBuf = ByteArray((sxMap[w - 2] shr 1) * uPix - uLo + 1)
+        val vRowBuf = ByteArray((sxMap[w - 2] shr 1) * vPix - vLo + 1)
         for (cy in 0 until h / 2) {
             val sy = syMap[cy * 2] shr 1
-            val dst = plane + cy * w
+            uSrc.position(uBase + sy * uRow + uLo)
+            uSrc.get(uRowBuf, 0, uRowBuf.size)
+            vSrc.position(vBase + sy * vRow + vLo)
+            vSrc.get(vRowBuf, 0, vRowBuf.size)
             for (cx in 0 until w / 2) {
                 val sx = sxMap[cx * 2] shr 1
-                out.put(dst + cx * 2, vBuf.get(vBase + sy * vRow + sx * vPix))     // NV21: V first,
-                out.put(dst + cx * 2 + 1, uBuf.get(uBase + sy * uRow + sx * uPix)) // then U
+                dstRow[cx * 2] = vRowBuf[sx * vPix - vLo]     // NV21: V first,
+                dstRow[cx * 2 + 1] = uRowBuf[sx * uPix - uLo] // then U
             }
+            dst.put(dstRow, 0, w)
         }
     }
 
@@ -602,23 +656,44 @@ object FrameSampler {
      * for bit rather than within a tolerance.
      *
      * [gathered] is `3 * GATE_SIDE²` bytes as [gatherGate] wrote them; [out] must be a DIRECT,
-     * native-order buffer of `3 * GATE_SIDE²` floats. Every read and write is ABSOLUTE, so neither
-     * position moves — ORT holds a tensor view over [out] and the sampler owns [gathered].
+     * native-order buffer of `3 * GATE_SIDE²` floats. Neither buffer's position moves — both are
+     * reached through a [ByteBuffer.duplicate], because ORT holds a tensor view over [out] (it reads
+     * `position()` and `remaining()` to size the tensor) and the sampler's producer owns [gathered].
+     *
+     * **perf-plan-v5 K1: the loop body runs over HEAP arrays, with one bulk copy in and one out.**
+     * Android has no `DirectFloatBuffer` — `ByteBuffer.asFloatBuffer()` returns a
+     * `ByteBufferAsFloatBuffer`, whose `put(int, float)` is two virtual dispatches over a nine-frame
+     * chain, while `put(float[])` is one `Memory.pokeFloatArray` memcpy (native order, so no byte
+     * swap). Same on the way in. 301 056 per-element buffer calls per gate frame become 2, and the
+     * 50 176-iteration body becomes ordinary array code the ART inliner can flatten and bounds-check
+     * once. Measured cost of the old shape: 39 634 ms over 3 215 gate frames = 12.33 ms/frame, i.e.
+     * ~245 ns for ~10 arithmetic operations per pixel.
+     *
+     * The arithmetic is **untouched** — same integer BT.601 coefficients, same `shr 10`, same
+     * `coerceIn`, same `/255f`, same order — so the tensor stays bit-identical and
+     * `FrameSamplerConvertTest`'s zero-tolerance equivalence against [convertToTensor] still holds.
+     *
+     * [yuv] and [rgb] are CALLER-OWNED scratch of `3 * GATE_SIDE²` each, for the same reason
+     * `FilterWorker.gateInput` is: this is an `object`, and a field here would be shared state the
+     * moment anything runs two passes at once. Allocating them per gate frame would be 752 kB × 3 215
+     * ≈ 2.4 GB of large-object churn.
      */
-    internal fun gateFromGathered(gathered: ByteBuffer, out: FloatBuffer) {
+    internal fun gateFromGathered(gathered: ByteBuffer, yuv: ByteArray, rgb: FloatArray, out: FloatBuffer) {
         val plane = GATE_SIDE * GATE_SIDE
+        gathered.duplicate().apply { position(0) }.get(yuv, 0, 3 * plane)
         for (i in 0 until plane) {
             val j = 3 * i
-            val y = gathered.get(j).toInt() and 0xFF
-            val u = (gathered.get(j + 1).toInt() and 0xFF) - 128
-            val v = (gathered.get(j + 2).toInt() and 0xFF) - 128
+            val y = yuv[j].toInt() and 0xFF
+            val u = (yuv[j + 1].toInt() and 0xFF) - 128
+            val v = (yuv[j + 2].toInt() and 0xFF) - 128
             val r = (y + ((1436 * v) shr 10)).coerceIn(0, 255)
             val g = (y - ((352 * u + 731 * v) shr 10)).coerceIn(0, 255)
             val b = (y + ((1815 * u) shr 10)).coerceIn(0, 255)
-            out.put(i, r / 255f)              // R plane
-            out.put(plane + i, g / 255f)      // G plane
-            out.put(2 * plane + i, b / 255f)  // B plane
+            rgb[i] = r / 255f              // R plane
+            rgb[plane + i] = g / 255f      // G plane
+            rgb[2 * plane + i] = b / 255f  // B plane
         }
+        out.duplicate().apply { position(0) }.put(rgb, 0, 3 * plane)
     }
 
     /**

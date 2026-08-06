@@ -40,7 +40,14 @@ import kotlin.math.tanh
  *   (`plan-v2` §5.10, against the tradeoff `prd-video-filter-android.md:80` documents and accepts).
  *
  * The PRD soft-clip guard (tanh knee at 0.95) is applied on the denormalized sum at emit time.
- * Contract: single-threaded (one worker drives feed/finish); [emit] receives interleaved stereo.
+ *
+ * **Contract: SERIALIZED, not thread-confined** (perf-plan-v5 C10); [emit] receives interleaved stereo.
+ * One driver, one call at a time, every call seeing the last one's writes — which is what the rings,
+ * the chunk grid and the gate scores need, and all this class ever actually needed. It is stated this
+ * way because `AudioPipeline` now feeds it from a coroutine that suspends between batches (its input
+ * arrives over a [kotlinx.coroutines.channels.Channel] from a decoder on another thread), so the
+ * driving thread's identity can change between calls even though the order cannot. [emit] runs inline
+ * on that same driver and may block it — that is the intended backpressure.
  */
 class DemucsSeparator(
     keepOther: Boolean,

@@ -28,8 +28,11 @@ import kotlin.math.abs
  * than guessing. The two-tier ±2-chunk dilation that goes with it lives in
  * [DemucsSeparator.separateChunk] — this class is stateless.
  *
- * Contract: one worker drives this at a time (thread-confined, like [HtdemucsSession]); [close]
- * releases the session.
+ * Contract: SERIALIZED — one driver, one call at a time, like [HtdemucsSession]; [close] releases the
+ * session. Not thread-CONFINED since perf-plan-v5 C10: both are driven from inside
+ * [DemucsSeparator.feed], whose caller now suspends between batches, so the thread can change between
+ * calls. `OrtSession.run` is itself thread-safe; the reused [input] buffer is what needs the ordering,
+ * and coroutine dispatch supplies it.
  */
 class MusicGate private constructor(private val session: OrtSession) : AutoCloseable {
 
