@@ -373,3 +373,103 @@ runs in one v3 session and 17 % uniformly in v4 §11; stage wall cannot resolve 
 Build gate is unchanged: `./gradlew compileDebugKotlin testDebugUnitTest` — **130 tests green** (129
 existing plus the new plane-position guard). `lintDebug` still has 31 pre-existing errors and is still
 not a gate.
+
+---
+
+## 8. Measured — S23, benchmark build, 2026-08-06
+
+**Everything above §8 was ranked off a DEBUGGABLE build. This section is the first non-debuggable
+measurement in the repo's history, and it moves three of this plan's conclusions.**
+
+Rig: S23 `R3CW5070LGM`, `benchmark` variant (`isDebuggable = false`), `qa-assets/BSKHKT-EP-02-FHD.mp4`
+— 1522 s, 1080p H.264 23.976, AAC 48 k stereo, 888 MB. `pm clear` between every run. 651 htdemucs
+chunks, 199 skipped (30 %). Censor runs are `censorWho=women` (the app's own default), music runs
+`removeMusic=true censorWho=none`. Unsegmented: 1522 s is 4 min 38 s under `Eta.CONFIRM_THRESHOLD_MS`,
+so the music path is the non-resumable `removeMusic` and **both halves of C10 are live**.
+
+### 8.1 The items work. All three counters moved hard, and nothing changed a byte.
+
+| counter | PRE | POST | ratio |
+|---|---:|---:|---:|
+| `pack` (A2) | 58 130 | 14 983 | **3.88×** |
+| `gateFill` (K1) | 17 828 | 5 006 | **3.56×** |
+| `decode` (C10) | 77 095 | 13 780 | **5.60×** |
+| `encode` (C10) | 54 891 | 2 512 | **21.9×** |
+
+Correctness controls, all exact: `gateFirings=82 intervalCount=21` on both censor runs;
+`music gate: skipped 199/651` and `fed=67138311 frames` on all three music runs; and the published
+`.m4a` bitstream is **byte-identical** — `ffmpeg -map 0:a -c copy -f md5` gives
+`27eb7f8e9ce6af4a166ddb2bff8eb3fb` for both the C10 build and a PRE build.
+
+`packNv21`'s bit-identity now has its own guard, `PackNv21GoldenTest`, against the verbatim pre-A2 body.
+`FrameSamplerConvertTest` could never have caught a regression here: it asserts planar-vs-semi-planar
+agreement *within one build*, so a rewrite that changed both layouts alike passes it untouched.
+
+### 8.2 §0's rerank is a debuggable-build artifact — the sign is inverted on the shipping build
+
+The Kotlin loops recover 2.7–5.3× once ART is allowed to optimise them; the native counters do not move:
+
+| counter | debuggable (§11 of v4) | benchmark | ratio |
+|---|---:|---:|---:|
+| `pack` | 10.31 ms/f | 3.82 ms/f | 2.70× |
+| `gateFill` | 12.33 ms/f | 2.34 ms/f | 5.27× |
+| `gateGather` | 2.28 ms/f | 0.83 ms/f | 2.75× |
+| `detect` (ML Kit) | 1.59 ms/f | 1.46 ms/f | 1.09× |
+| `gate` (ORT) | 7.91 ms/f | 7.50 ms/f | 1.05× |
+
+So the instrumented split flips. Debuggable: producer 81 445 vs consumer 75 049. Benchmark:
+**producer 71 559 vs consumer 97 890** — the consumer leads by 26 331 ms, the mirror image of §0's
+"26 338 ms of slack". **A2 is on the producer, i.e. on the side that is no longer the wall.** §0's
+ordering argument ("fix the producer, and only then does anything on the consumer buy a millisecond")
+is correct in form and backwards in fact on the build users run.
+
+`build.gradle.kts:71-75` predicted 1.3–2× for this. It is 2.7–5.3×.
+
+### 8.3 Why the wall barely moves, and why this rig cannot say by how much
+
+| | analyze | render | total |
+|---|---:|---:|---:|
+| PRE run 1 | 129 817 | 130 977 | 264 002 |
+| PRE run 2 (**same APK**) | 171 082 | 131 380 | 305 650 |
+| POST | 123 455 | 131 244 | 258 148 |
+
+**Two runs of the identical build differ by 32 % on analyze.** Per-counter, PRE-vs-PRE: `detect` 1.69×,
+`gateFill` 1.54×, `pack` 1.42×, `gate` 1.37×. Start temperatures were 30.0 / 31 / 34.7 °C and the
+slowdown is monotonic in temperature. The music side reproduces it: the same build re-run third gives
+`ort` **+10.4 %** (1 038 472 → 1 146 130) and the slowest `separate` of all three runs.
+
+Two things follow, and both are protocol corrections:
+
+1. **`maxThermal=0` proves nothing.** Every run above reported it. `JobStats` reads
+   `PowerManager.currentThermalStatus`, and the SoC is DVFS-limited long before that reports even
+   `THERMAL_STATUS_LIGHT`. A run can lose a third of its analyze to heat and still log a clean zero.
+2. **Render is not a thermal control.** It reproduced to **0.31 %** across all three censor runs — §1
+   asks for "render within 0.20 %" as the guard — while analyze moved 41 265 ms between two runs of the
+   same APK. Render is codec-paced (§5), so it is structurally blind to the only drift that matters.
+   The check passes on runs that are not comparable.
+
+**Consequence: no single-run A/B on this rig can resolve a wall delta under ~30 %.** Counter-level
+effects survive only when they exceed ~1.5×, which is why §8.1 is trustworthy and the totals are not.
+The phone also will not idle below ~31 °C on USB power, so a cooldown loop targeting 30 °C never exits.
+
+### 8.4 What this does to the projections
+
+§2 projected BLUR 191 327 → ~157 500 (−18 %). On the shipping build the same clip's baseline is not
+191 327-shaped at all, and the achievable analyze floor is set by native work: POST analyze is 123 455,
+of which `detect` 25 103 + `gate` 62 110 = **87 213 (71 %) is ML Kit and ORT** that no item on this
+board touches. A2 and K1 have already taken most of what was available on the Kotlin side.
+
+**Render is now 131 244 of a 258 148 ms censor job — 50.8 %, and untouched.** On the music shape `ort`
+is ~85 % of `separate`. So the two remaining levers are exactly §4.2 (overlap analyze and render) and
+§4.1 (INT8 htdemucs), and everything else on this board is now noise-sized.
+
+C10's own arithmetic survives but its size does not: it removes 115 694 ms of codec round trips from
+the critical path, and how much of that reaches the wall is buried in the ±10 % `ort` drift above.
+§1's claim that it "is positive in every world; only its size is uncertain" is not established by this
+run — one ordering of the A/B came out net negative, and the third run showed why.
+
+### 8.5 Owed, still
+
+- A cooled multi-run rig before ANY wall number in this document is quoted again. Alternating A/B/A/B
+  ordering at minimum; the runs above are confounded with order.
+- §4.1's listening test is unaffected by any of this and is still the gate for INT8.
