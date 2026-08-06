@@ -20,12 +20,13 @@
     <!-- Two-line privacy promise under the wordmark; \n is a real line break in the rendered text. -->
     <string name="pick_tagline">Filtering happens on your device.\nYour videos never leave your phone.</string>
 
-    <!-- Pick-video card. Title is one line with ellipsis; "Video selected" covers a provider that exposes no name. -->
-    <string name="pick_video_none">Pick a video</string>
-    <string name="pick_video_selected">Video selected</string>
+    <!-- Pick-source card. Title is one line with ellipsis; "File selected" covers a provider that exposes
+         no name, and says nothing about video because an audio pick lands here too. -->
+    <string name="pick_video_none">Pick a video or audio file</string>
+    <string name="pick_video_selected">File selected</string>
     <string name="pick_video_change">Tap to change</string>
     <!-- Accepted containers; the format names are proper nouns and stay Latin in every locale. -->
-    <string name="pick_video_formats">MP4 · MKV · WebM</string>
+    <string name="pick_video_formats">MP4 · MKV · WebM · MP3 · M4A</string>
 
     <!-- Section label above the operations card. Sentence case: SectionHeader() renders it as written. -->
     <string name="pick_eyebrow_choose">Choose what to filter</string>
@@ -158,7 +159,7 @@
 
     <!-- Library list. "Movies/Naqi" is a real on-disk path — keep it Latin, untranslated. -->
     <string name="jobs_library">Library</string>
-    <string name="jobs_library_empty">Filtered videos are saved to Movies/Naqi.</string>
+    <string name="jobs_library_empty">Filtered files are saved to Movies/Naqi, audio to Music/Naqi.</string>
 
     <!-- Progress card. jobs_stage_starting fills the instant before the worker publishes its first stage_* value. -->
     <string name="jobs_stage_starting">Starting…</string>
@@ -171,6 +172,8 @@
     <!-- Success card. %1$s = the saved file name; the Movies/Naqi/ segment is a real path and stays Latin. -->
     <string name="jobs_saved_label">Saved</string>
     <string name="jobs_saved_path">Movies/Naqi/%1$s</string>
+    <!-- The audio-only shape publishes an .m4a into Music/Naqi instead; same path rule. -->
+    <string name="jobs_saved_path_audio">Music/Naqi/%1$s</string>
 
     <!-- Header of the system share sheet. -->
     <string name="jobs_share_chooser_title">Share video</string>

@@ -259,7 +259,9 @@ private fun SavedCard(name: String?, uri: Uri?, context: Context) {
                     color = cs.onSurface,
                 )
                 Text(
-                    stringResource(R.string.jobs_saved_path, name.orEmpty()),
+                    // The audio-only shape publishes into Music/Naqi, so the one path label this app
+                    // shows has to follow it — naming the wrong folder is worse than naming none.
+                    stringResource(savedPathRes(name), name.orEmpty()),
                     style = MaterialTheme.typography.bodySmall,
                     color = cs.onSurfaceVariant,
                     maxLines = 1,
@@ -303,7 +305,12 @@ private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit) {
                 .clip(RoundedCornerShape(NaqiTokens.radiusButton))
                 .background(cs.surfaceContainerHighest),
             contentAlignment = Alignment.Center,
-        ) { Icon(NaqiIcons.Video, null, tint = cs.onSurfaceVariant, modifier = Modifier.size(20.dp)) }
+        ) {
+            Icon(
+                if (isAudioOutput(item.name)) NaqiIcons.MusicOff else NaqiIcons.Video,
+                null, tint = cs.onSurfaceVariant, modifier = Modifier.size(20.dp),
+            )
+        }
         Spacer(Modifier.width(NaqiTokens.space3))
         Column(Modifier.weight(1f)) {
             Text(
@@ -320,15 +327,31 @@ private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit) {
 
 private data class LibraryItem(val name: String, val bytes: Long, val uri: Uri?)
 
+/**
+ * The extension, not the mime: this is asked about a *name* the job reported, before there is a uri to
+ * ask MediaStore about. `.m4a` is what the audio-only shape writes and the only output that is not an
+ * mp4 — [FilterWorker]'s `outputName(uri, ext = "m4a")` is the one place it comes from.
+ */
+private fun isAudioOutput(name: String?): Boolean = name?.endsWith(".m4a", ignoreCase = true) == true
+
+private fun savedPathRes(name: String?) =
+    if (isAudioOutput(name)) R.string.jobs_saved_path_audio else R.string.jobs_saved_path
+
 /** Newest first, straight out of MediaStore — our own contributions need no permission to read back. */
 private fun loadLibrary(context: Context): List<LibraryItem> = runCatching {
-    val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+    // Files, not Video: the audio-only shape publishes into Music/Naqi, which a Video-collection query
+    // cannot see — the app would have made a file it then refuses to list. One query over both
+    // directories keeps them in one date order; scoped storage still limits the rows to this app's own,
+    // which is exactly Naqi's output. MEDIA_TYPE pins it to real media so no stray row can appear.
+    val collection = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
     context.contentResolver.query(
         collection,
-        arrayOf(MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME, MediaStore.Video.Media.SIZE),
-        "${MediaStore.Video.Media.RELATIVE_PATH} LIKE ?",
-        arrayOf("${Environment.DIRECTORY_MOVIES}/Naqi/%"),
-        "${MediaStore.Video.Media.DATE_ADDED} DESC",
+        arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE),
+        "(${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? OR ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?) " +
+            "AND ${MediaStore.Files.FileColumns.MEDIA_TYPE} IN " +
+            "(${MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO}, ${MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO})",
+        arrayOf("${Environment.DIRECTORY_MOVIES}/Naqi/%", "${Environment.DIRECTORY_MUSIC}/Naqi/%"),
+        "${MediaStore.MediaColumns.DATE_ADDED} DESC",
     )?.use { c ->
         buildList {
             while (c.moveToNext()) {
@@ -360,17 +383,24 @@ private fun shareableUri(context: Context, uri: Uri): Uri? {
     }
 }
 
+/**
+ * The output's own mime, falling back to [MIME_MP4]. Asked of the resolver rather than threaded down
+ * from the job: the audio-only shape publishes an `.m4a`, and handing that to a video player is how a
+ * finished job looks broken. MediaStore already knows which it is.
+ */
+private fun mimeOf(context: Context, uri: Uri): String = context.contentResolver.getType(uri) ?: MIME_MP4
+
 // runCatching: a device with no video player / no share target must not take the app down.
 private fun view(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_VIEW)
-        .setDataAndType(uri, MIME_MP4)
+        .setDataAndType(uri, mimeOf(context, uri))
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     runCatching { context.startActivity(intent) }
 }
 
 private fun share(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_SEND)
-        .setType(MIME_MP4)
+        .setType(mimeOf(context, uri))
         .putExtra(Intent.EXTRA_STREAM, uri)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     runCatching {

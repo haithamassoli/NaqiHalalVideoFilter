@@ -19,12 +19,12 @@
     <!-- Two-line privacy promise under the wordmark; \n is a real line break in the rendered text. -->
     <string name="pick_tagline">تتم الفلترة على جهازك.\nلا تغادر مقاطعك هاتفك أبدًا.</string>
 
-    <!-- Pick-video card. Title is one line with ellipsis; "Video selected" covers a provider that exposes no name. -->
-    <string name="pick_video_none">اختر فيديو</string>
-    <string name="pick_video_selected">تم اختيار الفيديو</string>
+    <!-- Pick-source card. See the English file: an audio pick lands here too, so neither line says "video". -->
+    <string name="pick_video_none">اختر مقطع فيديو أو ملفًا صوتيًا</string>
+    <string name="pick_video_selected">تم اختيار الملف</string>
     <string name="pick_video_change">انقر للتغيير</string>
     <!-- Accepted containers; the format names are proper nouns and stay Latin in every locale. -->
-    <string name="pick_video_formats">MP4 · MKV · WebM</string>
+    <string name="pick_video_formats">MP4 · MKV · WebM · MP3 · M4A</string>
 
     <!-- Section label above the two operation cards. Arabic has no case; a short phrase replaces the English caps. -->
     <string name="pick_eyebrow_choose">اختر ما تريد فلترته</string>
@@ -155,7 +155,7 @@
 
     <!-- Library list. "Movies/Naqi" is a real on-disk path — keep it Latin, untranslated. -->
     <string name="jobs_library">المكتبة</string>
-    <string name="jobs_library_empty">تُحفظ مقاطع الفيديو المُفلترة في Movies/Naqi.</string>
+    <string name="jobs_library_empty">تُحفظ الملفات المُفلترة في Movies/Naqi، والصوت في Music/Naqi.</string>
 
     <!-- Progress card. jobs_stage_starting fills the instant before the worker publishes its first stage_* value. -->
     <string name="jobs_stage_starting">جارٍ البدء…</string>
@@ -168,6 +168,8 @@
     <!-- Success card. %1$s = the saved file name; the Movies/Naqi/ segment is a real path and stays Latin. -->
     <string name="jobs_saved_label">تم الحفظ</string>
     <string name="jobs_saved_path">Movies/Naqi/%1$s</string>
+    <!-- The audio-only shape publishes an .m4a into Music/Naqi instead; same path rule. -->
+    <string name="jobs_saved_path_audio">Music/Naqi/%1$s</string>
 
     <!-- Header of the system share sheet. -->
     <string name="jobs_share_chooser_title">مشاركة الفيديو</string>

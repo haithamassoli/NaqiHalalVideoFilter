@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.media.displayName
+import com.haithamassoli.naqi.media.isAudio
 import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.NaqiBottomAction
@@ -91,11 +92,16 @@ fun PickOpsScreen(
         .apply { if (ops.censorFaces) value = ops.censorWho }
         .value
 
+    // An audio source has no video track, so music removal is the only op it can run — the pick sets it
+    // rather than leaving the user to discover that "Censor faces" fails preflight with "no video track".
+    val isAudio = remember(pickedUri) { pickedUri != null && context.isAudio(pickedUri) }
+
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
+            if (context.isAudio(uri)) onOpsChange(ops.copy(removeMusic = true, censorWho = FilterOps.NONE))
             onPicked(uri, context.displayName(uri))
         }
     }
@@ -135,7 +141,9 @@ fun PickOpsScreen(
             // costs the screen no room at all.
             UpdateCard(Modifier.padding(bottom = NaqiTokens.space5))
 
-            PickVideoCard(picked = pickedUri != null, fileName = pickedName) { picker.launch(arrayOf("video/*")) }
+            PickVideoCard(picked = pickedUri != null, fileName = pickedName) {
+                picker.launch(arrayOf("video/*", "audio/*"))
+            }
             Spacer(Modifier.height(NaqiTokens.space5))
 
             SectionHeader(stringResource(R.string.pick_eyebrow_choose))
@@ -148,22 +156,26 @@ fun PickOpsScreen(
                     checked = ops.removeMusic,
                     onCheckedChange = { onOpsChange(ops.copy(removeMusic = it)) },
                 )
-                NaqiRowDivider()
-                ToggleTile(
-                    title = stringResource(R.string.pick_op_faces_title),
-                    // The subtitle states the current choice instead of claiming "every face", which
-                    // Women/Men would make a lie (plan-censor-who §2.1). Off gets the plain description
-                    // of the op: ToggleTile renders `desc` at full emphasis either way, so an off row
-                    // saying "Everyone · and flagged scenes." would assert censoring that is not running.
-                    desc = if (ops.censorFaces)
-                        stringResource(R.string.pick_op_faces_desc, stringResource(whoLabelRes(who)))
-                    else stringResource(R.string.pick_op_faces_desc_off),
-                    icon = NaqiIcons.Shield,
-                    checked = ops.censorFaces,
-                    onCheckedChange = {
-                        onOpsChange(ops.copy(censorWho = if (it) who else FilterOps.NONE))
-                    },
-                )
+                // Hidden, not disabled, for an audio source: there is no frame to censor, so the row
+                // could only ever say no.
+                if (!isAudio) {
+                    NaqiRowDivider()
+                    ToggleTile(
+                        title = stringResource(R.string.pick_op_faces_title),
+                        // The subtitle states the current choice instead of claiming "every face", which
+                        // Women/Men would make a lie (plan-censor-who §2.1). Off gets the plain description
+                        // of the op: ToggleTile renders `desc` at full emphasis either way, so an off row
+                        // saying "Everyone · and flagged scenes." would assert censoring that is not running.
+                        desc = if (ops.censorFaces)
+                            stringResource(R.string.pick_op_faces_desc, stringResource(whoLabelRes(who)))
+                        else stringResource(R.string.pick_op_faces_desc_off),
+                        icon = NaqiIcons.Shield,
+                        checked = ops.censorFaces,
+                        onCheckedChange = {
+                            onOpsChange(ops.copy(censorWho = if (it) who else FilterOps.NONE))
+                        },
+                    )
+                }
             }
         }
     }

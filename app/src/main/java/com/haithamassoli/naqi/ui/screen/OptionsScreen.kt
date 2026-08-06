@@ -55,6 +55,7 @@ import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.data.Prefs
+import com.haithamassoli.naqi.media.containerDurationMs
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.NaqiBottomAction
 import com.haithamassoli.naqi.ui.NaqiCard
@@ -122,7 +123,11 @@ fun OptionsScreen(
     var durationMs by remember(inputUri) { mutableStateOf(0L) }
     LaunchedEffect(inputUri) {
         durationMs = withContext(Dispatchers.IO) {
-            runCatching { FrameSampler.probe(context, inputUri).durationMs }.getOrDefault(0L)
+            // The probe opens the video track, so an audio source always throws here — falling back to
+            // the container's own duration is what keeps the ETA line and the long-job confirmation
+            // alive for it. A real failure still lands on 0, which is "say nothing".
+            runCatching { FrameSampler.probe(context, inputUri).durationMs }
+                .getOrElse { context.containerDurationMs(inputUri) }
         }
     }
     // Cheap enough to recompute on recomposition, and it must follow ops: the shape sets the factor.
