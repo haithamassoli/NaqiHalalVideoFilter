@@ -570,6 +570,15 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     }
 
     /**
+     * [FrameSampler.gateFromGathered]'s heap scratch — 150 kB + 602 kB, one pair for the whole pass,
+     * held here for exactly [gateInput]'s reasons (`FrameSampler` is an object; per-frame allocation
+     * would be 752 kB × 3 215 ≈ 2.4 GB of large-object churn). See that function's KDoc.
+     */
+    private val gateYuv: ByteArray by lazy { ByteArray(3 * FrameSampler.GATE_SIDE * FrameSampler.GATE_SIDE) }
+
+    private val gateRgb: FloatArray by lazy { FloatArray(3 * FrameSampler.GATE_SIDE * FrameSampler.GATE_SIDE) }
+
+    /**
      * The consumer-side wall of one pass-1 body, and the line both shapes log it on.
      *
      * perf-plan 1.2, re-read after 1.3b: decode+convert runs alongside [sampledFrame], so `wall` is
@@ -627,7 +636,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         val task = tracker.detect(image)
         if (gateBytes != null) {
             val t1 = System.nanoTime()
-            FrameSampler.gateFromGathered(gateBytes, gateInput)
+            FrameSampler.gateFromGathered(gateBytes, gateYuv, gateRgb, gateInput)
             val t2 = System.nanoTime()
             val probs = Infer.nsfw(applicationContext, gateInput)
             t.gateFillNs += t2 - t1; t.gateNs += System.nanoTime() - t2

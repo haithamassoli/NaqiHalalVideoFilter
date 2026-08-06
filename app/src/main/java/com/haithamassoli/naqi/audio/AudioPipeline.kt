@@ -9,6 +9,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import com.haithamassoli.naqi.media.requireTrackIndex
 import com.haithamassoli.naqi.work.Checkpoint
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.trySendBlocking
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -29,7 +33,10 @@ import kotlin.math.roundToInt
  * Progress is chunk-count-driven (the natural unit — htdemucs chunks dominate wall time): [onProgress]
  * reports 2 after the stats pass, 2..98 across separation chunks, 100 at the end. [isCancelled] is
  * polled between chunks (inside the separator) and in the stream sink; a true reading throws
- * CancellationException so WorkManager sees the job as cancelled.
+ * CancellationException so WorkManager sees the job as cancelled. Since C10 the sink poll runs on the
+ * DECODER lane, so it stops decoding at once, but the separator only observes it after draining what
+ * [DECODE_QUEUE] already banked — `close(cause)` hands over the buffered elements before it rethrows.
+ * Bounded by the queue depth; the cost is at most a few extra chunks of inference on a cancel.
  */
 object AudioPipeline {
 
@@ -37,6 +44,132 @@ object AudioPipeline {
 
     /** ~1 s at 44.1 kHz. Container durations are routinely loose by a few hundred ms; a second is not. */
     private const val LENGTH_WARN_FRAMES = 44_100L
+
+    /**
+     * perf-plan-v5 C10: batches the decode queue holds. **The unit is a music-gate SKIP RUN, not a
+     * chunk** — and getting that wrong is what an initial 128 got wrong.
+     *
+     * The consumer is inside one *inferred* `processChunk` for ~2.3 s, so one chunk of banking is
+     * plenty there: the decoder produces a chunk of audio in ~200 ms and idles the other ~2.1 s. But a
+     * SKIPPED chunk takes [DemucsSeparator.passthroughChunk] and costs only the unconditional gate,
+     * flush and overlap-add — ~90-100 ms against that same ~200 ms of decode. Through a run of skipped
+     * chunks the consumer is therefore **decoder-paced**, and it stays that way until the queue runs
+     * dry. On the reference run the gate skipped 158 of ~276 chunks, so this is the majority case, not
+     * the corner: at 128 batches ≈ 1.09 × [DemucsSeparator.STRIDE] the queue covers one chunk of a run
+     * that is typically ~9 long, and ~15 s of decode stays on the critical path.
+     *
+     * **The unit that sets the number is the DRAIN rate, not the run length.** A sink call carries
+     * ~941 frames (one AAC-LC 1024-sample access unit through Sonic 48 k → 44.1 k) = 7.5 kB. Through a
+     * skip run the decoder still delivers at ~510 k frames/s while the consumer eats a whole STRIDE per
+     * ~96 ms, so each skipped chunk nets `103 194 − 510 109 × 0.096 ≈ 54 071` frames off the queue —
+     * **~58 batches per skipped chunk**, not a whole STRIDE. So N batches covers N/58 chunks of
+     * unbroken non-music:
+     *
+     * ```
+     * 512 × 941            = 481 690 frames = 4.67 × STRIDE
+     * 481 690 / 54 071     = 8.9 consecutive skipped chunks ≈ 21 s of non-music, zero stall
+     * 512 × 7.5 kB         = 3.9 MB typical
+     * ```
+     *
+     * 512 is **4× today's coverage for +2.9 MB**, and it re-arms: one separated chunk banks ~1 190
+     * batches, so every return to music refills this from empty in under half an inference. That refill
+     * figure is also the ceiling on useful depth — past ~1 190 the queue can never be filled at all.
+     *
+     * ponytail: not 2 048. [Channel] bounds by ELEMENTS, and nothing here knows the codec's output
+     * buffer size; if a decoder ever aggregated 16 access units per buffer, each element is 118 kB and
+     * 2 048 slots is 247 MB — a 1.51 GB peak against this stage's measured 1.27 GB and the PRD's 1.5 GB
+     * budget. 512 caps that branch at 62 MB (4.75 %). Depth also costs cancel latency: `close(cause)`
+     * hands over buffered elements first, so the consumer grinds ~4.67 more chunks (~11 s) after a tap.
+     *
+     * **`decode=` will NOT read 0 on a source with long dialogue stretches, and that is not a bug.**
+     * The stall floor is `(skipped × 54 071 − runs × 512 × 941) / 510 109` s — 0 s when runs are short,
+     * ~35 s when a 25-minute episode is five long runs. No depth rescues that case (the whole prize
+     * between 128 and infinity is ~39 s of a ~700 s stage), so read `decode=` together with the
+     * `music gate: skipped N/total` line on the same run. Alone it cannot be interpreted.
+     */
+    private const val DECODE_QUEUE = 512
+
+    /**
+     * Encode batches in flight. One flush emits at most `2 * STRIDE` floats = 826 kB, so 2 slots is
+     * 1.65 MB: one being encoded, one queued. `encode=` likewise now measures the separator BLOCKING
+     * here, not encoding, and should come back near 0.
+     */
+    private const val ENCODE_QUEUE = 2
+
+    /**
+     * One batch of interleaved f32 stereo crossing a thread boundary, **with its own copy**.
+     *
+     * The copy is not optional and it is not the trade. [AudioDecoder] reuses its `stereo`/`outFloat`
+     * hot arrays across sink calls and [DemucsSeparator] reuses one `emitBuf` across flushes, so
+     * neither array survives the call it arrived in. The cost is 643 s × 44 100 × 2 × 4 B = 227 MB per
+     * side over a 10-minute job, ~1.2 MB/s — against 82 s of wall this removes from the critical path.
+     * A pooled ring would save only ART's zero-fill on that and would cost an ownership protocol.
+     */
+    private class Pcm(val buf: FloatArray, val n: Int)
+
+    /**
+     * perf-plan-v5 C10. Decode on its own thread, feed the separator on this one.
+     *
+     * **The measurement this exists for.** `separate` was 385 420 ms on the S23 (perf-plan-v4 §11), of
+     * which ORT was 270 177 and `decode` 55 589 + `encode` 26 584 — and all three ran on ONE thread,
+     * because [AudioDecoder.stream]'s sink called `separator.feed` inline and the separator's `emit`
+     * called the AAC writer inline. So while ORT held 6 of the S23's 8 cores for ~2.3 s, the audio
+     * decoder did nothing; while the decoder blocked on MediaCodec, ORT did nothing. Neither counter is
+     * arithmetic — `decode` is 1.73 ms per 20 ms Opus packet and `encode` is 3.63 ms per 16 kB buffer,
+     * i.e. both are codec round trips — so they hide behind inference almost entirely.
+     *
+     * **Byte-identical output.** Nothing here touches an arithmetic path: the separator still sees the
+     * same batches in the same order on one logical thread, and the encoder still sees the same frame
+     * counts in the same order, so the same `samplesOut` PTS walk produces the same `.m4a`. Only the
+     * scheduling moves. [DemucsSeparator] and [MusicGate] require serialization rather than a fixed
+     * thread id, and a coroutine hop supplies the happens-before that makes those equivalent — the same
+     * arrangement `FrameSampler.sample` already runs pass 1 under.
+     *
+     * @return the same `decodeNs` the serial code logged, with a NEW meaning: it is now the consumer's
+     *   time STARVED of input rather than its time spent decoding. Near 0 means [DECODE_QUEUE] is deep
+     *   enough; a large value means the decoder cannot keep up and is the real floor.
+     */
+    private suspend fun feedFromDecoder(
+        context: Context,
+        uri: Uri,
+        isCancelled: () -> Boolean,
+        separator: DemucsSeparator,
+    ): Long = coroutineScope {
+        val pcmQ = Channel<Pcm>(DECODE_QUEUE)
+        // limitedParallelism(1): MediaCodec and its extractor are serial objects, and this keeps the
+        // whole decode on one IO lane instead of borrowing a fresh pool thread after every suspension.
+        launch(Dispatchers.IO.limitedParallelism(1)) {
+            try {
+                AudioDecoder.stream(context, uri, isCancelled) { buf, n ->
+                    if (isCancelled()) throw CancellationException()
+                    // Blocking, not offer-and-drop: this IS the backpressure, and the sink is a plain
+                    // (non-suspend) lambda inside AudioDecoder's own loop.
+                    pcmQ.trySendBlocking(Pcm(buf.copyOf(2 * n), n)).getOrThrow()
+                }
+                pcmQ.close()
+            } catch (t: Throwable) {
+                // WITH the cause. A bare close() would read to the consumer as a clean end of stream,
+                // and `DemucsSeparator.finish` would then resolve the track length from a TRUNCATED
+                // feed and publish a short film as a complete one (correctness item 7.5).
+                pcmQ.close(t)
+                throw t
+            }
+        }
+        var feedNs = 0L
+        val tStream = System.nanoTime()
+        try {
+            for (b in pcmQ) { // rethrows the decoder's own cause when it closed with one
+                val tFeed = System.nanoTime()
+                separator.feed(b.buf, b.n)
+                feedNs += System.nanoTime() - tFeed
+            }
+        } finally {
+            // Unpark a decoder blocked in trySendBlocking if THIS side died. Scope cancellation cannot
+            // interrupt that blocking send; only closing the channel can.
+            pcmQ.cancel()
+        }
+        System.nanoTime() - tStream - feedNs
+    }
 
     /**
      * PRD "Thermal: chunked work yields between segments; no hard fail on throttle, just slower."
@@ -176,50 +309,57 @@ object AudioPipeline {
                     var yieldNs = 0L
                     // Reset AFTER thermalYield, so a throttle pause is not billed to the next chunk.
                     var tChunk = System.nanoTime()
-                    val separator = DemucsSeparator(
-                        keepOther = keepOther,
-                        mean = stats.mean,
-                        std = stats.std,
-                        estimatedFrames = estFrames,
-                        infer = session::infer,
-                        onChunk = { done, total ->
-                            Log.i(TAG, "chunk $done/$total ${(System.nanoTime() - tChunk) / 1_000_000}ms")
-                            // Post only when the integer percent actually moves: ~4800 chunks on a film map
-                            // onto 96 distinct values, and every call is a setProgressAsync + a
-                            // setForegroundAsync. The identical bug in analyze measured −12.2 % when fixed
-                            // (`perf-plan.md` 1.1); `plan-v2` §5.9 asks for the same guard here.
-                            val pct = 2 + 96 * done / total // 0..total -> 2..98
-                            if (pct != lastPct) { lastPct = pct; onProgress(pct) }
-                            val tYield = System.nanoTime()
-                            thermalYield(context, isCancelled, demoteWhile)
-                            tChunk = System.nanoTime()
-                            yieldNs += tChunk - tYield // M2: Thread.sleep plus one thermal binder call
-                        },
-                        musicScore = gate?.let { it::score },
-                        emit = writer::write,
-                    )
-                    // M2 decodeNs: this call's own wall minus the separator work it wraps. Timing `feed`
-                    // and subtracting is the smaller of the two diffs — the sink is the only seam between
-                    // the two, so everything left is decode + channel fold + resample.
-                    var feedNs = 0L
-                    val tStream = System.nanoTime()
-                    AudioDecoder.stream(context, uri, isCancelled) { buf, n ->
-                        if (isCancelled()) throw CancellationException()
-                        val tFeed = System.nanoTime()
-                        separator.feed(buf, n)
-                        feedNs += System.nanoTime() - tFeed
+                    coroutineScope {
+                        // perf-plan-v5 C10's egress half — see [feedFromDecoder] for the ingress half
+                        // and for why neither changes a byte of the output. The writer is CONSTRUCTED
+                        // above and CLOSED in the finally below, both on this thread; every
+                        // `write`/`finish` runs on the one IO lane launched here, and `launch` plus this
+                        // scope's join are the two happens-before edges that make that safe.
+                        val encQ = Channel<Pcm>(ENCODE_QUEUE)
+                        launch(Dispatchers.IO.limitedParallelism(1)) {
+                            try {
+                                for (b in encQ) writer.write(b.buf, b.n)
+                                writer.finish()
+                            } finally {
+                                encQ.cancel() // unpark a separator blocked in emit if this side died
+                            }
+                        }
+                        val separator = DemucsSeparator(
+                            keepOther = keepOther,
+                            mean = stats.mean,
+                            std = stats.std,
+                            estimatedFrames = estFrames,
+                            infer = session::infer,
+                            onChunk = { done, total ->
+                                Log.i(TAG, "chunk $done/$total ${(System.nanoTime() - tChunk) / 1_000_000}ms")
+                                // Post only when the integer percent actually moves: ~4800 chunks on a film
+                                // map onto 96 distinct values, and every call is a setProgressAsync + a
+                                // setForegroundAsync. The identical bug in analyze measured −12.2 % when
+                                // fixed (`perf-plan.md` 1.1); `plan-v2` §5.9 asks for the same guard here.
+                                val pct = 2 + 96 * done / total // 0..total -> 2..98
+                                if (pct != lastPct) { lastPct = pct; onProgress(pct) }
+                                val tYield = System.nanoTime()
+                                thermalYield(context, isCancelled, demoteWhile)
+                                tChunk = System.nanoTime()
+                                yieldNs += tChunk - tYield // M2: Thread.sleep plus one thermal binder call
+                            },
+                            musicScore = gate?.let { it::score },
+                            emit = { buf, n -> encQ.trySendBlocking(Pcm(buf.copyOf(2 * n), n)).getOrThrow() },
+                        )
+                        val decodeNs = feedFromDecoder(context, uri, isCancelled, separator)
+                        separator.finish()
+                        // The stats pass no longer decodes the whole track (A3), so this is where an
+                        // undecodable stream is finally provable — and it costs nothing, since an empty
+                        // stream means the loop above did nothing.
+                        if (separator.framesFed == 0L) error("Could not decode any audio from this video.")
+                        logRun(
+                            separator, estFrames, decodeNs = decodeNs, yieldNs = yieldNs,
+                            sessionCreateNs = sessionCreateNs, gateOpenNs = tGate - tOpen,
+                        )
+                        // Ends the encoder's loop, which then calls writer.finish(); this scope joins it
+                        // before returning, so the finally below cannot close the writer under it.
+                        encQ.close()
                     }
-                    val decodeNs = System.nanoTime() - tStream - feedNs
-                    separator.finish()
-                    // The stats pass no longer decodes the whole track (A3), so this is where an
-                    // undecodable stream is finally provable — and it costs nothing, since an empty
-                    // stream means the loop above did nothing.
-                    if (separator.framesFed == 0L) error("Could not decode any audio from this video.")
-                    logRun(
-                        separator, estFrames, decodeNs = decodeNs, yieldNs = yieldNs,
-                        sessionCreateNs = sessionCreateNs, gateOpenNs = tGate - tOpen,
-                    )
-                    writer.finish()
                     onProgress(100)
                 } finally {
                     runCatching { writer.close() } // safe after finish or on error; don't mask the original throw
@@ -432,15 +572,11 @@ object AudioPipeline {
                                 written += frames
                             },
                         )
-                        var feedNs = 0L // M2 decodeNs, as in removeMusic
-                        val tStream = System.nanoTime()
-                        AudioDecoder.stream(context, uri, isCancelled) { buf, n ->
-                            if (isCancelled()) throw CancellationException()
-                            val tFeed = System.nanoTime()
-                            separator.feed(buf, n) // skipped chunks cost ~0; the ring still fills from real input
-                            feedNs += System.nanoTime() - tFeed
-                        }
-                        val decodeNs = System.nanoTime() - tStream - feedNs
+                        // perf-plan-v5 C10, INGRESS ONLY. This path's `emit` is a page-cache write to the
+                        // int16 scratch (~1 s over a whole film), not an AAC encode, so there is no
+                        // egress half worth moving — the one AAC pass runs at the end, in [encodePcm].
+                        // Skipped chunks still cost ~0; the ring fills from real input either way.
+                        val decodeNs = feedFromDecoder(context, uri, isCancelled, separator)
                         separator.finish()
                         if (separator.framesFed == 0L) error("Could not decode any audio from this video.")
                         logRun(

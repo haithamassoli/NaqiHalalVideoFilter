@@ -218,6 +218,29 @@ class FrameSamplerConvertTest {
         assertArrayEquals(packed(planar = true), packed(planar = false))
     }
 
+    /**
+     * perf-plan-v5 A2 replaced the absolute per-byte reads with per-row bulk ones, which move a
+     * position — so they run on duplicates. This is the assertion that catches losing the duplicate:
+     * [FrameSampler.toFrame] captures `yBase`/`uBase`/`vBase` from these very positions BEFORE the
+     * pack and [FrameSampler.gatherGate] re-reads the planes AFTER it, and MediaCodec hands the same
+     * plane buffer back for a recycled output index, so a moved position poisons the next frame.
+     * Positions are non-zero here for the same reason the gate's twin test uses them.
+     */
+    @Test
+    fun `packing moves no plane position and leaves the output buffer alone`() {
+        val y = luma().apply { position(7) }
+        val (u, v) = planarChroma()
+        u.position(2); v.position(1)
+        val out = ByteBuffer.allocateDirect(sxMap.size * syMap.size * 3 / 2).apply { position(4) }
+        FrameSampler.packNv21(y, yRow, 1, base, u, cRow, 1, base, v, cRow, 1, base, sxMap, syMap, out)
+        assertEquals(7, y.position())
+        assertEquals(2, u.position())
+        assertEquals(1, v.position())
+        assertEquals(4, out.position())
+        // ...and it still wrote the right bytes from index 0, ignoring that position.
+        assertArrayEquals(packed(planar = true), ByteArray(out.capacity()) { out.get(it) })
+    }
+
     // --- the face crop (plan-censor-who §4.1) ---
     //
     // Same two risks as the gate walk, one step harder: this walk reads the NV21 the pack above WROTE
@@ -354,6 +377,11 @@ class FrameSamplerConvertTest {
     private fun gathered() =
         ByteBuffer.allocateDirect(3 * FrameSampler.GATE_SIDE * FrameSampler.GATE_SIDE)
 
+    /** perf-plan-v5 K1's caller-owned scratch; `FilterWorker` holds one pair for the whole pass. */
+    private fun gateYuv() = ByteArray(3 * FrameSampler.GATE_SIDE * FrameSampler.GATE_SIDE)
+
+    private fun gateRgb() = FloatArray(3 * FrameSampler.GATE_SIDE * FrameSampler.GATE_SIDE)
+
     /** The reference tensor and the two-halves tensor over the same planes, in that order. */
     private fun bothPaths(planar: Boolean, rotation: Int): Pair<FloatBuffer, FloatBuffer> {
         val y = luma()
@@ -377,7 +405,7 @@ class FrameSamplerConvertTest {
                 y, yRow, 1, base, uv, cRow, 2, base, uv, cRow, 2, base + 1, rotation, gx, gy, bytes,
             )
         }
-        FrameSampler.gateFromGathered(bytes, two)
+        FrameSampler.gateFromGathered(bytes, gateYuv(), gateRgb(), two)
         return one to two
     }
 
@@ -415,7 +443,7 @@ class FrameSamplerConvertTest {
         val bytes = gathered().apply { position(11) }
         val out = tensor(FrameSampler.GATE_SIDE).apply { position(5) }
         FrameSampler.gatherGate(y, yRow, 1, base, u, cRow, 1, base, v, cRow, 1, base, 90, gx, gy, bytes)
-        FrameSampler.gateFromGathered(bytes, out)
+        FrameSampler.gateFromGathered(bytes, gateYuv(), gateRgb(), out)
         assertEquals(7, y.position())
         assertEquals(2, u.position())
         assertEquals(1, v.position())
