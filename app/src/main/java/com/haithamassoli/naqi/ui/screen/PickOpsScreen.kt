@@ -41,8 +41,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.haithamassoli.naqi.R
@@ -103,7 +105,7 @@ fun PickOpsScreen(
         topBar = {
             NaqiTopBar(
                 title = stringResource(R.string.app_name),
-                titleIcon = NaqiIcons.Droplet,
+                titleIcon = ImageVector.vectorResource(R.drawable.ic_naqi_mark),
                 actions = { OverflowMenu(onAbout = onAbout) },
             )
         },
@@ -299,35 +301,20 @@ private fun PickVideoCard(picked: Boolean, fileName: String?, onClick: () -> Uni
     }
 }
 
-/** The brand lockup, shown once on the about screen rather than above every visit to the pick screen. */
+/** The mark, shown once on the about screen rather than above every visit to the pick screen. */
 @Composable
 internal fun Wordmark() {
     Column(
         Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // The mark is the bowl of ن holding a droplet — it rhymes with the نـ of the wordmark below,
-        // so the two read as one lockup rather than a logo parked above a title.
+        // The mark is the bowl of ن with a play triangle for its dot. It stands alone: the top bar
+        // right above it already carries the name, so a wordmark here only said it twice.
         Icon(
             painterResource(R.drawable.ic_naqi_mark),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(56.dp),
-        )
-        Spacer(Modifier.height(NaqiTokens.space2))
-        Text(
-            stringResource(R.string.pick_wordmark_ar),
-            style = MaterialTheme.typography.displaySmall,
-            color = MaterialTheme.colorScheme.primary,
-            maxLines = 1,
-            softWrap = false,
-        )
-        // The ن of نقي drops a dot below its baseline; without this the Latin line sits in it.
-        Spacer(Modifier.height(NaqiTokens.space2))
-        Text(
-            stringResource(R.string.pick_wordmark_latin),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

@@ -16,8 +16,6 @@
     <string name="pick_seal_private">Private</string>
 
     <!-- Brand lockup under the droplet mark. BRAND: identical value in every locale, do not translate. -->
-    <string name="pick_wordmark_ar">نقي</string>
-    <string name="pick_wordmark_latin">Naqi</string>
 
     <!-- Two-line privacy promise under the wordmark; \n is a real line break in the rendered text. -->
     <string name="pick_tagline">Filtering happens on your device.\nYour videos never leave your phone.</string>

@@ -10,15 +10,6 @@ import androidx.compose.ui.unit.dp
 // A tiny hand-built icon set — avoids pulling the large material-icons-extended dependency.
 // Fill color is irrelevant: Icon(tint = …) recolors these to the theme role at the call site.
 object NaqiIcons {
-    val Droplet = icon("Droplet") {
-        moveTo(12f, 2f)
-        curveTo(9.5f, 5.5f, 5f, 9.8f, 5f, 14.3f)
-        curveTo(5f, 18.2f, 8.1f, 21.3f, 12f, 21.3f)
-        curveTo(15.9f, 21.3f, 19f, 18.2f, 19f, 14.3f)
-        curveTo(19f, 9.8f, 14.5f, 5.5f, 12f, 2f)
-        close()
-    }
-
     val Video = icon("Video") {
         // camera body
         moveTo(5f, 6.5f); lineTo(13f, 6.5f)
