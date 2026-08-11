@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { Downloader.updateIfDue(this@MainActivity) }
         setContent {
             NaqiTheme {
-                NaqiApp(modifier = Modifier.fillMaxSize())
+                NaqiApp(onDeleteOriginal = ::confirmDeleteOriginal, modifier = Modifier.fillMaxSize())
                 deleteTarget?.let { (uri, name) ->
                     ConfirmDeleteDialog(
                         name = name,
@@ -141,6 +141,14 @@ class MainActivity : ComponentActivity() {
 
     private fun displayNameOf(uri: Uri): String? = displayName(uri) ?: uri.lastPathSegment
 
+    /**
+     * The Saved card's "Delete original", which asks for exactly the confirmation the notification
+     * action does — one dialog, one delete, no second path to get a file wrong.
+     */
+    fun confirmDeleteOriginal(uri: Uri, name: String?) {
+        deleteTarget = uri to (name ?: getString(R.string.dlg_delete_original_fallback_name))
+    }
+
     private fun deleteTargetOf(intent: Intent): Pair<Uri, String>? {
         if (intent.action != JobNotifications.ACTION_CONFIRM_DELETE) return null
         val uri = intent.getStringExtra(JobNotifications.EXTRA_DELETE_ORIGINAL)?.takeIf { it.isNotBlank() } ?: return null
@@ -168,7 +176,14 @@ class MainActivity : ComponentActivity() {
             return
         }
         val asked = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && runCatching {
-            val request = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
+            // createDeleteRequest only speaks MediaStore ids, and what the picker hands us is a
+            // *document* uri — passing that straight through is a request the media provider cannot
+            // resolve, i.e. every SAF pick failing at the last step. getMediaUri translates it (it
+            // needs the read grant we persisted at pick time); anything it refuses — a provider that
+            // is not the device's own, a file no scanner has indexed — falls through to the uri we
+            // already had, which is no worse than before.
+            val target = runCatching { MediaStore.getMediaUri(this, uri) }.getOrDefault(uri)
+            val request = MediaStore.createDeleteRequest(contentResolver, listOf(target))
             systemDelete.launch(IntentSenderRequest.Builder(request.intentSender).build())
         }.isSuccess
         if (!asked) toast(R.string.dlg_delete_original_failed)

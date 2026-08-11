@@ -27,7 +27,11 @@ private enum class Step { Pick, Options, Jobs, About }
  * express a straight line.
  */
 @Composable
-fun NaqiApp(modifier: Modifier = Modifier) {
+fun NaqiApp(
+    /** Hands a source back to the activity's confirm-then-delete; the Saved card's only use for it. */
+    onDeleteOriginal: (Uri, String?) -> Unit = { _, _ -> },
+    modifier: Modifier = Modifier,
+) {
     // rememberSaveable, not remember: a filter job runs for minutes, so rotation and process death
     // are both likely mid-job. Plain remember would drop the user back on Pick with no route to the
     // running job — and the only way forward there (Start) REPLACEs the very job they were watching.
@@ -85,6 +89,7 @@ fun NaqiApp(modifier: Modifier = Modifier) {
         Step.Jobs -> JobsScreen(
             onNewJob = { step = Step.Pick },
             onResume = pickedUri?.let { uri -> { JobController.start(context, ops, uri.toString()) } },
+            onDeleteOriginal = onDeleteOriginal,
             modifier = modifier,
         )
     }

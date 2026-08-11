@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
@@ -44,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.ui.NaqiBottomAction
@@ -74,6 +76,8 @@ fun JobsScreen(
      * resume with — after process death the saved state can be gone even though the segments are not.
      */
     onResume: (() -> Unit)? = null,
+    /** Ask to delete the source, via the same confirm dialog the notification action opens. */
+    onDeleteOriginal: (Uri, String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -86,6 +90,8 @@ fun JobsScreen(
     val failed = info?.state == WorkInfo.State.FAILED
     val outputName = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_NAME)
     val outputUri = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_URI)
+    // Absent for a download: the quarantine is Naqi's own temp, already gone, and never the user's file.
+    val sourceUri = info?.outputData?.getString(FilterWorker.KEY_SOURCE_URI)?.takeIf { it.isNotEmpty() }
     // A @StringRes id, so a failure re-localizes if the language changes after the job failed; 0 = absent.
     val outputMessageId = info?.outputData?.getInt(FilterWorker.KEY_OUTPUT_MESSAGE, 0) ?: 0
     val resumable = info?.outputData?.getBoolean(FilterWorker.KEY_RESUMABLE, false) ?: false
@@ -140,7 +146,7 @@ fun JobsScreen(
 
             when {
                 running -> JobProgressCard(stageText, progress, etaMs) { JobController.cancel(context) }
-                succeeded -> SavedCard(outputName, savedUri, context)
+                succeeded -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context)
                 failed -> NaqiCard {
                     Text(
                         stringResource(if (outputMessageId != 0) outputMessageId else R.string.err_generic),
@@ -240,7 +246,13 @@ private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel:
 }
 
 @Composable
-private fun SavedCard(name: String?, uri: Uri?, context: Context) {
+private fun SavedCard(
+    name: String?,
+    uri: Uri?,
+    sourceUri: String?,
+    onDeleteOriginal: (Uri, String?) -> Unit,
+    context: Context,
+) {
     val cs = MaterialTheme.colorScheme
     NaqiCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -285,6 +297,17 @@ private fun SavedCard(name: String?, uri: Uri?, context: Context) {
                     modifier = Modifier.weight(1f),
                 ) { Text(stringResource(R.string.action_share)) }
             }
+        }
+        // Offered here as well as on the notification, which is gone the moment it is swiped. Text, not
+        // a third button in that row: it is the one destructive thing on the screen and must not read
+        // as a peer of Open and Share. It only ASKS — the confirm dialog is the same one the
+        // notification action opens, and the deleting happens there.
+        if (sourceUri != null) {
+            TextButton(
+                onClick = { onDeleteOriginal(sourceUri.toUri(), name) },
+                colors = ButtonDefaults.textButtonColors(contentColor = cs.error),
+                modifier = Modifier.align(Alignment.Start),
+            ) { Text(stringResource(R.string.action_delete_original)) }
         }
     }
 }

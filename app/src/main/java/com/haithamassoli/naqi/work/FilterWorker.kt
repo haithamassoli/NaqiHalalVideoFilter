@@ -61,9 +61,12 @@ import kotlin.math.max
  *   [Edl]. Pass 2 (50..100) renders with [RenderPipeline] into a cache temp. Published directly (no mux).
  *   perf-plan Phase 2 dropped sampling to 5 fps and was REVERTED — see `docs/perf-plan.md`. The speedup
  *   in pass 1 is item 1.3's two overlaps, which do not touch which frames are sampled.
- * - **Music-only**: [AudioPipeline.removeMusic] strips music into a temp .m4a (1..93), then
- *   [Remux.mux] copies the ORIGINAL video track verbatim next to the new audio (93..99).
- * - **Combined**: analyze 0..25, render 25..50, separate 50..93, mux the pass-2 video + new audio.
+ * - **Music-only**: [AudioPipeline.removeMusic] strips music into a temp .m4a (1..97), then
+ *   [Remux.mux] copies the ORIGINAL video track verbatim next to the new audio (97..99).
+ * - **Combined**: analyze 0..8, render 8..17, separate 17..97, mux the pass-2 video + new audio.
+ *
+ * Every band above is a MEASURED share of the wall, not an even split — see [Eta.Bands] for the numbers
+ * and for what the old even split did to the ETA on a feature-length job.
  *
  * The two branches of the combined and segmented shapes run CONCURRENTLY on a device with the memory
  * for it (`plan-v2` §5.8 S1) — see [branches] for why, and for the sequential fallback. The bands above
@@ -388,10 +391,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val audioTemp = File(workDir, "audio.m4a")
-        // Progress bands: analyze 0..25, render 25..50, separate 50..90, concat 90..99 (combined);
-        // without music removal analyze/render get the room the separator would have used.
-        val renderBase = if (removeMusic) 25 else 40
-        val renderSpan = if (removeMusic) 25 else 50
+        // Progress bands: analyze 0..8, render 8..17, separate 17..97, concat 97..99 (combined);
+        // without music removal analyze/render get the room the separator would have used. See Eta.Bands.
+        val analyzeSpan = if (removeMusic) Eta.Bands.ANALYZE else Eta.Bands.CENSOR_ANALYZE
+        val renderBase = analyzeSpan
+        val renderSpan = if (removeMusic) Eta.Bands.RENDER else Eta.Bands.CENSOR_RENDER
         try {
             // Up front, before the two long passes, because a device with no decoder for this codec cannot
             // do the job at all — the old unsegmented fallback needed the same decoder for Transformer to
@@ -412,19 +416,19 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             }
             // S1: the separator starts at t=0 and the two video passes run alongside it. See [runCombined]
             // for the reasoning and the failure/cancellation semantics — this is the same shape with the
-            // segmented passes and the segmented bands (video 0..50, audio 0..40, concat 90..99).
+            // segmented passes and the segmented bands (video 0..17, audio 0..80, concat 97..99).
             branches(
                 audio = if (!removeMusic) null else { demote ->
                     AudioPipeline.removeMusic(
                         applicationContext, inputUri, keepStems, audioTemp,
-                        onProgress = { p -> reportAudio(p, 40) },
+                        onProgress = { p -> reportAudio(p, Eta.Bands.SEPARATE) },
                         isCancelled = { isStopped },
                         jobDir = workDir,
                         demoteWhile = demote,
                     )
                 },
             ) {
-                val edl = analyzeSegments(inputUri, plan, durationMs, 0, renderBase)
+                val edl = analyzeSegments(inputUri, plan, durationMs, 0, analyzeSpan)
                 renderSegments(inputUri, plan, edl, meta, renderBase, renderSpan)
             }
 
@@ -452,7 +456,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                     parts = plan.map { ConcatPart(Checkpoint.segmentFile(workDir, it.index), it.startMs) },
                     audio = audio,
                     out = MuxOut.ToFd(fd),
-                ) { p -> reportBand(joining, p, 90, 9) } // 0..100 -> 90..99
+                ) { p -> reportBand(joining, p, Eta.Bands.MUX_BASE, Eta.Bands.MUX) } // 0..100 -> 97..99
             }
             JobStore.delete(applicationContext, jobKey) // succeeded: nothing left to resume
             return succeed(displayName, outputUri, inputUri)
@@ -787,7 +791,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         }
     }
 
-    // ---- Music-only: audio 1..93, mux 93..99, video passthrough from the original Uri ----
+    // ---- Music-only: audio 1..97, mux 97..99, video passthrough from the original Uri ----
     private suspend fun runMusicOnly(inputUri: Uri, durationMs: Long): Result {
         setForeground(foregroundInfo(stage(R.string.stage_separating), 1))
 
@@ -800,7 +804,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             stats.stage("separate")
             AudioPipeline.removeMusic(
                 applicationContext, inputUri, keepStems, audioTemp,
-                onProgress = { p -> reportBand(sep, p, 1, 92) },   // 0..100 -> 1..93
+                onProgress = { p -> reportBand(sep, p, 1, Eta.Bands.MUSIC_SEPARATE) },   // 0..100 -> 1..97
                 isCancelled = { isStopped },
                 jobDir = if (resumable) workDir else null,
             )
@@ -810,7 +814,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             val displayName = outputName(inputUri)
             val outputUri = Publish.muxedVideo(applicationContext, displayName) { fd ->
                 Remux.mux(applicationContext, TrackSource.FromUri(inputUri), audioTemp, MuxOut.ToFd(fd),
-                    onProgress = { p -> reportBand(mux, p, 93, 6) })   // 0..100 -> 93..99
+                    onProgress = { p -> reportBand(mux, p, Eta.Bands.MUX_BASE, Eta.Bands.MUX) })
             }
             JobStore.delete(applicationContext, jobKey)
             return succeed(displayName, outputUri, inputUri)
@@ -828,7 +832,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         }
     }
 
-    // ---- Combined: analyze 0..25, render 25..50, separate 50..93, mux 93..99 ----
+    // ---- Combined: analyze 0..8, render 8..17, separate 17..97, mux 97..99 (see Eta.Bands) ----
     private suspend fun runCombined(inputUri: Uri, meta: VideoMeta): Result {
         setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
@@ -840,18 +844,21 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 audio = { demote ->
                     AudioPipeline.removeMusic(
                         applicationContext, inputUri, keepStems, audioTemp,
-                        onProgress = { p -> reportAudio(p, 43) },
+                        onProgress = { p -> reportAudio(p, Eta.Bands.SEPARATE) },
                         isCancelled = { isStopped },
                         demoteWhile = demote,
                     )
                 },
             ) {
-                val edl = analyze(inputUri, faceTracker, meta, progressBase = 0, progressSpan = 25)
+                val edl = analyze(inputUri, faceTracker, meta, progressBase = 0, progressSpan = Eta.Bands.ANALYZE)
                 // S2 (`plan-v2` §5.9): render WITHOUT audio. Transformer used to write the source audio
                 // into render.mp4 and Remux.mux below reads only the video track back out of it — a wasted
                 // transmux for an AAC source, and for Opus/AC-3 (which media3 cannot transmux) a full
                 // decode + AAC encode that is thrown away, measured 12.9 s per 193 s track.
-                render(inputUri, renderTemp, edl, meta, removeAudio = true, progressBase = 25, progressSpan = 25)
+                render(
+                    inputUri, renderTemp, edl, meta, removeAudio = true,
+                    progressBase = Eta.Bands.ANALYZE, progressSpan = Eta.Bands.RENDER,
+                )
             }
 
             val mux = stage(R.string.stage_muxing)
@@ -859,7 +866,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             val displayName = outputName(inputUri)
             val outputUri = Publish.muxedVideo(applicationContext, displayName) { fd ->
                 Remux.mux(applicationContext, TrackSource.FromFile(renderTemp), audioTemp, MuxOut.ToFd(fd),
-                    onProgress = { p -> reportBand(mux, p, 93, 6) })   // 0..100 -> 93..99
+                    onProgress = { p -> reportBand(mux, p, Eta.Bands.MUX_BASE, Eta.Bands.MUX) })
             }
             return succeed(displayName, outputUri, inputUri)
         } catch (c: CancellationException) {
@@ -947,8 +954,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
      * S1's progress split. Under the concurrent schedule both branches post from different threads, so
      * neither may post an absolute overall percent — one would stomp the other and the bar would jump
      * backwards. Each owns a SHARE instead and what goes out is their sum, which is monotonic because
-     * both shares are. The shares are the bands that were already documented: video 0..50 (analyze
-     * 0..25, render 25..50), audio the remainder of its shape's band.
+     * both shares are. The shares are the bands that were already documented: video 0..17 (analyze
+     * 0..8, render 8..17), audio the remainder of its shape's band.
      *
      * Under the sequential schedule this is arithmetically identical to the old absolute posts — the
      * audio branch starts with `videoPct` already at 50 — so both shapes report the same numbers either
@@ -1278,7 +1285,15 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             applicationContext, displayName, outputUri.toString(),
             inputUri.toString().takeUnless { quarantined }, mime,
         )
-        return Result.success(workDataOf(KEY_OUTPUT_NAME to displayName, KEY_OUTPUT_URI to outputUri.toString()))
+        return Result.success(
+            workDataOf(
+                KEY_OUTPUT_NAME to displayName,
+                KEY_OUTPUT_URI to outputUri.toString(),
+                // The Saved card offers the same delete the notification does, so it needs the same
+                // target — null for a quarantine, which is not the user's file to be asked about.
+                KEY_SOURCE_URI to inputUri.toString().takeUnless { quarantined },
+            ),
+        )
     }
 
     /**
@@ -1357,6 +1372,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         const val KEY_OUTPUT_NAME = "output_name"
         const val KEY_OUTPUT_URI = "output_uri"
         const val KEY_OUTPUT_MESSAGE = "output_message"
+
+        /** The filtered file's source, echoed back so the Saved card can offer to delete it; null for a quarantine. */
+        const val KEY_SOURCE_URI = "source_uri"
 
         /**
          * Set on a failure that left completed segments on disk, so the UI can offer Resume. Re-running the

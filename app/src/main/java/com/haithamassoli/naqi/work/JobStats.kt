@@ -47,9 +47,10 @@ class JobStats(private val context: Context) {
      * Remaining wall clock from this device's own observed rate, or 0 while it is too early to say.
      *
      * ponytail: straight-line extrapolation over overall percent, which assumes the progress bands are
-     * proportional to their real cost. They roughly are (they were sized off the M2/M3 measurements),
-     * so the error is a wobble at each stage boundary that corrects itself within seconds. Per-stage
-     * rates would be exact — add them when a soak shows the wobble actually misleads anyone.
+     * proportional to their real cost. Since the reweight they are — [Eta.Bands] carries the measured
+     * shares — so the error is a wobble at each stage boundary rather than the 2× over-promise the even
+     * split used to hand a feature-length job. Per-stage rates would be exact; add them when a soak
+     * shows the wobble actually misleads anyone.
      */
     fun etaMs(pct: Int): Long =
         if (pct < MIN_PCT_FOR_ETA) 0L else elapsedMs() * (100 - pct) / pct

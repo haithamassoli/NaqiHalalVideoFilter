@@ -62,6 +62,38 @@ class EtaTest {
         assertEquals(0L, Eta.estimateMs(HOUR, FilterOps())) // no op selected — the UI forbids it
     }
 
+    /**
+     * Every shape's bands have to reach [Eta.Bands.MUX_BASE] exactly. A gap leaves the bar frozen while a
+     * stage runs; an overlap makes the concurrent schedule's `videoPct + audioPct` sum overshoot 99 and
+     * the bar hit "done" before the job is.
+     */
+    @Test
+    fun everyShapesBandsReachTheMuxBase() {
+        with(Eta.Bands) {
+            assertEquals(MUX_BASE, ANALYZE + RENDER + SEPARATE)   // combined, and segmented with music
+            assertEquals(MUX_BASE, CENSOR_ANALYZE + CENSOR_RENDER) // segmented censor-only
+            assertEquals(MUX_BASE, 1 + MUSIC_SEPARATE)             // music-only, which starts at 1
+            assertEquals(99, MUX_BASE + MUX)                       // 100 is reserved for "published"
+        }
+    }
+
+    /**
+     * The band that motivated the reweight. `perf-plan-v5.md` §8 measures the separator at **82.7 %** of a
+     * combined job's wall against 17.3 % for analyze+render; the bands used to give those two 50 points
+     * against the separator's 43, so [JobStats.etaMs] halved its estimate the moment htdemucs started
+     * (`long-film-plan.md:56`). Anything under three times the video passes is that even split creeping
+     * back in.
+     */
+    @Test
+    fun theSeparatorOwnsMostOfTheCombinedBar() {
+        with(Eta.Bands) {
+            assertTrue(
+                "separator has $SEPARATE points against ${ANALYZE + RENDER} for the video passes",
+                SEPARATE > 3 * (ANALYZE + RENDER),
+            )
+        }
+    }
+
     private companion object {
         const val FIVE_MIN = 5 * 60_000L
         const val HOUR = 60 * 60_000L
