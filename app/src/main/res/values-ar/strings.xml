@@ -262,23 +262,6 @@
     <string name="queue_clear_finished">مسح المكتملة</string>
 
     <!-- ============================================================
-         App update card (UpdateCard, on the pick screen).
-         ============================================================ -->
-    <!-- BRAND: "نقي" then the Latin version number, wrapped in RTL marks so it reads correctly. -->
-    <string name="update_available">نقي ‏%1$s‏ متاح</string>
-    <string name="update_sub">‏%1$s‏ · لديك ‏%2$s</string>
-    <string name="update_action">تحديث</string>
-    <string name="update_downloading">جارٍ تنزيل نقي ‏%1$s</string>
-    <string name="update_bytes">‏%1$s‏ من ‏%2$s</string>
-    <string name="update_ready">نقي ‏%1$s‏ جاهز للتثبيت</string>
-    <string name="update_ready_sub">ستبقى مقاطعك وإعداداتك كما هي.</string>
-    <string name="update_install">تثبيت</string>
-    <string name="update_failed">تعذّر التنزيل</string>
-    <string name="update_failed_sub">تحقّق من اتصالك ثم أعد المحاولة.</string>
-    <string name="update_retry">إعادة المحاولة</string>
-    <string name="update_dismiss">تجاهل</string>
-
-    <!-- ============================================================
          About / open-source licences (M4). AboutScreen.
          ============================================================ -->
     <string name="about_title">عن نقي</string>
@@ -297,6 +280,9 @@
     <string name="about_updating">جارٍ التحديث…</string>
     <string name="about_update_ok">أداة التنزيل محدّثة.</string>
     <string name="about_update_failed">تعذّر التحديث. تحقّق من اتصالك ثم أعد المحاولة.</string>
+    <!-- BRAND/URL: the repository address stays Latin in every locale. -->
+    <string name="about_repo_title">github.com/haithamassoli/NaqiHalalVideoFilter</string>
+    <string name="about_repo_desc">نقي مفتوح المصدر. اطّلع على الكود، أبلغ عن مشكلة، أو ابنِ التطبيق بنفسك.</string>
     <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
     <string name="about_notices_title">إشعارات المصادر المفتوحة</string>
     <string name="about_notice_missing">إشعارات المصادر المفتوحة غير متوفّرة في هذه النسخة.</string>

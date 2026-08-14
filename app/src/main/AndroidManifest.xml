@@ -10,11 +10,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Runtime permission on API 33+; still requested at runtime before starting a job. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Naqi is distributed as a GitHub Releases APK, not through Play, so it updates itself
-         ([AppUpdate]): DownloadManager fetches the new APK and this lets us open the system
-         installer on it. It does not grant a silent install — the user still confirms, and on first
-         use Android sends them to "allow installs from this source". -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- No storage permission: minSdk 29 means every install uses scoped MediaStore, and an app's own
          contributions to Movies/Naqi need no permission to write or read back. -->
 

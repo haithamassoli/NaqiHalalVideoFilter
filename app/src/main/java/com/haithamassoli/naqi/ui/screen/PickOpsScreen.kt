@@ -60,7 +60,6 @@ import com.haithamassoli.naqi.ui.NaqiTopBar
 import com.haithamassoli.naqi.ui.NoteLine
 import com.haithamassoli.naqi.ui.SectionHeader
 import com.haithamassoli.naqi.ui.ToggleTile
-import com.haithamassoli.naqi.ui.UpdateCard
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
 
 /**
@@ -136,10 +135,6 @@ fun PickOpsScreen(
         ) {
             TrustSeal()
             Spacer(Modifier.height(NaqiTokens.space5))
-
-            // Renders nothing unless there is an update to offer, so on almost every launch this
-            // costs the screen no room at all.
-            UpdateCard(Modifier.padding(bottom = NaqiTokens.space5))
 
             PickVideoCard(picked = pickedUri != null, fileName = pickedName) {
                 picker.launch(arrayOf("video/*", "audio/*"))

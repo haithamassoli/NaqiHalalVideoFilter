@@ -48,9 +48,8 @@ there are no analytics SDKs, and no account is required.
 Grab the APK from [Releases](https://github.com/haithamassoli/NaqiHalalVideoFilter/releases).
 
 **The APK here is the full build.** Download-by-link and share-into-Naqi ship only in this one. A
-Play Store build cannot carry them: yt-dlp fetches and updates executable code at runtime, and the
-in-app updater needs `REQUEST_INSTALL_PACKAGES` — Play's Device and Network Abuse policy allows
-neither. The filtering itself is the same either way.
+Play Store build cannot carry them: yt-dlp fetches and updates executable code at runtime, which
+Play's Device and Network Abuse policy does not allow. The filtering itself is the same either way.
 
 **Requirements:** Android 10 (API 29) or newer, **arm64-v8a** only. Free space of roughly
 2× the video size. The APK is large because the ONNX models ship inside it.
