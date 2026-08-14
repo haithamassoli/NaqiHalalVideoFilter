@@ -14,11 +14,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SegmentedButton
@@ -28,11 +29,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,9 +50,7 @@ import com.haithamassoli.naqi.ui.NaqiIcons
 import com.haithamassoli.naqi.ui.NaqiRowDivider
 import com.haithamassoli.naqi.ui.SectionHeader
 import com.haithamassoli.naqi.ui.ToggleTile
-import com.haithamassoli.naqi.ui.durationText
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
-import com.haithamassoli.naqi.work.Eta
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.Preflight
 import com.haithamassoli.naqi.work.Queue
@@ -71,15 +69,14 @@ sealed interface Shared {
 /**
  * The one sheet both share flows land in (PRD flows A and B).
  *
- * It opens **immediately** and fills in afterwards: `getInfo` is a network round-trip through a forked
- * yt-dlp process and can take seconds, and a share that shows nothing until it returns reads as a
- * broken app. So the sheet appears with a spinner, then a title, or an inline error with Retry.
+ * It opens immediately and leaves metadata discovery to the queued download, matching Seal's quick
+ * path. A network round-trip before showing the controls would make sharing feel like an app launch.
  *
  * The two flows differ in three places and are otherwise the same screen: a file has no Quality (there
  * is nothing to choose — the file exists), its primary button says Filter, and that button is disabled
  * when both filters are off, because filtering nothing is a no-op the user should not be able to queue.
  *
- * Quality is a segmented control rather than three stacked rows, and the filters are switches in one
+ * Quality is a scrollable segmented control, and the filters are switches in one
  * card: the whole sheet is a screenful shorter, which matters more here than anywhere — this is the
  * surface a user meets mid-share, on top of another app.
  */
@@ -93,34 +90,14 @@ fun ShareSheet(
     val context = LocalContext.current
     val isLink = shared is Shared.Link
 
-    var ops by remember { mutableStateOf(Prefs.ops(context)) }
-    var quality by remember { mutableStateOf(Prefs.quality(context)) }
+    var ops by rememberSaveable { mutableStateOf(Prefs.ops(context)) }
+    var quality by rememberSaveable { mutableStateOf(Prefs.quality(context)) }
     // What the faces toggle turns back ON to. The sheet has no Who control by design
     // (plan-censor-who §2.3) — it re-asks nothing, but it must not silently ANSWER either, so off-then-on
     // restores the last saved pick rather than hard-coding Everyone and persisting that downgrade below.
     val lastWho = remember { Prefs.lastWho(context) }
 
-    // Link metadata. `loading` starts true only for a link — a local file has nothing to fetch.
-    var loading by remember { mutableStateOf(isLink) }
-    var errorRes by remember { mutableIntStateOf(0) }
-    var title by remember { mutableStateOf((shared as? Shared.LocalFile)?.name) }
-    var durationMs by remember { mutableStateOf(0L) }
-    var sizeBytes by remember { mutableStateOf(0L) }
-    var attempt by remember { mutableIntStateOf(0) } // bumped by Retry to re-run the effect
-
-    LaunchedEffect(shared, attempt) {
-        if (shared !is Shared.Link) return@LaunchedEffect
-        loading = true
-        errorRes = 0
-        runCatching { Downloader.getInfo(context, shared.url) }
-            .onSuccess { info ->
-                title = info.title?.takeIf { it.isNotBlank() }
-                durationMs = info.duration.toLong() * 1000L
-                sizeBytes = info.fileSizeApproximate.takeIf { it > 0L } ?: info.fileSize
-            }
-            .onFailure { errorRes = R.string.share_info_failed }
-        loading = false
-    }
+    val title = (shared as? Shared.LocalFile)?.name
 
     // Audio has no picture to blur, so the option is disabled rather than obeyed-and-ignored. Disabled
     // rather than hidden: switching quality must not make the row under the user's finger disappear.
@@ -167,7 +144,7 @@ fun ShareSheet(
     // Space is checked here rather than only in the worker so the refusal arrives before the item is
     // queued — "it failed four items later" is not a useful thing to tell someone about disk space.
     val spaceError = if (isLink) {
-        Preflight.checkSpaceForDownload(context, sizeBytes, effectiveOps) ?: 0
+        Preflight.checkSpaceForDownload(context, 0L, effectiveOps) ?: 0
     } else {
         0
     }
@@ -183,41 +160,20 @@ fun ShareSheet(
                 .padding(horizontal = NaqiTokens.gutter)
                 .padding(bottom = NaqiTokens.space6),
         ) {
-            // ---- Header: title + duration · domain ----
-            when {
-                loading -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(NaqiTokens.space3))
+            // ---- Header: title + domain ----
+            Column {
+                Text(
+                    title ?: stringResource(R.string.share_untitled),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                subtitle(shared)?.let {
                     Text(
-                        stringResource(R.string.share_loading),
-                        style = MaterialTheme.typography.bodyMedium,
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-
-                errorRes != 0 -> Column {
-                    Text(
-                        stringResource(errorRes),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    TextButton(onClick = { attempt++ }) { Text(stringResource(R.string.action_retry)) }
-                }
-
-                else -> Column {
-                    Text(
-                        title ?: stringResource(R.string.share_untitled),
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    subtitle(shared, durationMs)?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
 
@@ -226,13 +182,18 @@ fun ShareSheet(
             // ---- Quality (links only) — one row instead of three ----
             if (isLink) {
                 SectionHeader(stringResource(R.string.share_eyebrow_quality))
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                SingleChoiceSegmentedButtonRow(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                ) {
                     val qualities = Downloader.Quality.entries
                     qualities.forEachIndexed { index, q ->
                         SegmentedButton(
                             selected = quality == q,
                             onClick = { quality = q },
                             shape = SegmentedButtonDefaults.itemShape(index = index, count = qualities.size),
+                            modifier = Modifier.widthIn(min = 76.dp),
                         ) { Text(stringResource(qualityLabel(q)), maxLines = 1) }
                     }
                 }
@@ -259,15 +220,6 @@ fun ShareSheet(
             }
 
             // ---- Warnings ----
-            val etaMs = Eta.estimateMs(durationMs, effectiveOps)
-            if (etaMs > Eta.CONFIRM_THRESHOLD_MS) {
-                Spacer(Modifier.height(NaqiTokens.space3))
-                Text(
-                    stringResource(R.string.dlg_long_job_body, durationText(etaMs)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
             if (spaceError != 0) {
                 Spacer(Modifier.height(NaqiTokens.space3))
                 Text(
@@ -286,8 +238,7 @@ fun ShareSheet(
                     onClick = ::onPrimary,
                     // A local file with no filters selected has nothing to do — the file already exists.
                     // A link with no filters is still a download, so it stays enabled.
-                    enabled = !loading && errorRes == 0 && spaceError == 0 &&
-                        (isLink || effectiveOps.any),
+                    enabled = spaceError == 0 && (isLink || effectiveOps.any),
                     shape = RoundedCornerShape(NaqiTokens.radiusButton),
                     modifier = Modifier
                         .weight(1f)
@@ -300,17 +251,17 @@ fun ShareSheet(
     }
 }
 
-/** `12:34 · youtube.com` for a link; nothing for a local file, whose name is already the title. */
+/** `youtube.com` for a link; nothing for a local file, whose name is already the title. */
 @Composable
-private fun subtitle(shared: Shared, durationMs: Long): String? {
+private fun subtitle(shared: Shared): String? {
     if (shared !is Shared.Link) return null
-    val host = runCatching { shared.url.toUri().host?.removePrefix("www.") }.getOrNull()
-    val duration = durationMs.takeIf { it > 0 }?.let { durationText(it) }
-    return listOfNotNull(duration, host).takeIf { it.isNotEmpty() }?.joinToString(" · ")
+    return runCatching { shared.url.toUri().host?.removePrefix("www.") }.getOrNull()
 }
 
 private fun qualityLabel(q: Downloader.Quality) = when (q) {
     Downloader.Quality.BEST -> R.string.share_quality_best
+    Downloader.Quality.P1080 -> R.string.share_quality_1080
     Downloader.Quality.P720 -> R.string.share_quality_720
+    Downloader.Quality.P480 -> R.string.share_quality_480
     Downloader.Quality.AUDIO -> R.string.share_quality_audio
 }

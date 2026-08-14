@@ -50,7 +50,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
         // Refuse before a single byte is fetched when the size is known. The sheet checks this too, so
         // the user gets the refusal before the item is even queued; this is the half that still holds
         // when the queue is drained hours later on a disk that has filled in the meantime.
-        // Size 0 = the extractor wouldn't say, which is common — then onSpaceCheck below is the net.
+        // Size 0 = unknown, so this still enforces the fixed 2 GiB floor; onSpaceCheck below is the net.
         val knownBytes = inputData.getLong(KEY_SIZE_BYTES, 0L)
         Preflight.checkSpaceForDownload(applicationContext, knownBytes, ops)?.let {
             Log.w(TAG, "refusing download: $knownBytes bytes will not fit")
@@ -82,6 +82,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
             Log.i(TAG, "downloaded ${file.name} (${file.length()} bytes) for $url")
 
             val fileUri = Uri.fromFile(file)
+            val downloadedTitle = file.nameWithoutExtension
             if (!ops.any) {
                 // Nothing to filter: publish the original as-is and empty the quarantine. The only path
                 // where a downloaded file reaches the gallery without passing through FilterWorker.
@@ -93,7 +94,13 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
                     Publish.video(applicationContext, file, name) { isStopped }
                 }
                 Downloader.discard(applicationContext, fileUri)
-                queued { it.copy(state = Queue.State.DONE, outputUri = outputUri.toString()) }
+                queued {
+                    it.copy(
+                        title = it.title ?: downloadedTitle,
+                        state = Queue.State.DONE,
+                        outputUri = outputUri.toString(),
+                    )
+                }
                 JobNotifications.done(
                     applicationContext, name, outputUri.toString(), null,
                     if (audio) Publish.MIME_M4A else Publish.MIME_MP4,
@@ -108,7 +115,13 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
 
             // Cross-name append: the filter chain is a different unique work name, so this never races
             // with our own chain and the queue keeps draining while this job's filter waits its turn.
-            queued { it.copy(state = Queue.State.PENDING_FILTER, sourceUri = fileUri.toString()) }
+            queued {
+                it.copy(
+                    title = it.title ?: downloadedTitle,
+                    state = Queue.State.PENDING_FILTER,
+                    sourceUri = fileUri.toString(),
+                )
+            }
             JobController.start(
                 applicationContext, ops, fileUri.toString(),
                 policy = ExistingWorkPolicy.APPEND_OR_REPLACE,

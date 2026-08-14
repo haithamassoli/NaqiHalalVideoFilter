@@ -200,7 +200,7 @@ private const val REPO_URL = "https://github.com/haithamassoli/NaqiHalalVideoFil
 private const val DOWNLOADER_VISIBLE_FROM = 1_787_875_200_000L
 
 /**
- * yt-dlp's installed version and the button that replaces it with the current stable release.
+ * yt-dlp's installed version and the button that replaces it with the current nightly release.
  *
  * Its own composable so that the state and the version read cost nothing while the section is
  * hidden — see [DOWNLOADER_VISIBLE_FROM].

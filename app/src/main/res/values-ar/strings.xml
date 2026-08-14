@@ -237,13 +237,13 @@
     <!-- ============================================================
          Share sheet (M4)
          ============================================================ -->
-    <string name="share_loading">جارٍ قراءة تفاصيل الفيديو…</string>
-    <string name="share_info_failed">تعذّرت قراءة هذا الفيديو. قد يكون خاصًا أو محجوبًا في منطقتك أو الموقع غير مدعوم.</string>
     <string name="share_untitled">فيديو مُشارَك</string>
     <string name="share_eyebrow_quality">الجودة</string>
     <string name="share_eyebrow_filters">الفلاتر</string>
     <string name="share_quality_best">الأفضل</string>
+    <string name="share_quality_1080">1080p</string>
     <string name="share_quality_720">720p</string>
+    <string name="share_quality_480">480p</string>
     <string name="share_quality_audio">الصوت فقط</string>
     <string name="action_download">تنزيل</string>
     <string name="action_filter">فلترة</string>

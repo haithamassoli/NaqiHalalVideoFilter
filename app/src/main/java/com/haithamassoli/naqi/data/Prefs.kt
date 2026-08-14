@@ -24,7 +24,8 @@ object Prefs {
     /** Read-only legacy: what [KEY_CENSOR_WHO] replaced. Still read so an upgrade keeps the last pick. */
     private const val KEY_CENSOR_WOMEN = "censor_women"
     private const val KEY_QUALITY = "quality"
-    private const val KEY_LAST_UPDATE_CHECK = "last_update_check"
+    // New key forces one NIGHTLY check after upgrading from the former stable channel.
+    private const val KEY_LAST_UPDATE_CHECK = "last_nightly_update_check"
 
     /** Weekly, per the PRD. Long enough not to nag, short enough to beat a broken extractor. */
     private const val UPDATE_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000

@@ -243,16 +243,16 @@
     <!-- ============================================================
          Share sheet (M4) — shown when a link or a video is shared into Naqi
          ============================================================ -->
-    <string name="share_loading">Reading video details…</string>
-    <string name="share_info_failed">Couldn\'t read this video. It may be private, region-locked, or the site isn\'t supported.</string>
     <!-- Fallback heading when the source exposes no title at all. -->
     <string name="share_untitled">Shared video</string>
     <!-- Section labels. -->
     <string name="share_eyebrow_quality">Quality</string>
     <string name="share_eyebrow_filters">Filters</string>
     <string name="share_quality_best">Best</string>
-    <!-- 720p is a format name; it stays Latin in every locale. -->
+    <!-- Resolution labels are format names; they stay Latin in every locale. -->
+    <string name="share_quality_1080">1080p</string>
     <string name="share_quality_720">720p</string>
+    <string name="share_quality_480">480p</string>
     <string name="share_quality_audio">Audio only</string>
     <string name="action_download">Download</string>
     <string name="action_filter">Filter</string>
