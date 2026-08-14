@@ -289,6 +289,7 @@
 
     <!-- Ongoing notification while a download runs; the second line is the video title. -->
     <string name="download_notif_title">جارٍ تنزيل الفيديو</string>
+    <string name="download_failed_notif_title">فشل تنزيل الفيديو</string>
     <string name="done_notif_title">تم حفظ النسخة المُفلترة</string>
     <string name="action_open">فتح</string>
     <string name="action_share">مشاركة</string>

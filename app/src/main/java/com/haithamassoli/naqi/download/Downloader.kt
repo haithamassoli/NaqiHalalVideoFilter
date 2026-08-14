@@ -7,6 +7,7 @@ import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.work.JobStore
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -158,24 +159,34 @@ object Downloader {
             updateIfDueLocked(context)
             ensureInit(context)
             val dir = quarantineDir(context, url)
-            val request = YoutubeDLRequest(url)
+            fun request() = YoutubeDLRequest(url)
                 .addOption("-f", quality.selector)
                 .addOption("-o", File(dir, "%(title).80B.%(ext)s").absolutePath)
                 // A shared link often carries a playlist id; without this a single share downloads 200 videos.
                 .addOption("--no-playlist")
                 // Keep the download timestamp rather than the upload date, so the gallery sorts it as new.
                 .addOption("--no-mtime")
-            if (quality == Quality.AUDIO) {
-                request.addOption("--extract-audio").addOption("--audio-format", "m4a")
-            }
-
-            YoutubeDL.getInstance().execute(request, processId) { progress, etaSeconds, _ ->
-                if (!onSpaceCheck()) {
-                    // The only way to stop a running yt-dlp: kill the process by the id we passed in.
-                    Log.w(TAG, "aborting download: out of space")
-                    YoutubeDL.getInstance().destroyProcessById(processId)
+                .apply {
+                    if (quality == Quality.AUDIO) {
+                        addOption("--extract-audio").addOption("--audio-format", "m4a")
+                    }
                 }
-                onProgress(progress.toInt().coerceIn(0, 100), etaSeconds)
+
+            retryOnceAfterYtDlpFailure(
+                afterFailure = { first ->
+                    Log.w(TAG, "yt-dlp failed; updating and retrying once", first)
+                    runCatching { updateLocked(context) }
+                        .onFailure { Log.w(TAG, "yt-dlp recovery update failed; retrying installed version", it) }
+                },
+            ) {
+                YoutubeDL.getInstance().execute(request(), processId) { progress, etaSeconds, _ ->
+                    if (!onSpaceCheck()) {
+                        // The only way to stop a running yt-dlp: kill the process by the id we passed in.
+                        Log.w(TAG, "aborting download: out of space")
+                        YoutubeDL.getInstance().destroyProcessById(processId)
+                    }
+                    onProgress(progress.toInt().coerceIn(0, 100), etaSeconds)
+                }
             }
 
             // The per-URL directory has one completed file; partials use an in-flight extension.
@@ -227,4 +238,15 @@ object Downloader {
 
     private const val STALE_MS = 7L * 24 * 60 * 60 * 1000
     private val IN_FLIGHT = setOf("part", "ytdl", "temp")
+
+    /** Retry only process failures; cancellation and local file errors must keep their original meaning. */
+    internal fun <T> retryOnceAfterYtDlpFailure(
+        afterFailure: (YoutubeDLException) -> Unit,
+        block: () -> T,
+    ): T = try {
+        block()
+    } catch (first: YoutubeDLException) {
+        afterFailure(first)
+        block()
+    }
 }

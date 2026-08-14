@@ -301,6 +301,7 @@
 
     <!-- Ongoing notification while a download runs; the second line is the video title. -->
     <string name="download_notif_title">Downloading video</string>
+    <string name="download_failed_notif_title">Download failed</string>
     <string name="done_notif_title">Filtered copy saved</string>
     <string name="action_open">Open</string>
     <string name="action_share">Share</string>

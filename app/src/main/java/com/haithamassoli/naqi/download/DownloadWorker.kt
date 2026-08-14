@@ -135,7 +135,9 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
             throw c
         } catch (t: Throwable) {
             Log.e(TAG, "download failed for $url", t)
-            return fail(messageFor(t))
+            val message = messageFor(t)
+            JobNotifications.downloadFailed(applicationContext, applicationContext.getString(message))
+            return fail(message)
         }
     }
 

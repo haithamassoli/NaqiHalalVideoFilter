@@ -28,6 +28,9 @@ internal object JobNotifications {
     /** Downloads run concurrently with filtering, so they need a notification of their own. */
     private const val DOWNLOAD_NOTIF_ID = 1003
 
+    /** Replaces the download's foreground notification after its update + retry both fail. */
+    private const val DOWNLOAD_FAILED_NOTIF_ID = 1004
+
     /** Extras on the MainActivity intent behind the "Delete original" action. */
     const val EXTRA_DELETE_ORIGINAL = "delete_original_uri"
     const val EXTRA_DELETE_NAME = "delete_original_name"
@@ -118,6 +121,18 @@ internal object JobNotifications {
         } else {
             ForegroundInfo(DOWNLOAD_NOTIF_ID, notification)
         }
+    }
+
+    fun downloadFailed(context: Context, message: String) {
+        ensureChannel(context)
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentTitle(context.getString(R.string.download_failed_notif_title))
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setSmallIcon(R.drawable.ic_notification)
+            .setAutoCancel(true)
+            .build()
+        runCatching { NotificationManagerCompat.from(context).notify(DOWNLOAD_FAILED_NOTIF_ID, notification) }
     }
 
     /**

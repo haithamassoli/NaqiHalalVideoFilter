@@ -1,5 +1,6 @@
 package com.haithamassoli.naqi.download
 
+import com.yausername.youtubedl_android.YoutubeDLException
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -20,5 +21,22 @@ class DownloaderTest {
         assertEquals(Downloader.Quality.P1080, Downloader.Quality.of("P1080"))
         assertEquals(Downloader.Quality.P480, Downloader.Quality.of("P480"))
         assertEquals(Downloader.Quality.BEST, Downloader.Quality.of(null))
+    }
+
+    @Test
+    fun ytDlpFailureUpdatesAndRetriesExactlyOnce() {
+        var attempts = 0
+        var updates = 0
+
+        val result = Downloader.retryOnceAfterYtDlpFailure(
+            afterFailure = { updates++ },
+        ) {
+            if (++attempts == 1) throw YoutubeDLException("stale extractor")
+            "downloaded"
+        }
+
+        assertEquals("downloaded", result)
+        assertEquals(2, attempts)
+        assertEquals(1, updates)
     }
 }
