@@ -21,10 +21,10 @@ Two independent operations, run alone or together:
   (`vocals`, or `vocals + other` to retain sound effects at the cost of some music leakage).
   Drums and bass are never kept.
 - **Censor women** — ML Kit finds and tracks faces, NudeNet votes on gender per track, and female
-  tracks are blurred for their whole span. An NSFW classifier gate additionally censors the entire
+  tracks are blurred for their whole span. An optional NSFW classifier gate additionally censors the entire
   frame while it fires, with pre-roll so nothing slips through on the first frame.
 
-Adjustable: blur amount, grayscale toggle, NSFW strictness (0–100), and whether faces of
+Adjustable: blur amount, grayscale toggle, NSFW on/off and strictness (0–100), and whether faces of
 unresolvable gender get blurred.
 
 Also included:

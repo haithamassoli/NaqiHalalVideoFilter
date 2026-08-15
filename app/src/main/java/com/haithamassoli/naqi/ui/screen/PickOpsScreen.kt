@@ -32,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,6 +79,7 @@ fun PickOpsScreen(
     onPicked: (Uri, String?) -> Unit,
     onOpsChange: (FilterOps) -> Unit,
     onContinue: () -> Unit,
+    onJobs: () -> Unit,
     onAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -111,7 +113,10 @@ fun PickOpsScreen(
             NaqiTopBar(
                 title = stringResource(R.string.app_name),
                 titleIcon = ImageVector.vectorResource(R.drawable.ic_naqi_mark),
-                actions = { OverflowMenu(onAbout = onAbout) },
+                actions = {
+                    TextButton(onClick = onJobs) { Text(stringResource(R.string.jobs_title)) }
+                    OverflowMenu(onAbout = onAbout)
+                },
             )
         },
         bottomBar = {

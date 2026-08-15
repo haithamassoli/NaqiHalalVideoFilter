@@ -43,6 +43,8 @@ data class FilterOps(
      * so unlike a browser extension's CSS filter it cannot be undone. Default false.
      */
     val wholeFrameBlur: Boolean = false,
+    /** Whether the NSFW gate may add whole-frame censor spans. Face censoring is independent. */
+    val censorNsfw: Boolean = true,
     val strictness: Int = DEFAULT_STRICTNESS,
     val blurAmount: Int = 60,
     val grayscale: Boolean = false,

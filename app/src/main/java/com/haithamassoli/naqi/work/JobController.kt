@@ -112,7 +112,7 @@ object JobController {
     private fun urlTag(url: String) = "naqi_url_${JobStore.keyOf(url)}"
 
     /** Ties every request belonging to one queue item together, so it can be cancelled as a unit. */
-    private fun itemTag(queueId: String) = "naqi_item_$queueId"
+    private fun itemTag(queueId: String) = "$ITEM_TAG_PREFIX$queueId"
 
     fun observe(context: Context): Flow<List<WorkInfo>> =
         WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(FilterWorker.UNIQUE_WORK)
@@ -120,6 +120,17 @@ object JobController {
     /** Downloads are a separate chain; the UI shows both. */
     fun observeDownloads(context: Context): Flow<List<WorkInfo>> =
         WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(DownloadWorker.UNIQUE_WORK)
+
+    /** The work the UI should describe; unique-work queries also return every older finished run. */
+    internal fun currentWork(items: List<WorkInfo>): WorkInfo? =
+        items.firstOrNull { it.state == WorkInfo.State.RUNNING }
+            ?: items.firstOrNull { it.state == WorkInfo.State.ENQUEUED }
+            ?: items.firstOrNull { !it.state.isFinished }
+            ?: items.lastOrNull()
+
+    internal fun queueIdOf(work: WorkInfo?): String? = work?.tags
+        ?.firstOrNull { it.startsWith(ITEM_TAG_PREFIX) }
+        ?.removePrefix(ITEM_TAG_PREFIX)
 
     fun cancel(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(FilterWorker.UNIQUE_WORK)
@@ -197,4 +208,5 @@ object JobController {
     }
 
     private const val TAG = "JobController"
+    private const val ITEM_TAG_PREFIX = "naqi_item_"
 }

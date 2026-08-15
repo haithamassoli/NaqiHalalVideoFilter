@@ -92,6 +92,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     private val ops = inputData.filterOps()
 
     private val strictness = ops.strictness
+    private val censorNsfw = ops.censorNsfw
     private val grayscale = ops.grayscale
 
     /** Non-zero replaces blur with a flat fill; see [FilterOps.solidColor] for why 0 means blur. */
@@ -152,7 +153,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // and harmless: the orphan re-analyzes from scratch and the 7-day sweep collects the old one.
             FilterOps.whoOrNull(inputData.getString(KEY_CENSOR_WHO))
                 ?: FilterOps.whoFromLegacy(inputData.getBoolean(KEY_CENSOR_WOMEN, false)),
-            inputData.getInt(KEY_STRICTNESS, FilterOps.DEFAULT_STRICTNESS),
+            // Reuse the old strictness slot while the gate is on, preserving existing resume keys.
+            // Off has one stable key because strictness cannot affect output while the gate is disabled.
+            if (inputData.getBoolean(KEY_CENSOR_NSFW, true))
+                inputData.getInt(KEY_STRICTNESS, FilterOps.DEFAULT_STRICTNESS)
+            else "nsfw-off",
             inputData.getInt(KEY_BLUR_AMOUNT, 60),
             inputData.getBoolean(KEY_GRAYSCALE, false),
             // Adding this moved every existing key once, orphaning any resumable directory left by a
@@ -692,6 +697,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             try {
                 FrameSampler.sample(
                     applicationContext, inputUri, fps = 10f, maxDim = 640,
+                    gateEnabled = censorNsfw,
                     startMs = seg.startMs, endMs = seg.endMs,
                 ) { image, gateBytes, uprightW, uprightH, ptsMs ->
                     sampledFrame(tracker, image, gateBytes, uprightW, uprightH, ptsMs, timers, segFirings)
@@ -1142,7 +1148,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         var index = 0
         var lastPct = -1
         val timers = PassTimers()
-        FrameSampler.sample(applicationContext, uri, fps = 10f, maxDim = 640) { image, gateBytes, uprightW, uprightH, ptsMs ->
+        FrameSampler.sample(
+            applicationContext, uri, fps = 10f, maxDim = 640, gateEnabled = censorNsfw,
+        ) { image, gateBytes, uprightW, uprightH, ptsMs ->
             sampledFrame(faceTracker, image, gateBytes, uprightW, uprightH, ptsMs, timers, firings)
             index++
             val pct = (progressBase + (ptsMs.toFloat() / progressDen) * progressSpan)
@@ -1346,6 +1354,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
          */
         const val KEY_CENSOR_WOMEN = "censor_women"
         const val KEY_INPUT_URI = "input_uri"
+        const val KEY_CENSOR_NSFW = "censor_nsfw"
         const val KEY_STRICTNESS = "strictness"
         const val KEY_BLUR_AMOUNT = "blur_amount"
         const val KEY_GRAYSCALE = "grayscale"

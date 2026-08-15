@@ -51,7 +51,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.data.Prefs
@@ -137,9 +136,7 @@ fun OptionsScreen(
     // Naqi runs one job at a time and the unique work policy is KEEP, so starting a second one would
     // silently do nothing. Say so and disable Start instead of accepting a tap that goes nowhere.
     val workInfos by remember { JobController.observe(context) }.collectAsState(initial = emptyList())
-    val jobRunning = workInfos.firstOrNull()?.state.let {
-        it == WorkInfo.State.RUNNING || it == WorkInfo.State.ENQUEUED
-    }
+    val jobRunning = JobController.currentWork(workInfos)?.state?.isFinished == false
 
     fun startJob() {
         JobController.start(context, ops, inputUri.toString())
@@ -220,11 +217,20 @@ fun OptionsScreen(
                         onCheckedChange = { onOpsChange(ops.copy(wholeFrameBlur = it)) },
                     )
                     NaqiRowDivider()
-                    SliderRow(
-                        title = stringResource(R.string.opt_strictness_title),
-                        desc = stringResource(R.string.opt_strictness_desc),
-                        value = ops.strictness,
-                    ) { onOpsChange(ops.copy(strictness = it)) }
+                    ToggleTile(
+                        title = stringResource(R.string.opt_nsfw_title),
+                        desc = stringResource(R.string.opt_nsfw_desc),
+                        checked = ops.censorNsfw,
+                        onCheckedChange = { onOpsChange(ops.copy(censorNsfw = it)) },
+                    )
+                    if (ops.censorNsfw) {
+                        NaqiRowDivider()
+                        SliderRow(
+                            title = stringResource(R.string.opt_strictness_title),
+                            desc = stringResource(R.string.opt_strictness_desc),
+                            value = ops.strictness,
+                        ) { onOpsChange(ops.copy(strictness = it)) }
+                    }
                     NaqiRowDivider()
                     CensorStyleRow(ops.solidColor) { onOpsChange(ops.copy(solidColor = it)) }
                     // Both only style the blur, and a solid fill has no blur to style — showing them

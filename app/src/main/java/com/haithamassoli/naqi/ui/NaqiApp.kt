@@ -28,6 +28,8 @@ private enum class Step { Pick, Options, Jobs, About }
  */
 @Composable
 fun NaqiApp(
+    /** Changes whenever a notification body asks to show the activities screen. */
+    activitiesRequest: Int = 0,
     /** Hands a source back to the activity's confirm-then-delete; the Saved card's only use for it. */
     onDeleteOriginal: (Uri, String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
@@ -35,10 +37,16 @@ fun NaqiApp(
     // rememberSaveable, not remember: a filter job runs for minutes, so rotation and process death
     // are both likely mid-job. Plain remember would drop the user back on Pick with no route to the
     // running job — and the only way forward there (Start) REPLACEs the very job they were watching.
-    var step by rememberSaveable { mutableStateOf(Step.Pick) }
+    var step by rememberSaveable {
+        mutableStateOf(if (activitiesRequest > 0) Step.Jobs else Step.Pick)
+    }
     var pickedUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var pickedName by rememberSaveable { mutableStateOf<String?>(null) }
     var ops by rememberSaveable { mutableStateOf(FilterOps()) }
+
+    LaunchedEffect(activitiesRequest) {
+        if (activitiesRequest > 0) step = Step.Jobs
+    }
 
     // Process death loses even saved state, so re-attach to a live job on a cold start. Downloads are
     // watched too, not just filter jobs: a share that only queued a download would otherwise leave the
@@ -68,6 +76,7 @@ fun NaqiApp(
             onPicked = { uri, name -> pickedUri = uri; pickedName = name },
             onOpsChange = { ops = it },
             onContinue = { step = Step.Options },
+            onJobs = { step = Step.Jobs },
             onAbout = { step = Step.About },
             modifier = modifier,
         )

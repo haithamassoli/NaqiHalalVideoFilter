@@ -37,10 +37,10 @@
     <string name="pick_op_faces_title">Censor faces</string>
     <!-- %1$s = the current Who choice (opt_who_everyone/_women/_men). The toggle on step 1 says *whether*
          faces are censored; this line says *which*, so step 1 can never state something Options contradicts. -->
-    <string name="pick_op_faces_desc">%1$s · and flagged scenes.</string>
+    <string name="pick_op_faces_desc">%1$s · scene censoring is optional.</string>
     <!-- Shown while the toggle is OFF. It describes what turning it on would do; the substituted line
          above asserts what IS happening, which an off row must not do (ToggleTile does not dim `desc`). -->
-    <string name="pick_op_faces_desc_off">Blur faces and flagged scenes.</string>
+    <string name="pick_op_faces_desc_off">Blur faces; scene censoring is optional.</string>
 
     <!-- Overflow menu on the pick screen; content description of the "⋮" button. -->
     <string name="action_more">More</string>
@@ -82,7 +82,7 @@
     <!-- Who is first in the section: it is the largest decision here, and Strictness/Style/Blur only tune
          what it selected. The segment labels are also substituted into pick_op_faces_desc on step 1. -->
     <string name="opt_who_title">Who</string>
-    <string name="opt_who_desc">Which faces get covered. Flagged scenes are censored either way.</string>
+    <string name="opt_who_desc">Which faces get covered. Scene censoring is controlled separately.</string>
     <string name="opt_who_everyone">Everyone</string>
     <string name="opt_who_women">Women</string>
     <string name="opt_who_men">Men</string>
@@ -90,6 +90,8 @@
          the output is a re-encoded file, so it cannot be undone the way a browser blur can. -->
     <string name="opt_whole_frame_title">Cover the whole frame</string>
     <string name="opt_whole_frame_desc">Covers the entire picture while a censored face is on screen, not just the face. Most of the video usually ends up covered.</string>
+    <string name="opt_nsfw_title">Censor flagged scenes</string>
+    <string name="opt_nsfw_desc">Uses the NSFW model to cover the whole frame when a scene is flagged.</string>
     <string name="opt_strictness_title">Strictness</string>
     <string name="opt_strictness_desc">How eagerly whole scenes are censored. Face blurring is never affected.</string>
     <string name="opt_censor_style_title">Censor style</string>
@@ -177,6 +179,7 @@
 
     <!-- Header of the system share sheet. -->
     <string name="jobs_share_chooser_title">Share video</string>
+    <string name="jobs_open_failed">No app can open this file.</string>
 
     <!-- File-size subtitle on a library row. %1$.1f = gigabytes, %1$.0f = megabytes. -->
     <string name="jobs_size_gb">%1$.1f GB</string>
@@ -264,7 +267,9 @@
     <!-- Share queue (M4). -->
     <string name="queue_eyebrow">Queue</string>
     <string name="queue_state_pending_download">Waiting to download</string>
+    <string name="queue_state_waiting_download">Queued behind the current download</string>
     <string name="queue_state_pending_filter">Waiting to filter</string>
+    <string name="queue_state_waiting_filter">Queued behind the current video</string>
     <string name="queue_state_filtering">Filtering</string>
     <string name="queue_state_done">Saved</string>
     <string name="queue_state_failed">Failed</string>

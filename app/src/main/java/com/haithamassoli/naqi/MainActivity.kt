@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -39,6 +40,9 @@ class MainActivity : ComponentActivity() {
     /** Set when the "Delete original" notification action opened us; drives the confirm dialog. */
     private var deleteTarget by mutableStateOf<Pair<Uri, String>?>(null)
 
+    /** Incremented for every notification-body tap so an already-running app handles repeated taps. */
+    private var activitiesRequest by mutableIntStateOf(0)
+
     // API 30+ fallback: the system asks the user itself, the only path that works for media we don't own.
     private val systemDelete =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -50,12 +54,17 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (BuildConfig.DEBUG_HOOKS) maybeAutorun()
         deleteTarget = deleteTargetOf(intent)
+        if (consumeActivitiesRequest(intent)) activitiesRequest++
         // Weekly yt-dlp check (PRD M4.4). Off the main thread, failure-tolerant, and no-op six days out
         // of seven — sites change how they serve video far faster than the app ships.
         lifecycleScope.launch { Downloader.updateIfDue(this@MainActivity) }
         setContent {
             NaqiTheme {
-                NaqiApp(onDeleteOriginal = ::confirmDeleteOriginal, modifier = Modifier.fillMaxSize())
+                NaqiApp(
+                    activitiesRequest = activitiesRequest,
+                    onDeleteOriginal = ::confirmDeleteOriginal,
+                    modifier = Modifier.fillMaxSize(),
+                )
                 deleteTarget?.let { (uri, name) ->
                     ConfirmDeleteDialog(
                         name = name,
@@ -75,6 +84,7 @@ class MainActivity : ComponentActivity() {
         // cancel hook has to be honoured on both paths or `am start --ez autorun_cancel` is a no-op.
         if (BuildConfig.DEBUG_HOOKS) maybeAutorun()
         deleteTargetOf(intent)?.let { deleteTarget = it }
+        if (consumeActivitiesRequest(intent)) activitiesRequest++
     }
 
     /**
@@ -91,6 +101,14 @@ class MainActivity : ComponentActivity() {
         val name = intent.getStringExtra(JobNotifications.EXTRA_DELETE_NAME)
             ?: getString(R.string.dlg_delete_original_fallback_name)
         return uri.toUri() to name
+    }
+
+    private fun consumeActivitiesRequest(intent: Intent): Boolean {
+        if (intent.action != JobNotifications.ACTION_SHOW_ACTIVITIES) return false
+        // Do not replay the notification route on a configuration recreation; the Compose step itself
+        // is already saveable. A later tap delivers a fresh intent and still reaches onNewIntent.
+        setIntent(Intent(intent).setAction(null))
+        return true
     }
 
     /**
@@ -157,6 +175,8 @@ class MainActivity : ComponentActivity() {
             censorWho = censorWho,
             // `--ez whole_frame true` — covers the whole picture while a censored face is on screen.
             wholeFrameBlur = intent.getBooleanExtra("whole_frame", false),
+            // `--ez censor_nsfw false` — keeps face censoring but disables whole-scene NSFW spans.
+            censorNsfw = intent.getBooleanExtra("censor_nsfw", true),
             strictness = intent.getIntExtra("strictness", FilterOps.DEFAULT_STRICTNESS),
             blurAmount = intent.getIntExtra("blur", 60),
             grayscale = intent.getBooleanExtra("grayscale", false),
@@ -168,7 +188,7 @@ class MainActivity : ComponentActivity() {
         // Echo what actually parsed. `everyone` and `women` censor identically until Phase C ships a
         // classifier, so without this an adb run cannot show WHICH value survived the wire — only that
         // something censored. Same reason the E2E hooks exist at all: logcat beats UI scripting here.
-        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur}")
+        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} censorNsfw=${ops.censorNsfw} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur}")
 
         // `--ez ytdlp_update true` forces the yt-dlp self-update from adb.
         if (intent.getBooleanExtra("ytdlp_update", false)) {

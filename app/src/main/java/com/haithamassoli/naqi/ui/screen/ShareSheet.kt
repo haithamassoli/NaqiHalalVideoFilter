@@ -217,6 +217,14 @@ fun ShareSheet(
                     enabled = !audioOnly,
                     onCheckedChange = { ops = ops.copy(censorWho = if (it) lastWho else FilterOps.NONE) },
                 )
+                if (effectiveOps.censorFaces) {
+                    NaqiRowDivider()
+                    ToggleTile(
+                        title = stringResource(R.string.opt_nsfw_title),
+                        checked = ops.censorNsfw,
+                        onCheckedChange = { ops = ops.copy(censorNsfw = it) },
+                    )
+                }
             }
 
             // ---- Warnings ----

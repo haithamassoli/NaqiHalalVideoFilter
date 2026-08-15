@@ -20,6 +20,7 @@ object Prefs {
 
     private const val KEY_REMOVE_MUSIC = "remove_music"
     private const val KEY_CENSOR_WHO = "censor_who"
+    private const val KEY_CENSOR_NSFW = "censor_nsfw"
 
     /** Read-only legacy: what [KEY_CENSOR_WHO] replaced. Still read so an upgrade keeps the last pick. */
     private const val KEY_CENSOR_WOMEN = "censor_women"
@@ -43,6 +44,7 @@ object Prefs {
             censorWho = FilterOps.whoOrNull(getString(KEY_CENSOR_WHO, null))
                 ?: if (contains(KEY_CENSOR_WOMEN)) FilterOps.whoFromLegacy(getBoolean(KEY_CENSOR_WOMEN, true))
                 else FilterOps.DEFAULT_WHO,
+            censorNsfw = getBoolean(KEY_CENSOR_NSFW, true),
         )
     }
 
@@ -67,6 +69,7 @@ object Prefs {
         prefs(context).edit()
             .putBoolean(KEY_REMOVE_MUSIC, ops.removeMusic)
             .putString(KEY_CENSOR_WHO, ops.censorWho)
+            .putBoolean(KEY_CENSOR_NSFW, ops.censorNsfw)
             .putString(KEY_QUALITY, quality.name)
             .apply()
     }

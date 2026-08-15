@@ -35,9 +35,9 @@
     <string name="pick_op_faces_title">حجب الوجوه</string>
     <!-- %1$s = the current Who choice (opt_who_everyone/_women/_men). The "·" sits between two Arabic runs,
          so the bidi algorithm resolves it RTL exactly as it already does in pick_diag_model_line. -->
-    <string name="pick_op_faces_desc">%1$s · والمشاهد المُخالفة.</string>
+    <string name="pick_op_faces_desc">%1$s · وحجب المشاهد خيار مستقل.</string>
     <!-- Shown while the toggle is OFF — see the English file. -->
-    <string name="pick_op_faces_desc_off">تُموّه الوجوه والمشاهد المُخالفة.</string>
+    <string name="pick_op_faces_desc_off">تُموّه الوجوه؛ وحجب المشاهد خيار مستقل.</string>
 
     <!-- Overflow menu on the pick screen; content description of the "⋮" button. -->
     <string name="action_more">المزيد</string>
@@ -71,12 +71,14 @@
     <!-- "مَن يُحجب" and not a bare "مَن": every sibling title in this card is a noun phrase, and the bare
          interrogative reads as a dangling question. Voweled to disambiguate مَن (who) from مِن (from). -->
     <string name="opt_who_title">مَن يُحجب</string>
-    <string name="opt_who_desc">أيّ الوجوه تُحجب. المشاهد المُخالفة تُحجب في كل الأحوال.</string>
+    <string name="opt_who_desc">أيّ الوجوه تُحجب. حجب المشاهد خيار مستقل.</string>
     <string name="opt_who_everyone">الجميع</string>
     <string name="opt_who_women">النساء</string>
     <string name="opt_who_men">الرجال</string>
     <string name="opt_whole_frame_title">حجب الشاشة كاملة</string>
     <string name="opt_whole_frame_desc">يحجب الصورة كاملة طوال ظهور وجه محجوب، لا الوجه وحده. غالبًا ما يُحجب معظم الفيديو بهذه الطريقة.</string>
+    <string name="opt_nsfw_title">حجب المشاهد المخالفة</string>
+    <string name="opt_nsfw_desc">يستخدم نموذج NSFW لحجب الصورة كاملة عندما يُصنَّف المشهد على أنه مخالف.</string>
     <string name="opt_strictness_title">الصرامة</string>
     <string name="opt_strictness_desc">مدى سهولة حجب المشهد كاملًا. لا يتأثّر تمويه الوجوه بهذا الإعداد.</string>
     <string name="opt_censor_style_title">أسلوب الحجب</string>
@@ -173,6 +175,7 @@
 
     <!-- Header of the system share sheet. -->
     <string name="jobs_share_chooser_title">مشاركة الفيديو</string>
+    <string name="jobs_open_failed">لا يوجد تطبيق يمكنه فتح هذا الملف.</string>
 
     <!-- File-size subtitle on a library row. %1$.1f = gigabytes, %1$.0f = megabytes. -->
     <string name="jobs_size_gb">%1$.1f غيغابايت</string>
@@ -254,7 +257,9 @@
     <!-- Share queue (M4). -->
     <string name="queue_eyebrow">القائمة</string>
     <string name="queue_state_pending_download">في انتظار التنزيل</string>
+    <string name="queue_state_waiting_download">ينتظر انتهاء التنزيل الحالي</string>
     <string name="queue_state_pending_filter">في انتظار الفلترة</string>
+    <string name="queue_state_waiting_filter">ينتظر انتهاء الفيديو الحالي</string>
     <string name="queue_state_filtering">جارٍ الفلترة</string>
     <string name="queue_state_done">تم الحفظ</string>
     <string name="queue_state_failed">فشل</string>

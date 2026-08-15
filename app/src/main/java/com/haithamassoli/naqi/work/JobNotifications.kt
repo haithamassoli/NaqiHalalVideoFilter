@@ -1,14 +1,17 @@
 package com.haithamassoli.naqi.work
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.PendingIntent
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.work.ForegroundInfo
 import androidx.work.WorkManager
@@ -69,6 +72,7 @@ internal object JobNotifications {
         .setContentTitle(title)
         .setContentText(text)
         .setSmallIcon(R.drawable.ic_notification)
+        .setContentIntent(showActivities(context))
         .setOngoing(true)
         .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
         .addAction(
@@ -130,9 +134,10 @@ internal object JobNotifications {
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(showActivities(context))
             .setAutoCancel(true)
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(DOWNLOAD_FAILED_NOTIF_ID, notification) }
+        notify(context, DOWNLOAD_FAILED_NOTIF_ID, notification)
     }
 
     /**
@@ -159,6 +164,7 @@ internal object JobNotifications {
             .setContentTitle(context.getString(R.string.done_notif_title))
             .setContentText(displayName)
             .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(showActivities(context))
             .setAutoCancel(true)
 
         // content:// only. Pre-Q publish() returns file://, and handing that to another app throws
@@ -169,7 +175,6 @@ internal object JobNotifications {
             val view = Intent(Intent.ACTION_VIEW)
                 .setDataAndType(output, mime)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            builder.setContentIntent(activity(context, 0, view))
             builder.addAction(0, context.getString(R.string.action_open), activity(context, 0, view))
 
             val share = Intent.createChooser(
@@ -191,10 +196,27 @@ internal object JobNotifications {
             builder.addAction(0, context.getString(R.string.action_delete_original), activity(context, 2, confirm))
         }
 
-        runCatching { NotificationManagerCompat.from(context).notify(DONE_NOTIF_ID, builder.build()) }
+        notify(context, DONE_NOTIF_ID, builder.build())
     }
 
     const val ACTION_CONFIRM_DELETE = "com.haithamassoli.naqi.CONFIRM_DELETE_ORIGINAL"
+    const val ACTION_SHOW_ACTIVITIES = "com.haithamassoli.naqi.SHOW_ACTIVITIES"
+
+    private fun showActivities(context: Context) = activity(
+        context,
+        3,
+        Intent(context, MainActivity::class.java)
+            .setAction(ACTION_SHOW_ACTIVITIES)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+    )
+
+    private fun notify(context: Context, id: Int, notification: android.app.Notification) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) return
+        NotificationManagerCompat.from(context).notify(id, notification)
+    }
 
     // IMMUTABLE is required on API 31+; each action needs its own request code or they collide.
     private fun activity(context: Context, requestCode: Int, intent: Intent) =

@@ -2,6 +2,7 @@ package com.haithamassoli.naqi.ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.NaqiIcons
@@ -67,20 +69,22 @@ internal fun QueueCard(items: List<Queue.Item>) {
     NaqiCard(contentPadding = 0.dp) {
         items.forEachIndexed { index, item ->
             if (index > 0) NaqiRowDivider()
-            QueueRow(item)
+            QueueRow(item, stateLabel(item.state, items))
         }
     }
 }
 
 @Composable
-private fun QueueRow(item: Queue.Item) {
+private fun QueueRow(item: Queue.Item, stateLabel: Int) {
     val context = LocalContext.current
     val cs = MaterialTheme.colorScheme
     val failed = item.state == Queue.State.FAILED
+    val output = item.outputUri?.takeIf { item.state == Queue.State.DONE }?.toUri()
 
     Row(
         Modifier
             .fillMaxWidth()
+            .then(if (output != null) Modifier.clickable { view(context, output) } else Modifier)
             .padding(start = NaqiTokens.space4, end = NaqiTokens.space2, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -98,7 +102,7 @@ private fun QueueRow(item: Queue.Item) {
             // repeat what the red glyph already says.
             val error = item.error?.takeIf { it != 0 }
             Text(
-                stringResource(error ?: stateLabel(item.state)),
+                stringResource(error ?: stateLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (failed) cs.error else cs.onSurfaceVariant,
                 maxLines = 2,
@@ -109,6 +113,10 @@ private fun QueueRow(item: Queue.Item) {
         // Exactly one action per row. A failed item offers the only thing worth doing to it; getting rid
         // of it is "Clear finished" in the header, which handles the whole list at once.
         when {
+            output != null -> TextButton(onClick = { view(context, output) }) {
+                Text(stringResource(R.string.action_open))
+            }
+
             failed -> TextButton(onClick = { JobController.retry(context, item) }) {
                 Text(stringResource(R.string.action_retry))
             }
@@ -165,10 +173,18 @@ private fun StatusGlyph(state: Queue.State) {
     }
 }
 
-private fun stateLabel(state: Queue.State) = when (state) {
-    Queue.State.PENDING_DOWNLOAD -> R.string.queue_state_pending_download
+private fun stateLabel(state: Queue.State, items: List<Queue.Item>) = when (state) {
+    Queue.State.PENDING_DOWNLOAD -> if (items.any { it.state == Queue.State.DOWNLOADING }) {
+        R.string.queue_state_waiting_download
+    } else {
+        R.string.queue_state_pending_download
+    }
     Queue.State.DOWNLOADING -> R.string.stage_downloading
-    Queue.State.PENDING_FILTER -> R.string.queue_state_pending_filter
+    Queue.State.PENDING_FILTER -> if (items.any { it.state == Queue.State.FILTERING }) {
+        R.string.queue_state_waiting_filter
+    } else {
+        R.string.queue_state_pending_filter
+    }
     Queue.State.FILTERING -> R.string.queue_state_filtering
     Queue.State.DONE -> R.string.queue_state_done
     Queue.State.FAILED -> R.string.queue_state_failed

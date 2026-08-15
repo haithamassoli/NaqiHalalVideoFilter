@@ -109,6 +109,7 @@ object FrameSampler {
      *   the ARITHMETIC over it ([gateFromGathered]) to the consumer, which is why the callback carries
      *   bytes rather than the filled tensor. 2 = the gate's 5 fps against face detection's 10 (plan-v2
      *   §5.3b would raise it). Not gathering on the other half of the frames is half of what V1 saves.
+     * @param gateEnabled false skips gathering entirely, so a disabled NSFW gate has no model-input cost.
      * @param startMs/[endMs] restrict the pass to `[startMs, endMs)` for a Phase 2 segment; the defaults
      *   cover the whole track and reproduce the M1 pass byte for byte. A window seeks to the preceding
      *   sync sample and discards frames below [startMs], and anchors the sample grid to [startMs] rather
@@ -121,6 +122,7 @@ object FrameSampler {
         fps: Float = 10f,
         maxDim: Int = 640,
         gateEvery: Int = 2,
+        gateEnabled: Boolean = true,
         startMs: Long = 0L,
         endMs: Long = Long.MAX_VALUE,
         onFrame: suspend (image: InputImage, gateBytes: ByteBuffer?, uprightW: Int, uprightH: Int, ptsMs: Long) -> Unit,
@@ -251,7 +253,7 @@ object FrameSampler {
                             try {
                                 toFrame(
                                     img, rotation, maxDim, ptsUs / 1000, // µs -> ms
-                                    wantGate = emitted % gateStride == 0,
+                                    wantGate = gateEnabled && emitted % gateStride == 0,
                                     nv21Reuse = nv21Ring[slot], gateReuse = gateRing[slot],
                                 )
                             } finally {
