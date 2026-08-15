@@ -285,8 +285,8 @@
     <string name="about_updating">جارٍ التحديث…</string>
     <string name="about_update_ok">أداة التنزيل محدّثة.</string>
     <string name="about_update_failed">تعذّر التحديث. تحقّق من اتصالك ثم أعد المحاولة.</string>
-    <!-- BRAND/URL: the repository address stays Latin in every locale. -->
-    <string name="about_repo_title">github.com/haithamassoli/NaqiHalalVideoFilter</string>
+    <!-- BRAND: the service name stays Latin in every locale. -->
+    <string name="about_repo_title">Github</string>
     <string name="about_repo_desc">نقي مفتوح المصدر. اطّلع على الكود، أبلغ عن مشكلة، أو ابنِ التطبيق بنفسك.</string>
     <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
     <string name="about_notices_title">إشعارات المصادر المفتوحة</string>

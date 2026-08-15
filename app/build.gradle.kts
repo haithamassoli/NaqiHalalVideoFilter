@@ -15,7 +15,7 @@ android {
         applicationId = "com.haithamassoli.naqi"
         minSdk = 29
         targetSdk = 36
-        versionCode = 18
+        versionCode = 19
         versionName = "1.4.3"
 
         // Base URL for the M3 model downloader's *converted* artifacts (the NSFW gate and htdemucs —

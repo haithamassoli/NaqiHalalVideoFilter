@@ -296,9 +296,8 @@
     <string name="about_updating">Updating…</string>
     <string name="about_update_ok">Downloader is up to date.</string>
     <string name="about_update_failed">Couldn\'t update. Check your connection and try again.</string>
-    <!-- Repo card. The URL is the title: it is the thing being offered, and shortening it would hide
-         which account the code actually comes from. action_open is its trailing label. -->
-    <string name="about_repo_title">github.com/haithamassoli/NaqiHalalVideoFilter</string>
+    <!-- Repo card. action_open is its trailing label. -->
+    <string name="about_repo_title">Github</string>
     <string name="about_repo_desc">Naqi is open source. Read the code, report a problem, or build it yourself.</string>
     <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
     <string name="about_notices_title">Open-source notices</string>
