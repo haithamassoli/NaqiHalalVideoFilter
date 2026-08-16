@@ -251,6 +251,8 @@
     <!-- Section labels. -->
     <string name="share_eyebrow_quality">Quality</string>
     <string name="share_eyebrow_filters">Filters</string>
+    <string name="share_advanced_options">Advanced options</string>
+    <string name="share_hide_advanced_options">Hide advanced options</string>
     <string name="share_quality_best">Best</string>
     <!-- Resolution labels are format names; they stay Latin in every locale. -->
     <string name="share_quality_1080">1080p</string>

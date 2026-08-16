@@ -243,6 +243,8 @@
     <string name="share_untitled">فيديو مُشارَك</string>
     <string name="share_eyebrow_quality">الجودة</string>
     <string name="share_eyebrow_filters">الفلاتر</string>
+    <string name="share_advanced_options">خيارات متقدمة</string>
+    <string name="share_hide_advanced_options">إخفاء الخيارات المتقدمة</string>
     <string name="share_quality_best">الأفضل</string>
     <string name="share_quality_1080">1080p</string>
     <string name="share_quality_720">720p</string>

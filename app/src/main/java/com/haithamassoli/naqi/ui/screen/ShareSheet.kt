@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -31,7 +32,6 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,9 +76,8 @@ sealed interface Shared {
  * is nothing to choose — the file exists), its primary button says Filter, and that button is disabled
  * when both filters are off, because filtering nothing is a no-op the user should not be able to queue.
  *
- * Quality is a scrollable segmented control, and the filters are switches in one
- * card: the whole sheet is a screenful shorter, which matters more here than anywhere — this is the
- * surface a user meets mid-share, on top of another app.
+ * Quality is a scrollable segmented control, and the filters are switches in one card. Detailed
+ * controls stay behind Advanced options so the quick path remains short.
  */
 @Composable
 fun ShareSheet(
@@ -92,10 +91,9 @@ fun ShareSheet(
 
     var ops by rememberSaveable { mutableStateOf(Prefs.ops(context)) }
     var quality by rememberSaveable { mutableStateOf(Prefs.quality(context)) }
-    // What the faces toggle turns back ON to. The sheet has no Who control by design
-    // (plan-censor-who §2.3) — it re-asks nothing, but it must not silently ANSWER either, so off-then-on
-    // restores the last saved pick rather than hard-coding Everyone and persisting that downgrade below.
-    val lastWho = remember { Prefs.lastWho(context) }
+    var showAdvanced by rememberSaveable { mutableStateOf(false) }
+    // What the faces toggle turns back ON to. Turning a filter off must not erase its saved Who choice.
+    var lastWho by rememberSaveable { mutableStateOf(Prefs.lastWho(context)) }
 
     val title = (shared as? Shared.LocalFile)?.name
 
@@ -157,6 +155,7 @@ fun ShareSheet(
         Column(
             Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = NaqiTokens.gutter)
                 .padding(bottom = NaqiTokens.space6),
         ) {
@@ -217,13 +216,34 @@ fun ShareSheet(
                     enabled = !audioOnly,
                     onCheckedChange = { ops = ops.copy(censorWho = if (it) lastWho else FilterOps.NONE) },
                 )
-                if (effectiveOps.censorFaces) {
+                if (effectiveOps.censorFaces && !showAdvanced) {
                     NaqiRowDivider()
                     ToggleTile(
                         title = stringResource(R.string.opt_nsfw_title),
                         checked = ops.censorNsfw,
                         onCheckedChange = { ops = ops.copy(censorNsfw = it) },
                     )
+                }
+            }
+
+            if (effectiveOps.any) {
+                TextButton(onClick = { showAdvanced = !showAdvanced }) {
+                    Text(
+                        stringResource(
+                            if (showAdvanced) R.string.share_hide_advanced_options
+                            else R.string.share_advanced_options,
+                        ),
+                    )
+                }
+            }
+
+            if (showAdvanced) {
+                Spacer(Modifier.height(NaqiTokens.space3))
+                FilterOptions(effectiveOps) { updated ->
+                    if (updated.censorFaces) lastWho = updated.censorWho
+                    // Audio-only temporarily disables picture filters; changing an audio option must
+                    // not erase the face choice that should return when video quality is selected.
+                    ops = if (audioOnly) ops.copy(keepStems = updated.keepStems) else updated
                 }
             }
 
