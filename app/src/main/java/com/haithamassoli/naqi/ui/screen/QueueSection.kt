@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +36,7 @@ import com.haithamassoli.naqi.ui.SectionHeader
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.Queue
+import kotlinx.coroutines.launch
 
 /**
  * The share queue, shown above the single-job card on the jobs screen.
@@ -46,8 +48,9 @@ import com.haithamassoli.naqi.work.Queue
  * **One list, one row per item.** It used to be a full bordered card per item — title, state, error and
  * a row of text buttons, ~130dp each — so three shared links filled the screen before the running job
  * was even visible. Now: one card, one 56dp row per item, a status glyph carrying the state that used
- * to need its own line, and exactly one action per row. "Clear finished" moved into the section header,
- * where it reads as a list action instead of a stray button under the last item.
+ * to need its own line, and exactly one action per row. Opening a finished item is the row tap itself,
+ * which frees that one slot for Share. "Clear finished" moved into the section header, where it reads
+ * as a list action instead of a stray button under the last item.
  *
  * State comes from `queue.json` rather than `WorkInfo`, because a queue-driven run always returns
  * success; see [Queue].
@@ -77,6 +80,7 @@ internal fun QueueCard(items: List<Queue.Item>) {
 @Composable
 private fun QueueRow(item: Queue.Item, stateLabel: Int) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val cs = MaterialTheme.colorScheme
     val failed = item.state == Queue.State.FAILED
     val output = item.outputUri?.takeIf { item.state == Queue.State.DONE }?.toUri()
@@ -84,7 +88,16 @@ private fun QueueRow(item: Queue.Item, stateLabel: Int) {
     Row(
         Modifier
             .fillMaxWidth()
-            .then(if (output != null) Modifier.clickable { view(context, output) } else Modifier)
+            // The tap is the only way to open now, so it has to say so out loud to a screen reader.
+            .then(
+                if (output != null) {
+                    Modifier.clickable(onClickLabel = stringResource(R.string.action_open)) {
+                        view(context, output)
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .padding(start = NaqiTokens.space4, end = NaqiTokens.space2, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -110,11 +123,12 @@ private fun QueueRow(item: Queue.Item, stateLabel: Int) {
             )
         }
         Spacer(Modifier.width(NaqiTokens.space2))
-        // Exactly one action per row. A failed item offers the only thing worth doing to it; getting rid
-        // of it is "Clear finished" in the header, which handles the whole list at once.
+        // Exactly one action per row. Tapping the row opens a finished item, so an "Open" button here
+        // would only repeat it — the slot goes to Share instead. A failed item offers the only thing
+        // worth doing to it; getting rid of it is "Clear finished" in the header, which does the lot.
         when {
-            output != null -> TextButton(onClick = { view(context, output) }) {
-                Text(stringResource(R.string.action_open))
+            output != null -> IconButton(onClick = { scope.launch { shareOutput(context, output) } }) {
+                Icon(NaqiIcons.Share, stringResource(R.string.action_share), tint = cs.onSurfaceVariant)
             }
 
             failed -> TextButton(onClick = { JobController.retry(context, item) }) {

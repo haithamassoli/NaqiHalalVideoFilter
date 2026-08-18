@@ -57,7 +57,10 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
             return fail(it)
         }
 
-        queued { it.copy(state = Queue.State.DOWNLOADING) }
+        // error = null: a re-run means whatever failed last time is no longer what is happening. Without
+        // this a transient failure (network drop) that later succeeds leaves its message on the item,
+        // and the row renders a stale "Download failed" under a green DONE tick.
+        queued { it.copy(state = Queue.State.DOWNLOADING, error = null) }
         setForeground(foregroundInfo(title, 0))
         try {
             val file = Downloader.download(

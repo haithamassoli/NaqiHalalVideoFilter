@@ -28,6 +28,11 @@
     <!-- Accepted containers; the format names are proper nouns and stay Latin in every locale. -->
     <string name="pick_video_formats">MP4 · MKV · WebM · MP3 · M4A</string>
 
+    <!-- The other source: a link the user pastes. The placeholder carries the "or", so the field needs no
+         section label of its own; the second string is the trailing icon button's content description. -->
+    <string name="pick_link_hint">Or paste a video link</string>
+    <string name="pick_link_action">Download link</string>
+
     <!-- Section label above the operations card. Sentence case: SectionHeader() renders it as written. -->
     <string name="pick_eyebrow_choose">Choose what to filter</string>
 
@@ -262,8 +267,10 @@
     <string name="action_download">Download</string>
     <string name="action_filter">Filter</string>
     <string name="action_retry">Retry</string>
-    <!-- Toasts on the share entry path. -->
-    <string name="share_no_url">No link found in what you shared.</string>
+    <!-- Shown on both link entry points, so the wording must not assume either one: a toast when a
+         share intent carries no link, and inline under the pick screen's field when what was TYPED
+         is not one. "in what you shared" read as a bug under a field the user typed into. -->
+    <string name="share_no_url">That doesn\'t look like a video link.</string>
     <string name="share_already_queued">Already in the queue.</string>
 
     <!-- Share queue (M4). -->

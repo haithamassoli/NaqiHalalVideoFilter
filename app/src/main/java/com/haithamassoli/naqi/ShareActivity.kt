@@ -79,6 +79,12 @@ class ShareActivity : ComponentActivity() {
     private fun toast(resId: Int) = Toast.makeText(this, resId, Toast.LENGTH_SHORT).show()
 }
 
-/** First http(s) URL in ordinary shared text, excluding sentence punctuation at the end. */
-private val URL_IN_TEXT =
+/**
+ * First http(s) URL in ordinary text, excluding sentence punctuation at the end — people paste
+ * "look at this https://…", not a bare URL.
+ *
+ * Shared with the pick screen's link field on purpose: both are the same trust boundary, and two
+ * copies would mean fixing one for a new URL shape and silently leaving the other stricter.
+ */
+internal val URL_IN_TEXT =
     Regex("""https?://[\w\-]+(\.[\w\-]+)+([\w\-.,@?^=%&:/~+#]*[\w\-@?^=%&/~+#])?""")

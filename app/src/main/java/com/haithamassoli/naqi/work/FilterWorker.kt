@@ -274,7 +274,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             return fail(Preflight.messageFor(probed.exceptionOrNull() ?: IllegalStateException("probe failed")))
         }
 
-        queued { it.copy(state = Queue.State.FILTERING) }
+        queued { it.copy(state = Queue.State.FILTERING, error = null) }
         return when {
             audioOnly -> runAudioOnly(inputUri)
             segmented -> runSegmented(inputUri, plan, removeMusic, audioPlan, durationMs, meta!!)

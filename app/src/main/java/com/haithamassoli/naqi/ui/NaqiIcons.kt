@@ -67,6 +67,17 @@ object NaqiIcons {
         lineTo(17.5f, 16f); lineTo(19.5f, 16f); lineTo(19.5f, 21f); lineTo(4.5f, 21f); close()
     }
 
+    /**
+     * Three nodes joined by two edges. The edges are drawn first and run all the way to the node
+     * centres, so the nodes cover their ends and no seam shows — every subpath here winds the same
+     * way as [circle], which is what keeps the non-zero fill solid instead of punching holes.
+     */
+    val Share = icon("Share") {
+        moveTo(5.6f, 11.2f); lineTo(17.6f, 5.2f); lineTo(18.4f, 6.8f); lineTo(6.4f, 12.8f); close()
+        moveTo(6.4f, 11.2f); lineTo(18.4f, 17.2f); lineTo(17.6f, 18.8f); lineTo(5.6f, 12.8f); close()
+        circle(18f, 6f, 2.4f); circle(6f, 12f, 2.4f); circle(18f, 18f, 2.4f)
+    }
+
     /** Overflow "kebab" — carries the entries that used to be full-width cards on the pick screen. */
     val More = icon("More") {
         circle(12f, 5.2f, 1.9f); circle(12f, 12f, 1.9f); circle(12f, 18.8f, 1.9f)

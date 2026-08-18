@@ -26,6 +26,11 @@
     <!-- Accepted containers; the format names are proper nouns and stay Latin in every locale. -->
     <string name="pick_video_formats">MP4 · MKV · WebM · MP3 · M4A</string>
 
+    <!-- The other source: a link the user pastes. See the English file — the placeholder carries the "or",
+         and the second string is the trailing icon button's content description. -->
+    <string name="pick_link_hint">أو الصق رابط فيديو</string>
+    <string name="pick_link_action">تنزيل الرابط</string>
+
     <!-- Section label above the two operation cards. Arabic has no case; a short phrase replaces the English caps. -->
     <string name="pick_eyebrow_choose">اختر ما تريد فلترته</string>
 
@@ -253,7 +258,7 @@
     <string name="action_download">تنزيل</string>
     <string name="action_filter">فلترة</string>
     <string name="action_retry">إعادة المحاولة</string>
-    <string name="share_no_url">لم يُعثر على رابط في ما شاركته.</string>
+    <string name="share_no_url">هذا لا يبدو رابط فيديو.</string>
     <string name="share_already_queued">موجود في القائمة بالفعل.</string>
 
     <!-- Share queue (M4). -->

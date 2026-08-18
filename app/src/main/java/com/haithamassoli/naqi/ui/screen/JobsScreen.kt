@@ -26,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -326,11 +327,21 @@ private fun SavedCard(
 @Composable
 private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit) {
     val cs = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val uri = item.uri
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(enabled = item.uri != null, onClick = onOpen)
-            .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3),
+            // The tap is the only way to open now, so it has to say so out loud to a screen reader.
+            .clickable(enabled = uri != null, onClickLabel = stringResource(R.string.action_open), onClick = onOpen)
+            // An IconButton is 48dp against a text button's 40dp; the shorter vertical padding keeps
+            // the row exactly as tall as it was, and the smaller end inset absorbs the button's own.
+            .padding(
+                start = NaqiTokens.space4,
+                end = NaqiTokens.space2,
+                top = NaqiTokens.space2,
+                bottom = NaqiTokens.space2,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -356,9 +367,14 @@ private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit) {
             )
             Text(formatSize(item.bytes), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         }
-        if (item.uri != null) {
+        // Tapping the row already opens it, so a trailing "Open" only repeated the row. Share is the
+        // other thing worth doing to a finished file, and as an icon it costs the row nothing.
+        // [loadLibrary] builds this uri with ContentUris, so it is content:// and safe to hand out as is.
+        if (uri != null) {
             Spacer(Modifier.width(NaqiTokens.space2))
-            TextButton(onClick = onOpen) { Text(stringResource(R.string.action_open)) }
+            IconButton(onClick = { share(context, uri) }) {
+                Icon(NaqiIcons.Share, stringResource(R.string.action_share), tint = cs.onSurfaceVariant)
+            }
         }
     }
 }
@@ -435,6 +451,17 @@ internal fun view(context: Context, uri: Uri) {
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     runCatching { context.startActivity(intent) }
         .onFailure { Toast.makeText(context, R.string.jobs_open_failed, Toast.LENGTH_SHORT).show() }
+}
+
+/**
+ * [share] for a uri that came back from a job rather than from MediaStore, so it could still be the
+ * pre-Q `file://` shape. [shareableUri] is a resolver query in that case, which is not something a
+ * click handler does on the main thread. Null means the scanner never indexed it and there is nothing
+ * safe to hand out — silence beats crashing whichever app it would have gone to.
+ */
+internal suspend fun shareOutput(context: Context, uri: Uri) {
+    val shareable = withContext(Dispatchers.IO) { shareableUri(context, uri) } ?: return
+    share(context, shareable)
 }
 
 private fun share(context: Context, uri: Uri) {

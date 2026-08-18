@@ -84,12 +84,25 @@ fun ShareSheet(
     shared: Shared,
     onDismiss: () -> Unit,
     onQueued: () -> Unit,
+    /**
+     * The two decisions the pick screen already asked for, when the sheet is opened from its link
+     * field. Only those two travel: the screen never shows strictness or blur amount, so carrying its
+     * whole [FilterOps] would silently reset saved tuning to defaults. Null from the share intent,
+     * which has no screen behind it.
+     */
+    initialOps: FilterOps? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val isLink = shared is Shared.Link
 
-    var ops by rememberSaveable { mutableStateOf(Prefs.ops(context)) }
+    var ops by rememberSaveable {
+        val saved = Prefs.ops(context)
+        mutableStateOf(
+            if (initialOps == null) saved
+            else saved.copy(removeMusic = initialOps.removeMusic, censorWho = initialOps.censorWho),
+        )
+    }
     var quality by rememberSaveable { mutableStateOf(Prefs.quality(context)) }
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
     // What the faces toggle turns back ON to. Turning a filter off must not erase its saved Who choice.
