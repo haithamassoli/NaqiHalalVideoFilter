@@ -7,9 +7,11 @@ import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.work.JobStore
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
-import com.yausername.youtubedl_android.mapper.VideoInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -31,12 +33,14 @@ object Downloader {
     private const val ROOT = "naqi-downloads"
 
     /**
-     * The three quality choices the sheet offers, and the yt-dlp format selectors behind them. Fixed
+     * The quality choices the sheet offers, and the yt-dlp format selectors behind them. Fixed
      * strings on purpose — the PRD forbids ever rendering yt-dlp's raw format table at the user.
      */
     enum class Quality(val selector: String) {
         BEST("bv*+ba/b"),
+        P1080("bv*[height<=1080]+ba/b[height<=1080]"),
         P720("bv*[height<=720]+ba/b[height<=720]"),
+        P480("bv*[height<=480]+ba/b[height<=480]"),
 
         /** Paired with `--extract-audio --audio-format m4a` in [download]; the result is an `.m4a`. */
         AUDIO("ba/b"),
@@ -49,6 +53,10 @@ object Downloader {
 
     @Volatile
     private var ready = false
+
+    // ponytail: one lock because yt-dlp updates replace files used by every active process. Split only
+    // if the library gains an atomic updater that is safe while a download is running.
+    private val processMutex = Mutex()
 
     /**
      * Unzip CPython, the yt-dlp zipapp and ffmpeg out of the extracted native libs. First call costs a
@@ -73,31 +81,26 @@ object Downloader {
         runCatching { YoutubeDL.getInstance().version(context.applicationContext) }.getOrNull()
 
     /**
-     * Replace the bundled yt-dlp with the current stable release.
+     * Replace the bundled yt-dlp with the current nightly release.
      *
      * **Not optional, and not a nicety.** The zipapp inside the AAR is frozen at whatever the library
      * was released with (0.18.1 ships 2025.11.12), and YouTube rotates the JS challenge that gates its
      * format URLs on the order of weeks — a stock install fails every YouTube link with "Requested
      * format is not available" until this has run once. Verified on an S23, 2026-07-29.
      *
-     * `STABLE`, not NIGHTLY: the whole point is not to trade one breakage for another.
+     * Nightly matches Seal's default and gets extractor fixes before the next stable release.
      */
     suspend fun update(context: Context): YoutubeDL.UpdateStatus? = withContext(Dispatchers.IO) {
-        ensureInit(context)
-        val status = YoutubeDL.getInstance()
-            .updateYoutubeDL(context.applicationContext, YoutubeDL.UpdateChannel.STABLE)
-        Log.i(TAG, "yt-dlp update: $status, version=${version(context)}")
-        status
+        processMutex.withLock { updateLocked(context) }
     }
 
-    /**
-     * Metadata for the share sheet: title, duration, approximate size. Blocking network call — it is
-     * what the sheet's loading state covers, and its failure (unsupported site, geo-block, offline) is
-     * what the sheet's inline Retry re-runs.
-     */
-    suspend fun getInfo(context: Context, url: String): VideoInfo = withContext(Dispatchers.IO) {
+    private fun updateLocked(context: Context): YoutubeDL.UpdateStatus? {
         ensureInit(context)
-        YoutubeDL.getInstance().getInfo(url)
+        val status = YoutubeDL.getInstance()
+            .updateYoutubeDL(context.applicationContext, YoutubeDL.UpdateChannel.NIGHTLY)
+        Prefs.markUpdateChecked(context)
+        Log.i(TAG, "yt-dlp update: $status, version=${version(context)}")
+        return status
     }
 
     /**
@@ -107,10 +110,13 @@ object Downloader {
      * asked for anything yet, and a failed check must cost them nothing. The clock is only advanced on
      * success, so a week offline does not silently consume the interval.
      */
-    suspend fun updateIfDue(context: Context) {
+    suspend fun updateIfDue(context: Context) = withContext(Dispatchers.IO) {
+        processMutex.withLock { updateIfDueLocked(context) }
+    }
+
+    private fun updateIfDueLocked(context: Context) {
         if (!Prefs.updateDue(context)) return
-        runCatching { update(context) }
-            .onSuccess { Prefs.markUpdateChecked(context) }
+        runCatching { updateLocked(context) }
             .onFailure { Log.w(TAG, "weekly yt-dlp check failed; will retry next launch", it) }
     }
 
@@ -147,36 +153,48 @@ object Downloader {
         onSpaceCheck: () -> Boolean = { true },
         onProgress: (Int, Long) -> Unit,
     ): File = withContext(Dispatchers.IO) {
-        ensureInit(context)
-        val dir = quarantineDir(context, url)
-        val request = YoutubeDLRequest(url)
-            .addOption("-f", quality.selector)
-            .addOption("-o", File(dir, "%(title).80B.%(ext)s").absolutePath)
-            // A shared link often carries a playlist id; without this a single share downloads 200 videos.
-            .addOption("--no-playlist")
-            // Keep the download timestamp rather than the upload date, so the gallery sorts it as new.
-            .addOption("--no-mtime")
-        if (quality == Quality.AUDIO) {
-            request.addOption("--extract-audio").addOption("--audio-format", "m4a")
-        }
+        processMutex.withLock {
+            // A user can live entirely in the translucent share flow and never open MainActivity, so
+            // this is the one route that can guarantee the nightly check precedes the actual process.
+            updateIfDueLocked(context)
+            ensureInit(context)
+            val dir = quarantineDir(context, url)
+            fun request() = YoutubeDLRequest(url)
+                .addOption("-f", quality.selector)
+                .addOption("-o", File(dir, "%(title).80B.%(ext)s").absolutePath)
+                // A shared link often carries a playlist id; without this a single share downloads 200 videos.
+                .addOption("--no-playlist")
+                // Keep the download timestamp rather than the upload date, so the gallery sorts it as new.
+                .addOption("--no-mtime")
+                .apply {
+                    if (quality == Quality.AUDIO) {
+                        addOption("--extract-audio").addOption("--audio-format", "m4a")
+                    }
+                }
 
-        YoutubeDL.getInstance().execute(request, processId) { progress, etaSeconds, _ ->
-            if (!onSpaceCheck()) {
-                // The only way to stop a running yt-dlp: kill the process by the id we passed in. execute()
-                // then throws CanceledException, which the worker turns into the out-of-space message.
-                Log.w(TAG, "aborting download: out of space")
-                YoutubeDL.getInstance().destroyProcessById(processId)
+            retryOnceAfterYtDlpFailure(
+                afterFailure = { first ->
+                    Log.w(TAG, "yt-dlp failed; updating and retrying once", first)
+                    runCatching { updateLocked(context) }
+                        .onFailure { Log.w(TAG, "yt-dlp recovery update failed; retrying installed version", it) }
+                },
+            ) {
+                YoutubeDL.getInstance().execute(request(), processId) { progress, etaSeconds, _ ->
+                    if (!onSpaceCheck()) {
+                        // The only way to stop a running yt-dlp: kill the process by the id we passed in.
+                        Log.w(TAG, "aborting download: out of space")
+                        YoutubeDL.getInstance().destroyProcessById(processId)
+                    }
+                    onProgress(progress.toInt().coerceIn(0, 100), etaSeconds)
+                }
             }
-            onProgress(progress.toInt().coerceIn(0, 100), etaSeconds)
-        }
 
-        // yt-dlp does not report the final path back through the response, and `--print` would mean
-        // parsing stdout around every other line it writes. The directory is per-URL and freshly made,
-        // so the one finished file in it IS the answer; `.part`/`.ytdl` are its in-flight bookkeeping.
-        dir.listFiles()
-            ?.filter { it.isFile && it.extension !in IN_FLIGHT }
-            ?.maxByOrNull { it.length() }
-            ?: error("download reported success but produced no file")
+            // The per-URL directory has one completed file; partials use an in-flight extension.
+            dir.listFiles()
+                ?.filter { it.isFile && it.extension !in IN_FLIGHT }
+                ?.maxByOrNull { it.length() }
+                ?: error("download reported success but produced no file")
+        }
     }
 
     /** Kill a running download by the id its [download] call was given. */
@@ -220,4 +238,15 @@ object Downloader {
 
     private const val STALE_MS = 7L * 24 * 60 * 60 * 1000
     private val IN_FLIGHT = setOf("part", "ytdl", "temp")
+
+    /** Retry only process failures; cancellation and local file errors must keep their original meaning. */
+    internal fun <T> retryOnceAfterYtDlpFailure(
+        afterFailure: (YoutubeDLException) -> Unit,
+        block: () -> T,
+    ): T = try {
+        block()
+    } catch (first: YoutubeDLException) {
+        afterFailure(first)
+        block()
+    }
 }

@@ -39,10 +39,7 @@
             android:foregroundServiceType="dataSync|mediaProcessing"
             tools:node="merge" />
 
-        <!-- singleTask so a share reuses the running instance instead of stacking a second copy on top
-             of a job the user is watching. Accepted cost (PRD "Entry point"): a share pulls the user
-             into Naqi's task, and Back does not return to the source app. The fix is Seal's separate
-             dialog-themed activity; cut for v1. -->
+        <!-- singleTask keeps notification actions and launcher taps on the existing app task. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -55,6 +52,16 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+        <!-- A translucent target keeps the sending app visible behind the quick-download sheet. -->
+        <activity
+            android:name=".ShareActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleInstance"
+            android:theme="@style/Theme.NaqiHalalVideoFilter.Dialog">
 
             <!-- Share a link: Naqi downloads it, then filters it. -->
             <intent-filter>

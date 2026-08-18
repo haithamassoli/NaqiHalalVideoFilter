@@ -21,10 +21,10 @@ Two independent operations, run alone or together:
   (`vocals`, or `vocals + other` to retain sound effects at the cost of some music leakage).
   Drums and bass are never kept.
 - **Censor women** — ML Kit finds and tracks faces, NudeNet votes on gender per track, and female
-  tracks are blurred for their whole span. An NSFW classifier gate additionally censors the entire
+  tracks are blurred for their whole span. An optional NSFW classifier gate additionally censors the entire
   frame while it fires, with pre-roll so nothing slips through on the first frame.
 
-Adjustable: blur amount, grayscale toggle, NSFW strictness (0–100), and whether faces of
+Adjustable: blur amount, grayscale toggle, NSFW on/off and strictness (0–100), and whether faces of
 unresolvable gender get blurred.
 
 Also included:
@@ -48,9 +48,8 @@ there are no analytics SDKs, and no account is required.
 Grab the APK from [Releases](https://github.com/haithamassoli/NaqiHalalVideoFilter/releases).
 
 **The APK here is the full build.** Download-by-link and share-into-Naqi ship only in this one. A
-Play Store build cannot carry them: yt-dlp fetches and updates executable code at runtime, and the
-in-app updater needs `REQUEST_INSTALL_PACKAGES` — Play's Device and Network Abuse policy allows
-neither. The filtering itself is the same either way.
+Play Store build cannot carry them: yt-dlp fetches and updates executable code at runtime, which
+Play's Device and Network Abuse policy does not allow. The filtering itself is the same either way.
 
 **Requirements:** Android 10 (API 29) or newer, **arm64-v8a** only. Free space of roughly
 2× the video size. The APK is large because the ONNX models ship inside it.

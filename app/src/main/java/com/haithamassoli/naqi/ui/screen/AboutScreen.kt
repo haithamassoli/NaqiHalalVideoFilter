@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -25,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -42,9 +44,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * About + open-source licences, the only place the user can force a yt-dlp update, and — since this
- * redesign — where the model smoke report lives. That report is a diagnostic: useful when a device
- * misbehaves, noise on the screen where someone is trying to pick a video.
+ * About + open-source licences, the link to the repository, the only place the user can force a
+ * yt-dlp update, and — since this redesign — where the model smoke report lives. That report is a
+ * diagnostic: useful when a device misbehaves, noise on the screen where someone is trying to pick
+ * a video.
  *
  * The attribution text is the repository's own `NOTICE`, copied into assets by the build rather than
  * retyped as a string resource — see `app/build.gradle.kts`. It is deliberately not translated: a
@@ -55,7 +58,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val uriHandler = LocalUriHandler.current
 
     var notice by remember { mutableStateOf("") }
     var showNotice by remember { mutableStateOf(false) }
@@ -68,15 +71,6 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
     var smoke by remember { mutableStateOf<SmokeReport?>(null) }
     LaunchedEffect(Unit) { smoke = withContext(Dispatchers.Default) { ModelSmoke.run(context) } }
-
-    // Null until read; the version only exists once an update has run at least once (it is written by
-    // the updater, not read out of the bundled zipapp).
-    var ytdlpVersion by remember { mutableStateOf<String?>(null) }
-    var updating by remember { mutableStateOf(false) }
-    var updateResult by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
-        ytdlpVersion = withContext(Dispatchers.IO) { Downloader.version(context) }
-    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -114,46 +108,10 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 )
             }
 
-            Spacer(Modifier.height(NaqiTokens.space6))
-            SectionHeader(stringResource(R.string.about_eyebrow_downloader))
-            NaqiCard {
-                Text(
-                    stringResource(
-                        R.string.about_ytdlp_version,
-                        ytdlpVersion ?: stringResource(R.string.about_ytdlp_unknown),
-                    ),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Spacer(Modifier.height(NaqiTokens.space1))
-                Text(
-                    stringResource(R.string.about_ytdlp_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                updateResult?.let {
-                    Spacer(Modifier.height(NaqiTokens.space2))
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                }
-                Spacer(Modifier.height(NaqiTokens.space3))
-                OutlinedButton(
-                    enabled = !updating,
-                    shape = NaqiTokens.shapeButton,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        updating = true
-                        updateResult = null
-                        scope.launch {
-                            val status = runCatching { Downloader.update(context) }
-                            ytdlpVersion = withContext(Dispatchers.IO) { Downloader.version(context) }
-                            updateResult = context.getString(
-                                if (status.isSuccess) R.string.about_update_ok else R.string.about_update_failed,
-                            )
-                            updating = false
-                        }
-                    },
-                ) {
-                    Text(stringResource(if (updating) R.string.about_updating else R.string.about_update))
-                }
+            if (System.currentTimeMillis() >= DOWNLOADER_VISIBLE_FROM) {
+                Spacer(Modifier.height(NaqiTokens.space6))
+                SectionHeader(stringResource(R.string.about_eyebrow_downloader))
+                NaqiCard { DownloaderCard() }
             }
 
             Spacer(Modifier.height(NaqiTokens.space5))
@@ -162,6 +120,37 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
             Spacer(Modifier.height(NaqiTokens.space5))
             SectionHeader(stringResource(R.string.about_eyebrow_licenses))
+            NaqiCard(contentPadding = 0.dp) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        // runCatching: a device with no browser must not take the app down on a tap.
+                        .clickable { runCatching { uriHandler.openUri(REPO_URL) } }
+                        .padding(NaqiTokens.space4),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.about_repo_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            stringResource(R.string.about_repo_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(NaqiTokens.space3))
+                    Text(
+                        stringResource(R.string.action_open),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(NaqiTokens.space3))
             NaqiCard(contentPadding = 0.dp) {
                 Row(
                     Modifier
@@ -196,6 +185,76 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+private const val REPO_URL = "https://github.com/haithamassoli/NaqiHalalVideoFilter"
+
+/**
+ * The downloader section is hidden until 2026-08-28 (2026-08-14 + two weeks).
+ *
+ * ponytail: a date constant, not a build flag or a remote toggle — the hide has a known end and the
+ * build that carries it will still be installed then. Delete the constant and its `if` to bring the
+ * section back for good.
+ */
+private const val DOWNLOADER_VISIBLE_FROM = 1_787_875_200_000L
+
+/**
+ * yt-dlp's installed version and the button that replaces it with the current nightly release.
+ *
+ * Its own composable so that the state and the version read cost nothing while the section is
+ * hidden — see [DOWNLOADER_VISIBLE_FROM].
+ */
+@Composable
+private fun DownloaderCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Null until read; the version only exists once an update has run at least once (it is written by
+    // the updater, not read out of the bundled zipapp).
+    var ytdlpVersion by remember { mutableStateOf<String?>(null) }
+    var updating by remember { mutableStateOf(false) }
+    var updateResult by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        ytdlpVersion = withContext(Dispatchers.IO) { Downloader.version(context) }
+    }
+
+    Text(
+        stringResource(
+            R.string.about_ytdlp_version,
+            ytdlpVersion ?: stringResource(R.string.about_ytdlp_unknown),
+        ),
+        style = MaterialTheme.typography.titleSmall,
+    )
+    Spacer(Modifier.height(NaqiTokens.space1))
+    Text(
+        stringResource(R.string.about_ytdlp_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    updateResult?.let {
+        Spacer(Modifier.height(NaqiTokens.space2))
+        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+    }
+    Spacer(Modifier.height(NaqiTokens.space3))
+    OutlinedButton(
+        enabled = !updating,
+        shape = NaqiTokens.shapeButton,
+        modifier = Modifier.fillMaxWidth(),
+        onClick = {
+            updating = true
+            updateResult = null
+            scope.launch {
+                val status = runCatching { Downloader.update(context) }
+                ytdlpVersion = withContext(Dispatchers.IO) { Downloader.version(context) }
+                updateResult = context.getString(
+                    if (status.isSuccess) R.string.about_update_ok else R.string.about_update_failed,
+                )
+                updating = false
+            }
+        },
+    ) {
+        Text(stringResource(if (updating) R.string.about_updating else R.string.about_update))
     }
 }
 

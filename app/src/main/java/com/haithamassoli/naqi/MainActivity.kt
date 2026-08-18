@@ -19,24 +19,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.core.content.IntentCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import com.haithamassoli.naqi.download.Downloader
-import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.NaqiApp
-import com.haithamassoli.naqi.ui.screen.ShareSheet
-import com.haithamassoli.naqi.ui.screen.Shared
 import com.haithamassoli.naqi.ui.theme.NaqiTheme
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.JobNotifications
-import com.haithamassoli.naqi.work.Queue
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -44,8 +40,8 @@ class MainActivity : ComponentActivity() {
     /** Set when the "Delete original" notification action opened us; drives the confirm dialog. */
     private var deleteTarget by mutableStateOf<Pair<Uri, String>?>(null)
 
-    /** Set when something was shared into Naqi; drives the share sheet. */
-    private var shared by mutableStateOf<Shared?>(null)
+    /** Incremented for every notification-body tap so an already-running app handles repeated taps. */
+    private var activitiesRequest by mutableIntStateOf(0)
 
     // API 30+ fallback: the system asks the user itself, the only path that works for media we don't own.
     private val systemDelete =
@@ -58,25 +54,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (BuildConfig.DEBUG_HOOKS) maybeAutorun()
         deleteTarget = deleteTargetOf(intent)
-        shared = sharedOf(intent)
+        if (consumeActivitiesRequest(intent)) activitiesRequest++
         // Weekly yt-dlp check (PRD M4.4). Off the main thread, failure-tolerant, and no-op six days out
         // of seven — sites change how they serve video far faster than the app ships.
         lifecycleScope.launch { Downloader.updateIfDue(this@MainActivity) }
         setContent {
             NaqiTheme {
-                NaqiApp(onDeleteOriginal = ::confirmDeleteOriginal, modifier = Modifier.fillMaxSize())
+                NaqiApp(
+                    activitiesRequest = activitiesRequest,
+                    onDeleteOriginal = ::confirmDeleteOriginal,
+                    modifier = Modifier.fillMaxSize(),
+                )
                 deleteTarget?.let { (uri, name) ->
                     ConfirmDeleteDialog(
                         name = name,
                         onDismiss = { deleteTarget = null },
                         onConfirm = { deleteTarget = null; deleteOriginal(uri) },
-                    )
-                }
-                shared?.let {
-                    ShareSheet(
-                        shared = it,
-                        onDismiss = { shared = null },
-                        onQueued = { shared = null },
                     )
                 }
             }
@@ -87,59 +80,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        // Default launchMode means a redelivered intent lands here, not in onCreate — the debug
+        // singleTask means a redelivered intent lands here, not in onCreate — the debug
         // cancel hook has to be honoured on both paths or `am start --ez autorun_cancel` is a no-op.
         if (BuildConfig.DEBUG_HOOKS) maybeAutorun()
         deleteTargetOf(intent)?.let { deleteTarget = it }
-        sharedOf(intent)?.let { shared = it }
+        if (consumeActivitiesRequest(intent)) activitiesRequest++
     }
-
-    /**
-     * Parse an `ACTION_SEND`. Two shapes, per the PRD's flows A and B.
-     *
-     * **Link.** The shared text is rarely a bare URL — apps wrap it in "Check this out: <url> via …" —
-     * so the first http(s) URL is scraped out rather than the whole extra being trusted. No match is a
-     * toast and nothing else; so is a URL already in the queue, because sharing twice must not queue
-     * twice.
-     *
-     * **File.** A share grant dies with the receiving task and cannot be persisted, so the read
-     * permission is re-granted to ourselves immediately — that survives until reboot, which is long
-     * enough for a queued job to reach the front. A reboot before then is the case the worker reports as
-     * "Re-share the file".
-     */
-    private fun sharedOf(intent: Intent): Shared? {
-        if (intent.action != Intent.ACTION_SEND) return null
-        // Consumed, so a configuration change or a redelivered intent cannot re-open the sheet.
-        val type = intent.type.orEmpty()
-
-        if (type.startsWith("video/")) {
-            val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
-                ?: return null
-            intent.removeExtra(Intent.EXTRA_STREAM)
-            runCatching {
-                grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            return Shared.LocalFile(uri, displayNameOf(uri))
-        }
-
-        if (!type.startsWith("text/")) return null
-        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
-        intent.removeExtra(Intent.EXTRA_TEXT)
-        val url = URL_IN_TEXT.find(text)?.value
-        if (url == null) {
-            toast(R.string.share_no_url)
-            return null
-        }
-        // Two sources of truth deliberately: queue.json is what the user sees, and the WorkManager tag
-        // covers an item enqueued by the debug intent, which never touches the queue.
-        if (Queue.isActive(this, url) || JobController.isQueued(this, url)) {
-            toast(R.string.share_already_queued)
-            return null
-        }
-        return Shared.Link(url)
-    }
-
-    private fun displayNameOf(uri: Uri): String? = displayName(uri) ?: uri.lastPathSegment
 
     /**
      * The Saved card's "Delete original", which asks for exactly the confirmation the notification
@@ -155,6 +101,14 @@ class MainActivity : ComponentActivity() {
         val name = intent.getStringExtra(JobNotifications.EXTRA_DELETE_NAME)
             ?: getString(R.string.dlg_delete_original_fallback_name)
         return uri.toUri() to name
+    }
+
+    private fun consumeActivitiesRequest(intent: Intent): Boolean {
+        if (intent.action != JobNotifications.ACTION_SHOW_ACTIVITIES) return false
+        // Do not replay the notification route on a configuration recreation; the Compose step itself
+        // is already saveable. A later tap delivers a fresh intent and still reaches onNewIntent.
+        setIntent(Intent(intent).setAction(null))
+        return true
     }
 
     /**
@@ -221,6 +175,8 @@ class MainActivity : ComponentActivity() {
             censorWho = censorWho,
             // `--ez whole_frame true` — covers the whole picture while a censored face is on screen.
             wholeFrameBlur = intent.getBooleanExtra("whole_frame", false),
+            // `--ez censor_nsfw false` — keeps face censoring but disables whole-scene NSFW spans.
+            censorNsfw = intent.getBooleanExtra("censor_nsfw", true),
             strictness = intent.getIntExtra("strictness", FilterOps.DEFAULT_STRICTNESS),
             blurAmount = intent.getIntExtra("blur", 60),
             grayscale = intent.getBooleanExtra("grayscale", false),
@@ -232,7 +188,7 @@ class MainActivity : ComponentActivity() {
         // Echo what actually parsed. `everyone` and `women` censor identically until Phase C ships a
         // classifier, so without this an adb run cannot show WHICH value survived the wire — only that
         // something censored. Same reason the E2E hooks exist at all: logcat beats UI scripting here.
-        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur}")
+        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} censorNsfw=${ops.censorNsfw} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur}")
 
         // `--ez ytdlp_update true` forces the yt-dlp self-update from adb.
         if (intent.getBooleanExtra("ytdlp_update", false)) {
@@ -266,14 +222,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 }
-
-/**
- * First http(s) URL inside arbitrary shared text. Deliberately permissive about what follows the host
- * and strict about how the match ENDS — a trailing "." or "," in "watch this: <url>." belongs to the
- * sentence, not the link.
- */
-private val URL_IN_TEXT =
-    Regex("""https?://[\w\-]+(\.[\w\-]+)+([\w\-.,@?^=%&:/~+#]*[\w\-@?^=%&/~+#])?""")
 
 @androidx.compose.runtime.Composable
 private fun ConfirmDeleteDialog(name: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {

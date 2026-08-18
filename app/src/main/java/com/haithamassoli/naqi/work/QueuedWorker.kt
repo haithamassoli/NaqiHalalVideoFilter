@@ -60,6 +60,7 @@ internal fun FilterOps.pairs(): Array<Pair<String, Any?>> = arrayOf(
     // Emitting both would leave two sources of truth for one option, one of which cannot say "women".
     FilterWorker.KEY_CENSOR_WHO to censorWho,
     FilterWorker.KEY_WHOLE_FRAME to wholeFrameBlur,
+    FilterWorker.KEY_CENSOR_NSFW to censorNsfw,
     FilterWorker.KEY_STRICTNESS to strictness,
     FilterWorker.KEY_BLUR_AMOUNT to blurAmount,
     FilterWorker.KEY_GRAYSCALE to grayscale,
@@ -75,6 +76,8 @@ internal fun Data.filterOps(): FilterOps = FilterOps(
     censorWho = FilterOps.whoOrNull(getString(FilterWorker.KEY_CENSOR_WHO))
         ?: FilterOps.whoFromLegacy(getBoolean(FilterWorker.KEY_CENSOR_WOMEN, false)),
     wholeFrameBlur = getBoolean(FilterWorker.KEY_WHOLE_FRAME, false),
+    // Absent means an older queued job, whose NSFW gate was always on.
+    censorNsfw = getBoolean(FilterWorker.KEY_CENSOR_NSFW, true),
     strictness = getInt(FilterWorker.KEY_STRICTNESS, FilterOps.DEFAULT_STRICTNESS),
     blurAmount = getInt(FilterWorker.KEY_BLUR_AMOUNT, 60),
     grayscale = getBoolean(FilterWorker.KEY_GRAYSCALE, false),

@@ -28,6 +28,11 @@
     <!-- Accepted containers; the format names are proper nouns and stay Latin in every locale. -->
     <string name="pick_video_formats">MP4 · MKV · WebM · MP3 · M4A</string>
 
+    <!-- The other source: a link the user pastes. The placeholder carries the "or", so the field needs no
+         section label of its own; the second string is the trailing icon button's content description. -->
+    <string name="pick_link_hint">Or paste a video link</string>
+    <string name="pick_link_action">Download link</string>
+
     <!-- Section label above the operations card. Sentence case: SectionHeader() renders it as written. -->
     <string name="pick_eyebrow_choose">Choose what to filter</string>
 
@@ -37,10 +42,10 @@
     <string name="pick_op_faces_title">Censor faces</string>
     <!-- %1$s = the current Who choice (opt_who_everyone/_women/_men). The toggle on step 1 says *whether*
          faces are censored; this line says *which*, so step 1 can never state something Options contradicts. -->
-    <string name="pick_op_faces_desc">%1$s · and flagged scenes.</string>
+    <string name="pick_op_faces_desc">%1$s · scene censoring is optional.</string>
     <!-- Shown while the toggle is OFF. It describes what turning it on would do; the substituted line
          above asserts what IS happening, which an off row must not do (ToggleTile does not dim `desc`). -->
-    <string name="pick_op_faces_desc_off">Blur faces and flagged scenes.</string>
+    <string name="pick_op_faces_desc_off">Blur faces; scene censoring is optional.</string>
 
     <!-- Overflow menu on the pick screen; content description of the "⋮" button. -->
     <string name="action_more">More</string>
@@ -82,7 +87,7 @@
     <!-- Who is first in the section: it is the largest decision here, and Strictness/Style/Blur only tune
          what it selected. The segment labels are also substituted into pick_op_faces_desc on step 1. -->
     <string name="opt_who_title">Who</string>
-    <string name="opt_who_desc">Which faces get covered. Flagged scenes are censored either way.</string>
+    <string name="opt_who_desc">Which faces get covered. Scene censoring is controlled separately.</string>
     <string name="opt_who_everyone">Everyone</string>
     <string name="opt_who_women">Women</string>
     <string name="opt_who_men">Men</string>
@@ -90,6 +95,8 @@
          the output is a re-encoded file, so it cannot be undone the way a browser blur can. -->
     <string name="opt_whole_frame_title">Cover the whole frame</string>
     <string name="opt_whole_frame_desc">Covers the entire picture while a censored face is on screen, not just the face. Most of the video usually ends up covered.</string>
+    <string name="opt_nsfw_title">Censor flagged scenes</string>
+    <string name="opt_nsfw_desc">Uses the NSFW model to cover the whole frame when a scene is flagged.</string>
     <string name="opt_strictness_title">Strictness</string>
     <string name="opt_strictness_desc">How eagerly whole scenes are censored. Face blurring is never affected.</string>
     <string name="opt_censor_style_title">Censor style</string>
@@ -177,6 +184,7 @@
 
     <!-- Header of the system share sheet. -->
     <string name="jobs_share_chooser_title">Share video</string>
+    <string name="jobs_open_failed">No app can open this file.</string>
 
     <!-- File-size subtitle on a library row. %1$.1f = gigabytes, %1$.0f = megabytes. -->
     <string name="jobs_size_gb">%1$.1f GB</string>
@@ -243,28 +251,34 @@
     <!-- ============================================================
          Share sheet (M4) — shown when a link or a video is shared into Naqi
          ============================================================ -->
-    <string name="share_loading">Reading video details…</string>
-    <string name="share_info_failed">Couldn\'t read this video. It may be private, region-locked, or the site isn\'t supported.</string>
     <!-- Fallback heading when the source exposes no title at all. -->
     <string name="share_untitled">Shared video</string>
     <!-- Section labels. -->
     <string name="share_eyebrow_quality">Quality</string>
     <string name="share_eyebrow_filters">Filters</string>
+    <string name="share_advanced_options">Advanced options</string>
+    <string name="share_hide_advanced_options">Hide advanced options</string>
     <string name="share_quality_best">Best</string>
-    <!-- 720p is a format name; it stays Latin in every locale. -->
+    <!-- Resolution labels are format names; they stay Latin in every locale. -->
+    <string name="share_quality_1080">1080p</string>
     <string name="share_quality_720">720p</string>
+    <string name="share_quality_480">480p</string>
     <string name="share_quality_audio">Audio only</string>
     <string name="action_download">Download</string>
     <string name="action_filter">Filter</string>
     <string name="action_retry">Retry</string>
-    <!-- Toasts on the share entry path. -->
-    <string name="share_no_url">No link found in what you shared.</string>
+    <!-- Shown on both link entry points, so the wording must not assume either one: a toast when a
+         share intent carries no link, and inline under the pick screen's field when what was TYPED
+         is not one. "in what you shared" read as a bug under a field the user typed into. -->
+    <string name="share_no_url">That doesn\'t look like a video link.</string>
     <string name="share_already_queued">Already in the queue.</string>
 
     <!-- Share queue (M4). -->
     <string name="queue_eyebrow">Queue</string>
     <string name="queue_state_pending_download">Waiting to download</string>
+    <string name="queue_state_waiting_download">Queued behind the current download</string>
     <string name="queue_state_pending_filter">Waiting to filter</string>
+    <string name="queue_state_waiting_filter">Queued behind the current video</string>
     <string name="queue_state_filtering">Filtering</string>
     <string name="queue_state_done">Saved</string>
     <string name="queue_state_failed">Failed</string>
@@ -313,12 +327,16 @@
     <string name="about_updating">Updating…</string>
     <string name="about_update_ok">Downloader is up to date.</string>
     <string name="about_update_failed">Couldn\'t update. Check your connection and try again.</string>
+    <!-- Repo card. action_open is its trailing label. -->
+    <string name="about_repo_title">Github</string>
+    <string name="about_repo_desc">Naqi is open source. Read the code, report a problem, or build it yourself.</string>
     <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
     <string name="about_notices_title">Open-source notices</string>
     <string name="about_notice_missing">Open-source notices are unavailable in this build.</string>
 
     <!-- Ongoing notification while a download runs; the second line is the video title. -->
     <string name="download_notif_title">Downloading video</string>
+    <string name="download_failed_notif_title">Download failed</string>
     <string name="done_notif_title">Filtered copy saved</string>
     <string name="action_open">Open</string>
     <string name="action_share">Share</string>

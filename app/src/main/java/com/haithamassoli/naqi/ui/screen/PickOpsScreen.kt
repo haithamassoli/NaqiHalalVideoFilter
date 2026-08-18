@@ -24,30 +24,39 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.haithamassoli.naqi.R
+import com.haithamassoli.naqi.URL_IN_TEXT
 import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.media.isAudio
 import com.haithamassoli.naqi.data.Prefs
@@ -62,6 +71,8 @@ import com.haithamassoli.naqi.ui.SectionHeader
 import com.haithamassoli.naqi.ui.ToggleTile
 import com.haithamassoli.naqi.ui.UpdateCard
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
+import com.haithamassoli.naqi.work.JobController
+import com.haithamassoli.naqi.work.Queue
 
 /**
  * Step 1: choose the video and which operations to run. Tuning for those operations lives on the
@@ -79,6 +90,7 @@ fun PickOpsScreen(
     onPicked: (Uri, String?) -> Unit,
     onOpsChange: (FilterOps) -> Unit,
     onContinue: () -> Unit,
+    onJobs: () -> Unit,
     onAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -96,6 +108,32 @@ fun PickOpsScreen(
     // rather than leaving the user to discover that "Censor faces" fails preflight with "no video track".
     val isAudio = remember(pickedUri) { pickedUri != null && context.isAudio(pickedUri) }
 
+    // The other answer to "where does the video come from?". Everything past the URL — quality, the
+    // filters, the queue — is what a shared link already lands in, so this only has to produce a URL and
+    // open the same sheet. That sheet asks its own filter questions (seeded from Prefs); the toggles
+    // below belong to the picked file.
+    var link by rememberSaveable { mutableStateOf("") }
+    var linkError by rememberSaveable { mutableStateOf<Int?>(null) }
+    var linkSheet by rememberSaveable { mutableStateOf<String?>(null) }
+    val focus = LocalFocusManager.current
+
+    fun submitLink() {
+        val url = URL_IN_TEXT.find(link)?.value
+        linkError = when {
+            url == null -> R.string.share_no_url
+            // Same rule as the share intent: the same link twice is one item, not two.
+            Queue.isActive(context, url) || JobController.isQueued(context, url) ->
+                R.string.share_already_queued
+
+            else -> null
+        }
+        // Keep the keyboard up on a rejection — the text still needs fixing.
+        if (linkError == null) {
+            focus.clearFocus()
+            linkSheet = url
+        }
+    }
+
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
@@ -112,7 +150,10 @@ fun PickOpsScreen(
             NaqiTopBar(
                 title = stringResource(R.string.app_name),
                 titleIcon = ImageVector.vectorResource(R.drawable.ic_naqi_mark),
-                actions = { OverflowMenu(onAbout = onAbout) },
+                actions = {
+                    TextButton(onClick = onJobs) { Text(stringResource(R.string.jobs_title)) }
+                    OverflowMenu(onAbout = onAbout)
+                },
             )
         },
         bottomBar = {
@@ -144,6 +185,14 @@ fun PickOpsScreen(
             PickVideoCard(picked = pickedUri != null, fileName = pickedName) {
                 picker.launch(arrayOf("video/*", "audio/*"))
             }
+            // Tighter than the gap below: file and link are one decision with two answers.
+            Spacer(Modifier.height(NaqiTokens.space3))
+            LinkField(
+                value = link,
+                error = linkError,
+                onValueChange = { link = it; linkError = null },
+                onSubmit = ::submitLink,
+            )
             Spacer(Modifier.height(NaqiTokens.space5))
 
             SectionHeader(stringResource(R.string.pick_eyebrow_choose))
@@ -179,6 +228,53 @@ fun PickOpsScreen(
             }
         }
     }
+
+    linkSheet?.let { url ->
+        ShareSheet(
+            shared = Shared.Link(url),
+            // The toggles sit under both sources, so a link honours what the user already set here
+            // instead of asking the same question twice. Untouched toggles pass null and let the
+            // sheet keep its own saved defaults.
+            initialOps = ops.takeIf { it.any },
+            onDismiss = { linkSheet = null },
+            onQueued = { linkSheet = null; link = ""; onJobs() },
+        )
+    }
+}
+
+/**
+ * The link half of the source decision: one field, one action, no header. The placeholder carries the
+ * "or", and the trailing button is an [IconButton] because the pinned Continue is the screen's one
+ * filled action and nothing else may compete with it.
+ */
+@Composable
+private fun LinkField(
+    value: String,
+    error: Int?,
+    onValueChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text(stringResource(R.string.pick_link_hint)) },
+        trailingIcon = {
+            IconButton(onClick = onSubmit, enabled = value.isNotBlank()) {
+                Icon(NaqiIcons.Download, contentDescription = stringResource(R.string.pick_link_action))
+            }
+        },
+        isError = error != null,
+        supportingText = if (error != null) {
+            { Text(stringResource(error)) }
+        } else {
+            null
+        },
+        singleLine = true,
+        shape = NaqiTokens.shapeButton,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+        keyboardActions = KeyboardActions(onGo = { onSubmit() }),
+    )
 }
 
 /**

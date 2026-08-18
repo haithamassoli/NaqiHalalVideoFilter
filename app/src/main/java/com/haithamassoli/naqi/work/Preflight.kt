@@ -71,8 +71,8 @@ internal object Preflight {
      */
     @StringRes
     fun checkSpaceForDownload(context: Context, sourceBytes: Long, ops: FilterOps): Int? {
-        if (sourceBytes <= 0L) return null // size unknown — DownloadWorker aborts mid-flight instead
-        val required = requiredBytes(sourceBytes, tempCopiesFor(ops) + 1)
+        // Unknown size still has to satisfy the fixed 2 GiB floor; live checks cover the file itself.
+        val required = requiredBytes(sourceBytes.coerceAtLeast(0L), tempCopiesFor(ops) + 1)
         return if (context.noBackupFilesDir.usableSpace >= required) null else LOW_SPACE_DOWNLOAD
     }
 

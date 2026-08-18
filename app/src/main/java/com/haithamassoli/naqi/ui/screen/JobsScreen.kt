@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -84,8 +86,8 @@ fun JobsScreen(
 
     val workFlow = remember { JobController.observe(context) }
     val workInfos by workFlow.collectAsState(initial = emptyList())
-    val info = workInfos.firstOrNull()
-    val running = info?.state == WorkInfo.State.RUNNING || info?.state == WorkInfo.State.ENQUEUED
+    val info = JobController.currentWork(workInfos)
+    val running = info?.state?.isFinished == false
     val succeeded = info?.state == WorkInfo.State.SUCCEEDED
     val failed = info?.state == WorkInfo.State.FAILED
     val outputName = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_NAME)
@@ -105,6 +107,14 @@ fun JobsScreen(
     // the picker path looks exactly as it did.
     val queue by Queue.items.collectAsState()
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { Queue.load(context) } }
+    val queueId = JobController.queueIdOf(info)
+    val runningQueueItem = queue.firstOrNull { it.id == queueId }
+    val showSaved = succeeded && queueId == null
+    val onCancel: (() -> Unit)? = when {
+        queueId == null -> { { JobController.cancel(context) } }
+        runningQueueItem != null -> { { JobController.cancelItem(context, runningQueueItem) } }
+        else -> null // The queue is still loading; never cancel the whole chain by mistake.
+    }
 
     // Resolved off the main thread: the pre-Q output is a file:// uri that has to be looked up in MediaStore.
     var savedUri by remember { mutableStateOf<Uri?>(null) }
@@ -139,14 +149,9 @@ fun JobsScreen(
                 .padding(horizontal = NaqiTokens.gutter)
                 .padding(top = NaqiTokens.space2, bottom = NaqiTokens.space5),
         ) {
-            if (queue.isNotEmpty()) {
-                QueueCard(queue)
-                Spacer(Modifier.height(NaqiTokens.space5))
-            }
-
             when {
-                running -> JobProgressCard(stageText, progress, etaMs) { JobController.cancel(context) }
-                succeeded -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context)
+                running -> JobProgressCard(stageText, progress, etaMs, onCancel)
+                showSaved -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context)
                 failed -> NaqiCard {
                     Text(
                         stringResource(if (outputMessageId != 0) outputMessageId else R.string.err_generic),
@@ -180,6 +185,11 @@ fun JobsScreen(
                 )
             }
 
+            if (queue.isNotEmpty()) {
+                if (running || showSaved || failed) Spacer(Modifier.height(NaqiTokens.space5))
+                QueueCard(queue)
+            }
+
             Spacer(Modifier.height(NaqiTokens.space6))
             SectionHeader(stringResource(R.string.jobs_library))
             if (library.isEmpty()) {
@@ -202,7 +212,7 @@ fun JobsScreen(
 }
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel: () -> Unit) {
+private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel: (() -> Unit)?) {
     val cs = MaterialTheme.colorScheme
     val starting = stringResource(R.string.jobs_stage_starting)
     NaqiCard {
@@ -240,7 +250,9 @@ private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel:
             } else {
                 Spacer(Modifier.weight(1f))
             }
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
+            if (onCancel != null) {
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
+            }
         }
     }
 }
@@ -315,11 +327,21 @@ private fun SavedCard(
 @Composable
 private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit) {
     val cs = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val uri = item.uri
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(enabled = item.uri != null, onClick = onOpen)
-            .padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3),
+            // The tap is the only way to open now, so it has to say so out loud to a screen reader.
+            .clickable(enabled = uri != null, onClickLabel = stringResource(R.string.action_open), onClick = onOpen)
+            // An IconButton is 48dp against a text button's 40dp; the shorter vertical padding keeps
+            // the row exactly as tall as it was, and the smaller end inset absorbs the button's own.
+            .padding(
+                start = NaqiTokens.space4,
+                end = NaqiTokens.space2,
+                top = NaqiTokens.space2,
+                bottom = NaqiTokens.space2,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -344,6 +366,15 @@ private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(formatSize(item.bytes), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+        }
+        // Tapping the row already opens it, so a trailing "Open" only repeated the row. Share is the
+        // other thing worth doing to a finished file, and as an icon it costs the row nothing.
+        // [loadLibrary] builds this uri with ContentUris, so it is content:// and safe to hand out as is.
+        if (uri != null) {
+            Spacer(Modifier.width(NaqiTokens.space2))
+            IconButton(onClick = { share(context, uri) }) {
+                Icon(NaqiIcons.Share, stringResource(R.string.action_share), tint = cs.onSurfaceVariant)
+            }
         }
     }
 }
@@ -414,11 +445,23 @@ private fun shareableUri(context: Context, uri: Uri): Uri? {
 private fun mimeOf(context: Context, uri: Uri): String = context.contentResolver.getType(uri) ?: MIME_MP4
 
 // runCatching: a device with no video player / no share target must not take the app down.
-private fun view(context: Context, uri: Uri) {
+internal fun view(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_VIEW)
         .setDataAndType(uri, mimeOf(context, uri))
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     runCatching { context.startActivity(intent) }
+        .onFailure { Toast.makeText(context, R.string.jobs_open_failed, Toast.LENGTH_SHORT).show() }
+}
+
+/**
+ * [share] for a uri that came back from a job rather than from MediaStore, so it could still be the
+ * pre-Q `file://` shape. [shareableUri] is a resolver query in that case, which is not something a
+ * click handler does on the main thread. Null means the scanner never indexed it and there is nothing
+ * safe to hand out — silence beats crashing whichever app it would have gone to.
+ */
+internal suspend fun shareOutput(context: Context, uri: Uri) {
+    val shareable = withContext(Dispatchers.IO) { shareableUri(context, uri) } ?: return
+    share(context, shareable)
 }
 
 private fun share(context: Context, uri: Uri) {

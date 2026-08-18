@@ -26,6 +26,11 @@
     <!-- Accepted containers; the format names are proper nouns and stay Latin in every locale. -->
     <string name="pick_video_formats">MP4 · MKV · WebM · MP3 · M4A</string>
 
+    <!-- The other source: a link the user pastes. See the English file — the placeholder carries the "or",
+         and the second string is the trailing icon button's content description. -->
+    <string name="pick_link_hint">أو الصق رابط فيديو</string>
+    <string name="pick_link_action">تنزيل الرابط</string>
+
     <!-- Section label above the two operation cards. Arabic has no case; a short phrase replaces the English caps. -->
     <string name="pick_eyebrow_choose">اختر ما تريد فلترته</string>
 
@@ -35,9 +40,9 @@
     <string name="pick_op_faces_title">حجب الوجوه</string>
     <!-- %1$s = the current Who choice (opt_who_everyone/_women/_men). The "·" sits between two Arabic runs,
          so the bidi algorithm resolves it RTL exactly as it already does in pick_diag_model_line. -->
-    <string name="pick_op_faces_desc">%1$s · والمشاهد المُخالفة.</string>
+    <string name="pick_op_faces_desc">%1$s · وحجب المشاهد خيار مستقل.</string>
     <!-- Shown while the toggle is OFF — see the English file. -->
-    <string name="pick_op_faces_desc_off">تُموّه الوجوه والمشاهد المُخالفة.</string>
+    <string name="pick_op_faces_desc_off">تُموّه الوجوه؛ وحجب المشاهد خيار مستقل.</string>
 
     <!-- Overflow menu on the pick screen; content description of the "⋮" button. -->
     <string name="action_more">المزيد</string>
@@ -71,12 +76,14 @@
     <!-- "مَن يُحجب" and not a bare "مَن": every sibling title in this card is a noun phrase, and the bare
          interrogative reads as a dangling question. Voweled to disambiguate مَن (who) from مِن (from). -->
     <string name="opt_who_title">مَن يُحجب</string>
-    <string name="opt_who_desc">أيّ الوجوه تُحجب. المشاهد المُخالفة تُحجب في كل الأحوال.</string>
+    <string name="opt_who_desc">أيّ الوجوه تُحجب. حجب المشاهد خيار مستقل.</string>
     <string name="opt_who_everyone">الجميع</string>
     <string name="opt_who_women">النساء</string>
     <string name="opt_who_men">الرجال</string>
     <string name="opt_whole_frame_title">حجب الشاشة كاملة</string>
     <string name="opt_whole_frame_desc">يحجب الصورة كاملة طوال ظهور وجه محجوب، لا الوجه وحده. غالبًا ما يُحجب معظم الفيديو بهذه الطريقة.</string>
+    <string name="opt_nsfw_title">حجب المشاهد المخالفة</string>
+    <string name="opt_nsfw_desc">يستخدم نموذج NSFW لحجب الصورة كاملة عندما يُصنَّف المشهد على أنه مخالف.</string>
     <string name="opt_strictness_title">الصرامة</string>
     <string name="opt_strictness_desc">مدى سهولة حجب المشهد كاملًا. لا يتأثّر تمويه الوجوه بهذا الإعداد.</string>
     <string name="opt_censor_style_title">أسلوب الحجب</string>
@@ -173,6 +180,7 @@
 
     <!-- Header of the system share sheet. -->
     <string name="jobs_share_chooser_title">مشاركة الفيديو</string>
+    <string name="jobs_open_failed">لا يوجد تطبيق يمكنه فتح هذا الملف.</string>
 
     <!-- File-size subtitle on a library row. %1$.1f = gigabytes, %1$.0f = megabytes. -->
     <string name="jobs_size_gb">%1$.1f غيغابايت</string>
@@ -237,24 +245,28 @@
     <!-- ============================================================
          Share sheet (M4)
          ============================================================ -->
-    <string name="share_loading">جارٍ قراءة تفاصيل الفيديو…</string>
-    <string name="share_info_failed">تعذّرت قراءة هذا الفيديو. قد يكون خاصًا أو محجوبًا في منطقتك أو الموقع غير مدعوم.</string>
     <string name="share_untitled">فيديو مُشارَك</string>
     <string name="share_eyebrow_quality">الجودة</string>
     <string name="share_eyebrow_filters">الفلاتر</string>
+    <string name="share_advanced_options">خيارات متقدمة</string>
+    <string name="share_hide_advanced_options">إخفاء الخيارات المتقدمة</string>
     <string name="share_quality_best">الأفضل</string>
+    <string name="share_quality_1080">1080p</string>
     <string name="share_quality_720">720p</string>
+    <string name="share_quality_480">480p</string>
     <string name="share_quality_audio">الصوت فقط</string>
     <string name="action_download">تنزيل</string>
     <string name="action_filter">فلترة</string>
     <string name="action_retry">إعادة المحاولة</string>
-    <string name="share_no_url">لم يُعثر على رابط في ما شاركته.</string>
+    <string name="share_no_url">هذا لا يبدو رابط فيديو.</string>
     <string name="share_already_queued">موجود في القائمة بالفعل.</string>
 
     <!-- Share queue (M4). -->
     <string name="queue_eyebrow">القائمة</string>
     <string name="queue_state_pending_download">في انتظار التنزيل</string>
+    <string name="queue_state_waiting_download">ينتظر انتهاء التنزيل الحالي</string>
     <string name="queue_state_pending_filter">في انتظار الفلترة</string>
+    <string name="queue_state_waiting_filter">ينتظر انتهاء الفيديو الحالي</string>
     <string name="queue_state_filtering">جارٍ الفلترة</string>
     <string name="queue_state_done">تم الحفظ</string>
     <string name="queue_state_failed">فشل</string>
@@ -297,12 +309,16 @@
     <string name="about_updating">جارٍ التحديث…</string>
     <string name="about_update_ok">أداة التنزيل محدّثة.</string>
     <string name="about_update_failed">تعذّر التحديث. تحقّق من اتصالك ثم أعد المحاولة.</string>
+    <!-- BRAND: the service name stays Latin in every locale. -->
+    <string name="about_repo_title">Github</string>
+    <string name="about_repo_desc">نقي مفتوح المصدر. اطّلع على الكود، أبلغ عن مشكلة، أو ابنِ التطبيق بنفسك.</string>
     <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
     <string name="about_notices_title">إشعارات المصادر المفتوحة</string>
     <string name="about_notice_missing">إشعارات المصادر المفتوحة غير متوفّرة في هذه النسخة.</string>
 
     <!-- Ongoing notification while a download runs; the second line is the video title. -->
     <string name="download_notif_title">جارٍ تنزيل الفيديو</string>
+    <string name="download_failed_notif_title">فشل تنزيل الفيديو</string>
     <string name="done_notif_title">تم حفظ النسخة المُفلترة</string>
     <string name="action_open">فتح</string>
     <string name="action_share">مشاركة</string>

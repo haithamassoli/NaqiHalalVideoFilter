@@ -51,7 +51,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.data.Prefs
@@ -137,9 +136,7 @@ fun OptionsScreen(
     // Naqi runs one job at a time and the unique work policy is KEEP, so starting a second one would
     // silently do nothing. Say so and disable Start instead of accepting a tap that goes nowhere.
     val workInfos by remember { JobController.observe(context) }.collectAsState(initial = emptyList())
-    val jobRunning = workInfos.firstOrNull()?.state.let {
-        it == WorkInfo.State.RUNNING || it == WorkInfo.State.ENQUEUED
-    }
+    val jobRunning = JobController.currentWork(workInfos)?.state?.isFinished == false
 
     fun startJob() {
         JobController.start(context, ops, inputUri.toString())
@@ -202,71 +199,7 @@ fun OptionsScreen(
                 .padding(horizontal = NaqiTokens.gutter)
                 .padding(top = NaqiTokens.space2, bottom = NaqiTokens.space5),
         ) {
-            if (ops.censorFaces) {
-                SectionHeader(stringResource(R.string.opt_section_censor_faces))
-                NaqiCard(contentPadding = 0.dp) {
-                    // First in the card: Who is the largest decision in the section, everything below
-                    // only tunes what it selected.
-                    // Saved on pick, not on Start: this is the only control that sets Who, and the
-                    // pick screen's toggle reads it back the next time censoring is turned on.
-                    WhoRow(ops.censorWho) { Prefs.saveWho(context, it); onOpsChange(ops.copy(censorWho = it)) }
-                    NaqiRowDivider()
-                    // Directly under Who because it is the other "how much gets covered" decision, and
-                    // above Strictness for the same reason Who is: it changes the picture, not the tuning.
-                    ToggleTile(
-                        title = stringResource(R.string.opt_whole_frame_title),
-                        desc = stringResource(R.string.opt_whole_frame_desc),
-                        checked = ops.wholeFrameBlur,
-                        onCheckedChange = { onOpsChange(ops.copy(wholeFrameBlur = it)) },
-                    )
-                    NaqiRowDivider()
-                    SliderRow(
-                        title = stringResource(R.string.opt_strictness_title),
-                        desc = stringResource(R.string.opt_strictness_desc),
-                        value = ops.strictness,
-                    ) { onOpsChange(ops.copy(strictness = it)) }
-                    NaqiRowDivider()
-                    CensorStyleRow(ops.solidColor) { onOpsChange(ops.copy(solidColor = it)) }
-                    // Both only style the blur, and a solid fill has no blur to style — showing them
-                    // under Solid would be two controls that cannot change the output.
-                    if (ops.solidColor == FilterOps.BLUR) {
-                        NaqiRowDivider()
-                        SliderRow(
-                            title = stringResource(R.string.opt_blur_amount_title),
-                            desc = stringResource(R.string.opt_blur_amount_desc),
-                            value = ops.blurAmount,
-                        ) { onOpsChange(ops.copy(blurAmount = it)) }
-                        NaqiRowDivider()
-                        ToggleTile(
-                            title = stringResource(R.string.opt_grayscale_title),
-                            desc = stringResource(R.string.opt_grayscale_desc),
-                            checked = ops.grayscale,
-                            onCheckedChange = { onOpsChange(ops.copy(grayscale = it)) },
-                        )
-                    }
-                    // The collapsible "Advanced" row went with plan-v2 §5.4: "Blur unknown faces" was the
-                    // only thing inside it, and once every detected face is censored there is no unknown
-                    // bucket left to open. An expander over nothing is worse than no expander.
-                }
-                Spacer(Modifier.height(NaqiTokens.space5))
-            }
-
-            if (ops.removeMusic) {
-                SectionHeader(stringResource(R.string.opt_section_remove_music))
-                NaqiCard(contentPadding = 0.dp) {
-                    KeepStemsOption(
-                        title = stringResource(R.string.opt_keep_vocals_title),
-                        desc = stringResource(R.string.opt_keep_vocals_desc),
-                        selected = ops.keepStems == "vocals",
-                    ) { onOpsChange(ops.copy(keepStems = "vocals")) }
-                    NaqiRowDivider()
-                    KeepStemsOption(
-                        title = stringResource(R.string.opt_keep_vocals_other_title),
-                        desc = stringResource(R.string.opt_keep_vocals_other_desc),
-                        selected = ops.keepStems == "vocals_other",
-                    ) { onOpsChange(ops.copy(keepStems = "vocals_other")) }
-                }
-            }
+            FilterOptions(ops, onOpsChange)
         }
     }
 
@@ -284,6 +217,80 @@ fun OptionsScreen(
                 TextButton(onClick = { confirming = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
+    }
+}
+
+/** The operation-specific controls shared by the full options screen and the share sheet. */
+@Composable
+internal fun FilterOptions(ops: FilterOps, onOpsChange: (FilterOps) -> Unit) {
+    val context = LocalContext.current
+
+    if (ops.censorFaces) {
+        SectionHeader(stringResource(R.string.opt_section_censor_faces))
+        NaqiCard(contentPadding = 0.dp) {
+            // First in the card: Who is the largest decision in the section, everything below
+            // only tunes what it selected. Save it immediately because both entry points reuse it
+            // when their faces toggle is turned back on.
+            WhoRow(ops.censorWho) { Prefs.saveWho(context, it); onOpsChange(ops.copy(censorWho = it)) }
+            NaqiRowDivider()
+            ToggleTile(
+                title = stringResource(R.string.opt_whole_frame_title),
+                desc = stringResource(R.string.opt_whole_frame_desc),
+                checked = ops.wholeFrameBlur,
+                onCheckedChange = { onOpsChange(ops.copy(wholeFrameBlur = it)) },
+            )
+            NaqiRowDivider()
+            ToggleTile(
+                title = stringResource(R.string.opt_nsfw_title),
+                desc = stringResource(R.string.opt_nsfw_desc),
+                checked = ops.censorNsfw,
+                onCheckedChange = { onOpsChange(ops.copy(censorNsfw = it)) },
+            )
+            if (ops.censorNsfw) {
+                NaqiRowDivider()
+                SliderRow(
+                    title = stringResource(R.string.opt_strictness_title),
+                    desc = stringResource(R.string.opt_strictness_desc),
+                    value = ops.strictness,
+                ) { onOpsChange(ops.copy(strictness = it)) }
+            }
+            NaqiRowDivider()
+            CensorStyleRow(ops.solidColor) { onOpsChange(ops.copy(solidColor = it)) }
+            // Both only style the blur, and a solid fill has no blur to style.
+            if (ops.solidColor == FilterOps.BLUR) {
+                NaqiRowDivider()
+                SliderRow(
+                    title = stringResource(R.string.opt_blur_amount_title),
+                    desc = stringResource(R.string.opt_blur_amount_desc),
+                    value = ops.blurAmount,
+                ) { onOpsChange(ops.copy(blurAmount = it)) }
+                NaqiRowDivider()
+                ToggleTile(
+                    title = stringResource(R.string.opt_grayscale_title),
+                    desc = stringResource(R.string.opt_grayscale_desc),
+                    checked = ops.grayscale,
+                    onCheckedChange = { onOpsChange(ops.copy(grayscale = it)) },
+                )
+            }
+        }
+        Spacer(Modifier.height(NaqiTokens.space5))
+    }
+
+    if (ops.removeMusic) {
+        SectionHeader(stringResource(R.string.opt_section_remove_music))
+        NaqiCard(contentPadding = 0.dp) {
+            KeepStemsOption(
+                title = stringResource(R.string.opt_keep_vocals_title),
+                desc = stringResource(R.string.opt_keep_vocals_desc),
+                selected = ops.keepStems == "vocals",
+            ) { onOpsChange(ops.copy(keepStems = "vocals")) }
+            NaqiRowDivider()
+            KeepStemsOption(
+                title = stringResource(R.string.opt_keep_vocals_other_title),
+                desc = stringResource(R.string.opt_keep_vocals_other_desc),
+                selected = ops.keepStems == "vocals_other",
+            ) { onOpsChange(ops.copy(keepStems = "vocals_other")) }
+        }
     }
 }
 

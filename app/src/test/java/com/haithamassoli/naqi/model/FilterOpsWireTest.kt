@@ -65,6 +65,7 @@ class FilterOpsWireTest {
     fun theDefaultsAreTheOnesTheUiOpensOn() {
         assertEquals(FilterOps.WOMEN, FilterOps.DEFAULT_WHO)
         assertEquals(FilterOps.NONE, FilterOps().censorWho)
+        assertTrue(FilterOps().censorNsfw)
         assertEquals(40, FilterOps().strictness)
     }
 
@@ -107,6 +108,12 @@ class FilterOpsWireTest {
         assertEquals(FilterOps.MEN, Queue.opsFromJson(JSONObject().put("censorWho", "men")).censorWho)
     }
 
+    @Test
+    fun theNsfwChoiceSurvivesOldAndNewQueueItems() {
+        assertTrue(Queue.opsFromJson(JSONObject()).censorNsfw)
+        assertFalse(Queue.opsFromJson(JSONObject().put("censorNsfw", false)).censorNsfw)
+    }
+
     /** The same fallback for a job enqueued by the old build and run after the update. */
     @Test
     fun aJobEnqueuedByTheOldBuildKeepsItsCensorSetting() {
@@ -121,9 +128,11 @@ class FilterOpsWireTest {
      */
     @Test
     fun theWorkDataWriterEmitsOnlyTheNewKey() {
-        val data = workDataOf(*FilterOps(censorWho = FilterOps.WOMEN).pairs())
+        val data = workDataOf(*FilterOps(censorWho = FilterOps.WOMEN, censorNsfw = false).pairs())
         assertEquals(FilterOps.WOMEN, data.getString("censor_who"))
         assertFalse(data.keyValueMap.containsKey("censor_women"))
         assertEquals(FilterOps.WOMEN, data.filterOps().censorWho)
+        assertFalse(data.filterOps().censorNsfw)
+        assertTrue(workDataOf().filterOps().censorNsfw)
     }
 }
