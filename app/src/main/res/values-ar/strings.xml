@@ -274,6 +274,23 @@
     <string name="queue_clear_finished">مسح المكتملة</string>
 
     <!-- ============================================================
+         App update card (UpdateCard, on the pick screen).
+         ============================================================ -->
+    <!-- BRAND: "نقي" then the Latin version number, wrapped in RTL marks so it reads correctly. -->
+    <string name="update_available">نقي ‏%1$s‏ متاح</string>
+    <string name="update_sub">‏%1$s‏ · لديك ‏%2$s</string>
+    <string name="update_action">تحديث</string>
+    <string name="update_downloading">جارٍ تنزيل نقي ‏%1$s</string>
+    <string name="update_bytes">‏%1$s‏ من ‏%2$s</string>
+    <string name="update_ready">نقي ‏%1$s‏ جاهز للتثبيت</string>
+    <string name="update_ready_sub">ستبقى مقاطعك وإعداداتك كما هي.</string>
+    <string name="update_install">تثبيت</string>
+    <string name="update_failed">تعذّر التنزيل</string>
+    <string name="update_failed_sub">تحقّق من اتصالك ثم أعد المحاولة.</string>
+    <string name="update_retry">إعادة المحاولة</string>
+    <string name="update_dismiss">تجاهل</string>
+
+    <!-- ============================================================
          About / open-source licences (M4). AboutScreen.
          ============================================================ -->
     <string name="about_title">عن نقي</string>
