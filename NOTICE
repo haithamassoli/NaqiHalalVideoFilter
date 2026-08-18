@@ -13,7 +13,8 @@ GPL-3.0. Before the download feature the repository carried no licence at all.
 UNRESOLVED LICENCE ISSUE — READ BEFORE ANY PUBLIC RELEASE
 ======================================================
 
-  The NSFW gate (nsfw_mnv2_140_f32.onnx, from GantMan/nsfw_model 1.2.0) is
+  The NSFW gate (nsfw_mnv2_140_int8.onnx, quantized from nsfw_mnv2_140_f32.onnx,
+  from GantMan/nsfw_model 1.2.0) is
   marked NOASSERTION upstream and still needs review before distribution.
 
   RESOLVED: NudeNet v3 320n (AGPL-3.0) has been removed from the app. It
@@ -58,7 +59,14 @@ Demucs (htdemucs) — github.com/facebookresearch/demucs
   github.com/sevagh/demucs.onnx. Used for music removal.
 
 nsfw_model (MobileNetV2 1.4-224) — github.com/GantMan/nsfw_model
-  NOASSERTION upstream. See the unresolved-licence section above.
+  NOASSERTION upstream. See the unresolved-licence section above. The shipped
+  artifact is the INT8 quantization of it (scripts/nsfw_int8_quantize.py); the
+  fp32 graph it was quantized from is kept alongside as the A/B baseline.
+
+YAMNet — github.com/tensorflow/models/tree/master/research/audioset/yamnet
+  Apache License 2.0. Google's TF2 SavedModel, converted to ONNX by
+  scripts/yamnet_export.py. Answers "is there music in this chunk?" so silent
+  and speech-only stretches skip stem separation.
 
 InsightFace (buffalo_l — genderage.onnx) — github.com/deepinsight/insightface
   Code MIT; the buffalo_l weight pack is published for non-commercial research

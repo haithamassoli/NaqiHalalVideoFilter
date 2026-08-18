@@ -1,0 +1,47 @@
+name: Bug report
+description: Something is broken or behaves wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Naqi version
+      description: About → Version, e.g. 1.4.4 (21)
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: Galaxy S23, Android 15
+    validations:
+      required: true
+  - type: textarea
+    id: job
+    attributes:
+      label: The job
+      description: >
+        Which operations were on (remove music / censor faces / NSFW gate), who was selected,
+        strictness, and roughly how long the input is. Source format helps too (MP4, MKV, a link).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logcat, if you have it
+      description: "`adb logcat -d | grep -i naqi` around the failure. Optional, but it usually decides the issue."
+      render: text
+  - type: checkboxes
+    id: accuracy
+    attributes:
+      label: Please confirm
+      options:
+        - label: This is not just "it missed a face" or "it censored too much" — that is accuracy, not a bug (see the README).
+          required: true

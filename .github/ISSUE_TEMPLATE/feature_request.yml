@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest something Naqi should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that Naqi makes hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: Optional. The problem matters more than the solution.
+  - type: checkboxes
+    id: docs
+    attributes:
+      label: Please confirm
+      options:
+        - label: I searched `docs/` — several ideas were already considered and rejected there, with reasons.
+          required: true
