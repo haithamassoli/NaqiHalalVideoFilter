@@ -160,14 +160,68 @@ function png(out, size, shape) {
     <defs>${GRAD}<clipPath id="c">${clip}</clipPath></defs>
     <g clip-path="url(#c)"><rect width="108" height="108" fill="url(#bg)"/>
     ${markSvgPaths(PAPER, BRIGHT)}</g></svg>`;
+  shot(svg, out, size, size);
+}
+
+// Rasterise a fragment of markup at an exact pixel size.
+function shot(body, out, w, h) {
   const html = `${TMP}/t.html`;
-  fs.writeFileSync(html, `<style>html,body{margin:0;padding:0;background:transparent}</style>${svg}`);
+  fs.writeFileSync(html, `<style>html,body{margin:0;padding:0;background:transparent}</style>${body}`);
   cp.execFileSync(CHROME, ['--headless', '--disable-gpu', '--hide-scrollbars',
+    '--allow-file-access-from-files', '--force-device-scale-factor=1',
     '--default-background-color=00000000', `--screenshot=${out}`,
-    `--window-size=${size},${size}`, `file://${html}`], { stdio: 'ignore' });
+    `--window-size=${w},${h}`, `file://${html}`], { stdio: 'ignore' });
 }
 
 png(`${BRAND}/naqi-icon-512.png`, 512, 'square');   // Play Store listing icon
 png(`${BRAND}/naqi-icon-1024.png`, 1024, 'squircle');
+
+// ---------- Play feature graphic (1024x500) ----------
+// Play crops this on some surfaces and overlays a play button over the middle, so the lockup sits
+// left of centre and nothing that has to be read comes within 88px of an edge.
+const FONT = `${RES}/font/thmanyah_sans`;
+const MARK_H = 202, MARK_W = +(MARK_H * box[2] / box[3]).toFixed(1);
+const AR_NAME = 'نقي';
+const AR_TAG = 'فلترة فيديو حلال، '
+  + 'على جهازك وحده.';
+const banner = `<style>
+  @font-face{font-family:Thmanyah;src:url('file://${FONT}_regular.otf');font-weight:400}
+  @font-face{font-family:Thmanyah;src:url('file://${FONT}_medium.otf');font-weight:500}
+  @font-face{font-family:Thmanyah;src:url('file://${FONT}_bold.otf');font-weight:700}
+  body{width:1024px;height:500px;font-family:Thmanyah,sans-serif;color:${PAPER};overflow:hidden}
+  .bg{position:absolute;inset:0;background:
+      radial-gradient(70% 130% at 14% -10%, #2E9479 0%, rgba(46,148,121,0) 60%),
+      linear-gradient(126deg, #1E6B58 0%, #0C1512 62%, #08110E 100%)}
+  /* the mark again, oversized and bleeding off the corner — depth without a second colour */
+  .ghost{display:none}
+  .lockup{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);justify-content:center;
+    display:flex;align-items:center;gap:50px}
+  .mark{width:${MARK_W}px;height:${MARK_H}px;flex:none}
+  h1{margin:0 0 22px;font-weight:700;font-size:92px;line-height:.86;letter-spacing:-2.5px;
+    display:flex;align-items:baseline;gap:22px}
+  h1 span{font-size:50px;letter-spacing:0;color:${BRIGHT}}
+  p{margin:0;font-weight:500;font-size:29px;line-height:1.5;color:rgba(245,247,243,.74)}
+  p+p{color:rgba(245,247,243,.5);font-size:27px}
+  .keys{margin-top:30px;display:flex;gap:12px;font-weight:500;font-size:20px;letter-spacing:1.6px}
+  .keys i{font-style:normal;padding:7px 15px;border:1px solid rgba(111,217,182,.34);
+    border-radius:999px;color:${BRIGHT}}
+</style>
+<div class="bg"></div>
+<svg class="ghost" viewBox="${box.join(' ')}" xmlns="http://www.w3.org/2000/svg">
+  ${markSvgPaths(PAPER, PAPER)}
+</svg>
+<div class="lockup">
+  <svg class="mark" viewBox="${box.join(' ')}" xmlns="http://www.w3.org/2000/svg">
+    ${markSvgPaths(PAPER, BRIGHT)}
+  </svg>
+  <div>
+    <h1>Naqi<span dir="rtl">${AR_NAME}</span></h1>
+    <p>Halal video filtering, entirely on your phone.</p>
+    <p dir="rtl">${AR_TAG}</p>
+    <div class="keys"><i>PRIVATE</i><i>OFFLINE</i><i>OPEN SOURCE</i></div>
+  </div>
+</div>`;
+shot(banner, `${BRAND}/naqi-feature-1024x500.png`, 1024, 500);
+
 fs.rmSync(TMP, { recursive: true, force: true });
 console.log('generated');
