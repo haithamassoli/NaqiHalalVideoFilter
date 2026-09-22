@@ -69,7 +69,6 @@ import com.haithamassoli.naqi.ui.NaqiTopBar
 import com.haithamassoli.naqi.ui.NoteLine
 import com.haithamassoli.naqi.ui.SectionHeader
 import com.haithamassoli.naqi.ui.ToggleTile
-import com.haithamassoli.naqi.ui.UpdateCard
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.Queue
@@ -178,21 +177,25 @@ fun PickOpsScreen(
             TrustSeal()
             Spacer(Modifier.height(NaqiTokens.space5))
 
-            // Renders nothing unless there is an update to offer, so on almost every launch this
-            // costs the screen no room at all.
-            UpdateCard(Modifier.padding(bottom = NaqiTokens.space5))
-
             PickVideoCard(picked = pickedUri != null, fileName = pickedName) {
                 picker.launch(arrayOf("video/*", "audio/*"))
             }
-            // Tighter than the gap below: file and link are one decision with two answers.
-            Spacer(Modifier.height(NaqiTokens.space3))
-            LinkField(
-                value = link,
-                error = linkError,
-                onValueChange = { link = it; linkError = null },
-                onSubmit = ::submitLink,
-            )
+            // ponytail: the link field stays hidden for the first 3 days after install; sharing a link
+            // into the app still works. Delete this gate when it is no longer needed.
+            val linkFieldVisible = remember {
+                val installed = context.packageManager.getPackageInfo(context.packageName, 0).firstInstallTime
+                System.currentTimeMillis() - installed >= 3L * 24 * 60 * 60 * 1000
+            }
+            if (linkFieldVisible) {
+                // Tighter than the gap below: file and link are one decision with two answers.
+                Spacer(Modifier.height(NaqiTokens.space3))
+                LinkField(
+                    value = link,
+                    error = linkError,
+                    onValueChange = { link = it; linkError = null },
+                    onSubmit = ::submitLink,
+                )
+            }
             Spacer(Modifier.height(NaqiTokens.space5))
 
             SectionHeader(stringResource(R.string.pick_eyebrow_choose))
