@@ -319,7 +319,7 @@ private fun OverflowMenu(onAbout: () -> Unit) {
 }
 
 @Composable
-private fun TrustSeal() {
+internal fun TrustSeal() {
     val primary = MaterialTheme.colorScheme.primary
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
         Row(
