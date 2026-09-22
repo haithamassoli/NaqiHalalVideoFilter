@@ -341,4 +341,18 @@
     <string name="action_open">Open</string>
     <string name="action_share">Share</string>
     <string name="action_delete_original">Delete original</string>
+
+    <!-- Onboarding — first launch only -->
+    <string name="onb_get_started">Get started</string>
+    <string name="onb_welcome_title">Clean up any video</string>
+    <string name="onb_welcome_body">Naqi filters your videos the way you want, in a few taps.</string>
+    <string name="onb_feat_blur">Blur faces automatically</string>
+    <string name="onb_feat_music">Remove music, keep the voices</string>
+    <string name="onb_feat_private">Everything stays on your device</string>
+    <string name="onb_blur_title">Blurring</string>
+    <string name="onb_blur_body">Choose whose faces to cover and how.</string>
+    <string name="onb_music_title">Music</string>
+    <string name="onb_music_body">Naqi can take the music out and leave the dialogue.</string>
+    <string name="onb_ready_title">You\'re all set</string>
+    <string name="onb_ready_body">Pick a video and Naqi does the rest. You can change these choices before each video.</string>
 </resources>

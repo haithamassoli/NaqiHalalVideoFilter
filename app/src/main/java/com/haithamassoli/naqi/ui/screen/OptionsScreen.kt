@@ -300,7 +300,7 @@ internal fun FilterOptions(ops: FilterOps, onOpsChange: (FilterOps) -> Unit) {
  * would be a control that turns off the card containing it. Off stays the step-1 toggle.
  */
 @Composable
-private fun WhoRow(who: String, onChange: (String) -> Unit) {
+internal fun WhoRow(who: String, onChange: (String) -> Unit) {
     val cs = MaterialTheme.colorScheme
     Column(Modifier.padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3)) {
         Text(stringResource(R.string.opt_who_title), style = MaterialTheme.typography.titleSmall, color = cs.onSurface)
@@ -327,7 +327,7 @@ private fun WhoRow(who: String, onChange: (String) -> Unit) {
  * covers that; add a picker if anyone actually asks to match a specific palette.
  */
 @Composable
-private fun CensorStyleRow(color: Int, onChange: (Int) -> Unit) {
+internal fun CensorStyleRow(color: Int, onChange: (Int) -> Unit) {
     val cs = MaterialTheme.colorScheme
     Column(Modifier.padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3)) {
         Text(stringResource(R.string.opt_censor_style_title), style = MaterialTheme.typography.titleSmall, color = cs.onSurface)

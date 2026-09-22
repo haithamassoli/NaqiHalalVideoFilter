@@ -323,4 +323,18 @@
     <string name="action_open">فتح</string>
     <string name="action_share">مشاركة</string>
     <string name="action_delete_original">حذف الأصلي</string>
+
+    <!-- Onboarding — first launch only -->
+    <string name="onb_get_started">ابدأ الآن</string>
+    <string name="onb_welcome_title">نقِّ أي فيديو</string>
+    <string name="onb_welcome_body">يصفّي نقي فيديوهاتك كما تحب، ببضع لمسات.</string>
+    <string name="onb_feat_blur">تمويه الوجوه تلقائيًا</string>
+    <string name="onb_feat_music">إزالة الموسيقى مع إبقاء الأصوات</string>
+    <string name="onb_feat_private">كل شيء يبقى على جهازك</string>
+    <string name="onb_blur_title">التمويه</string>
+    <string name="onb_blur_body">اختر وجوه مَن تُحجب وكيف.</string>
+    <string name="onb_music_title">الموسيقى</string>
+    <string name="onb_music_body">يستطيع نقي إزالة الموسيقى وإبقاء الحوار.</string>
+    <string name="onb_ready_title">كل شيء جاهز</string>
+    <string name="onb_ready_body">اختر فيديو ونقي يتكفّل بالباقي. يمكنك تغيير هذه الخيارات قبل كل فيديو.</string>
 </resources>

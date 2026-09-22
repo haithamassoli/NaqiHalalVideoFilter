@@ -21,6 +21,8 @@ object Prefs {
     private const val KEY_REMOVE_MUSIC = "remove_music"
     private const val KEY_CENSOR_WHO = "censor_who"
     private const val KEY_CENSOR_NSFW = "censor_nsfw"
+    private const val KEY_SOLID_COLOR = "solid_color"
+    private const val KEY_ONBOARDED = "onboarded"
 
     /** Read-only legacy: what [KEY_CENSOR_WHO] replaced. Still read so an upgrade keeps the last pick. */
     private const val KEY_CENSOR_WOMEN = "censor_women"
@@ -58,6 +60,7 @@ object Prefs {
                 ?: if (contains(KEY_CENSOR_WOMEN)) FilterOps.whoFromLegacy(getBoolean(KEY_CENSOR_WOMEN, true))
                 else FilterOps.DEFAULT_WHO,
             censorNsfw = getBoolean(KEY_CENSOR_NSFW, true),
+            solidColor = getInt(KEY_SOLID_COLOR, FilterOps.BLUR),
         )
     }
 
@@ -83,8 +86,16 @@ object Prefs {
             .putBoolean(KEY_REMOVE_MUSIC, ops.removeMusic)
             .putString(KEY_CENSOR_WHO, ops.censorWho)
             .putBoolean(KEY_CENSOR_NSFW, ops.censorNsfw)
+            .putInt(KEY_SOLID_COLOR, ops.solidColor)
             .putString(KEY_QUALITY, quality.name)
             .apply()
+    }
+
+    /** False until the first-launch tour is finished; set once and never cleared. */
+    fun onboarded(context: Context): Boolean = prefs(context).getBoolean(KEY_ONBOARDED, false)
+
+    fun markOnboarded(context: Context) {
+        prefs(context).edit().putBoolean(KEY_ONBOARDED, true).apply()
     }
 
     /** Has it been a week since the last yt-dlp update check? */

@@ -12,9 +12,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.screen.AboutScreen
 import com.haithamassoli.naqi.ui.screen.JobsScreen
+import com.haithamassoli.naqi.ui.screen.OnboardingScreen
 import com.haithamassoli.naqi.ui.screen.OptionsScreen
 import com.haithamassoli.naqi.ui.screen.PickOpsScreen
 import com.haithamassoli.naqi.work.JobController
@@ -61,6 +63,14 @@ fun NaqiApp(
             step = Step.Jobs
             attached = true
         }
+    }
+
+    // First launch only. After everything above so the hooks keep a stable order; the tour's picks
+    // seed this session's ops, and it wrote them to Prefs for every later one.
+    var onboarded by rememberSaveable { mutableStateOf(Prefs.onboarded(context)) }
+    if (!onboarded) {
+        OnboardingScreen(onDone = { ops = it; onboarded = true }, modifier = modifier)
+        return
     }
 
     // Both later steps go back to the start: options is a detour off pick, and jobs ends the flow.
