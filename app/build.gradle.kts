@@ -15,8 +15,8 @@ android {
         applicationId = "com.haithamassoli.naqi"
         minSdk = 29
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.4.5"
+        versionCode = 24
+        versionName = "1.4.6"
 
         // Base URL for the M3 model downloader's *converted* artifacts (the NSFW gate and htdemucs —
         // NudeNet carries its own public release URL). Empty by default: no host is published yet, and
@@ -153,6 +153,21 @@ val copyNotice = tasks.register<CopyNoticeTask>("copyNotice") {
 androidComponents.onVariants { variant ->
     variant.sources.assets?.addGeneratedSourceDirectory(copyNotice, CopyNoticeTask::outputDir)
 }
+
+// Models are gitignored. A build without them looks healthy but cannot remove music or censor scenes.
+abstract class VerifyModelsTask : DefaultTask() {
+    @get:Internal abstract val modelsDir: DirectoryProperty
+
+    @TaskAction fun verify() {
+        val missing = listOf("genderage.onnx", "htdemucs_s26_f16.onnx", "nsfw_mnv2_140_int8.onnx", "yamnet.onnx")
+            .filter { modelsDir.file(it).get().asFile.length() == 0L }
+        check(missing.isEmpty()) { "Missing ONNX models: $missing. Run ./scripts/fetch-models.sh" }
+    }
+}
+val verifyModels = tasks.register<VerifyModelsTask>("verifyModels") {
+    modelsDir.set(layout.projectDirectory.dir("src/main/assets/models"))
+}
+tasks.named("preBuild") { dependsOn(verifyModels) }
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))

@@ -252,6 +252,16 @@ class DemucsSeparatorTest {
         assertTrue("passthrough SNR", snrDb(input, out, 2 * n) > 60.0)
     }
 
+    @Test
+    fun absentGateSeparatesEveryChunk() {
+        val n = 300_000
+        val input = noise(n)
+        val fake = SpecFake(mapOf(3 to 1f))
+        var calls = 0
+        run(input, n, keepOther = false, infer = { w, s -> calls++; fake.infer(w, s) })
+        assertEquals(((n + MAX_SHIFT + STRIDE - 1L) / STRIDE).toInt(), calls)
+    }
+
     /**
      * Dilation, both directions. One music-positive chunk must force the model over ITSELF and over the
      * two chunks on each side, and over nothing else.

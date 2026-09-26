@@ -92,11 +92,9 @@ The models are gitignored (~105 MB of ONNX), so a fresh clone must fetch them fi
 ./scripts/fetch-models.sh
 ```
 
-That script downloads what has a public host (`yamnet`, InsightFace `genderage`) and quantizes the
-INT8 NSFW gate locally. `nsfw_mnv2_140_f32.onnx` and `htdemucs_s26_f16.onnx` are locally converted
-artifacts with no public host — the regeneration pipelines (venvs, commands, parity checks) are in
-[`docs/m0-spikes.md`](docs/m0-spikes.md). Alternatively, host them yourself and pass
-`-PnaqiModelBaseUrl=https://your-host/path` so the app downloads them on first use instead.
+The script restores all four models from the v1.4.4 APK and checks their SHA-256 hashes. The build
+fails if any model is missing, preventing an APK whose filtering cannot work. Model regeneration
+steps are in [`docs/m0-spikes.md`](docs/m0-spikes.md).
 
 Then:
 
