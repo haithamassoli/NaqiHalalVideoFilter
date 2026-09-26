@@ -22,6 +22,7 @@ import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.analysis.NRect
 import com.haithamassoli.naqi.analysis.NsfwGate
 import com.haithamassoli.naqi.analysis.VideoMeta
+import com.haithamassoli.naqi.audio.AudioDecoder
 import com.haithamassoli.naqi.audio.AudioPipeline
 import com.haithamassoli.naqi.audio.ConcatAudio
 import com.haithamassoli.naqi.audio.ConcatPart
@@ -34,6 +35,7 @@ import com.haithamassoli.naqi.edl.Edl
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.edl.FaceTrackEdl
 import com.haithamassoli.naqi.edl.promoteFacesToFullFrame
+import com.haithamassoli.naqi.media.containerDurationMs
 import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.media.firstTrackIndex
 import com.haithamassoli.naqi.media.requireTrackIndex
@@ -50,6 +52,9 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import kotlin.math.exp
 import kotlin.math.max
+
+internal fun shouldResumeAudio(durationMs: Long, forcedSegments: Boolean): Boolean =
+    durationMs >= Eta.CONFIRM_THRESHOLD_MS || forcedSegments
 
 /**
  * Filtering job. Up to two passes over one source video plus an audio pass, promoted to a foreground
@@ -183,7 +188,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // A1 also landed in this build but does NOT belong on this list: it splits the gate fill across
             // two threads and leaves the tensor bit-identical, so an older `an-NNN.json`'s `firingsMs` is
             // still valid. A4, which would have changed the gate's pixels, was cut for under-censoring.)
-            "plan4",
+            // The current separator no longer skips chunks with YAMNet: the old gate missed audible
+            // music. Old audio checkpoints may contain bypassed chunks, so only music jobs get a new key.
+            if (inputData.getBoolean(KEY_REMOVE_MUSIC, false)) "music-gate-off-v1" else "plan4",
         )
     }
 
@@ -214,7 +221,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         // Probed before Preflight because the segment plan changes how much scratch the job needs.
         val probed = runCatching { FrameSampler.probe(applicationContext, inputUri) }
         val meta = probed.getOrNull()
-        val durationMs = meta?.durationMs ?: 0L
 
         // The fifth job shape: an "Audio only" download has no video track at all. Every other shape
         // assumes one — music removal *copies* it sample-for-sample — so this is detected rather than
@@ -222,6 +228,10 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         // a flag threaded from the download would be one more thing to keep in sync with reality.
         val audioOnly = removeMusic && !hasVideoTrack(inputUri)
         if (audioOnly) Log.i(TAG, "audio-only job: no video track, publishing to Music/Naqi")
+        val durationMs = if (audioOnly) {
+            applicationContext.containerDurationMs(inputUri).takeIf { it > 0L }
+                ?: (AudioDecoder.estimateFrames(applicationContext, inputUri) / 44_100L * 1000L)
+        } else meta?.durationMs ?: 0L
 
         val plan = if (audioOnly) emptyList() else planFor(inputUri, durationMs, inputData.getLong(KEY_SEGMENT_MS, 0L))
         val segmented = censorFaces && plan.isNotEmpty()
@@ -240,7 +250,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         // exercised on a clip short enough to kill and resume by hand — it is otherwise unreachable below
         // 30 min, which is far too long an iteration loop for the fiddliest code in the phase.
         val forcedSegments = inputData.getLong(KEY_SEGMENT_MS, 0L) > 0
-        val resumableAudio = removeMusic && (durationMs >= Eta.CONFIRM_THRESHOLD_MS || forcedSegments)
+        val resumableAudio = removeMusic && shouldResumeAudio(durationMs, forcedSegments)
         if (segmented) Log.i(TAG, "segmented: ${plan.size} segments over ${durationMs}ms key=$jobKey")
 
         // --- Preflight (BEFORE any heavy setForeground work) ---
@@ -276,10 +286,10 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
         queued { it.copy(state = Queue.State.FILTERING, error = null) }
         return when {
-            audioOnly -> runAudioOnly(inputUri)
+            audioOnly -> runAudioOnly(inputUri, resumableAudio)
             segmented -> runSegmented(inputUri, plan, removeMusic, audioPlan, durationMs, meta!!)
             removeMusic && censorFaces -> runCombined(inputUri, meta!!)
-            removeMusic -> runMusicOnly(inputUri, durationMs)
+            removeMusic -> runMusicOnly(inputUri, resumableAudio)
             else -> runCensorOnly(inputUri, meta!!) // M1's unsegmented path
         }
     }
@@ -330,19 +340,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         }
     }
 
-    /**
-     * Audio-only: [AudioPipeline.removeMusic] already emits an `.m4a`, so there is nothing to render and
-     * nothing to mux — separate over the whole 1..99 band and publish into `Music/Naqi`.
-     *
-     * ponytail: this shape NEVER resumes, and unlike [runMusicOnly] that is not a choice. `durationMs`
-     * comes from [FrameSampler.probe], which opens with `requireTrackIndex("video/")` and therefore throws
-     * on the very `.m4a` that gets us here — doWork's `runCatching { … }.getOrDefault(0L)` then hands this
-     * shape 0 on every run, so the >= 30 min resumable test could never fire. The dead branch is gone
-     * rather than left to look like a live option. To actually give a long podcast a resumable separator,
-     * measure duration off the AUDIO track (MediaMetadataRetriever's METADATA_KEY_DURATION works with no
-     * video track) and pass `workDir` as `jobDir` above that threshold.
-     */
-    private suspend fun runAudioOnly(inputUri: Uri): Result {
+    /** Separate an audio source directly into Music/Naqi, using PCM checkpoints for long jobs. */
+    private suspend fun runAudioOnly(inputUri: Uri, resumable: Boolean): Result {
         setForeground(foregroundInfo(stage(R.string.stage_separating), 1))
 
         val audioTemp = File(workDir, "audio.m4a")
@@ -353,6 +352,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 applicationContext, inputUri, keepStems, audioTemp,
                 onProgress = { p -> reportBand(sep, p, 1, 98) },  // 0..100 -> 1..99
                 isCancelled = { isStopped },
+                jobDir = if (resumable) workDir else null,
             )
 
             val displayName = outputName(inputUri, ext = "m4a")
@@ -361,14 +361,14 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             JobStore.delete(applicationContext, jobKey)
             return succeed(displayName, outputUri, inputUri, Publish.MIME_M4A)
         } catch (c: CancellationException) {
-            runCatching { JobStore.delete(applicationContext, jobKey) }
+            if (!resumable || userCancelled()) runCatching { JobStore.delete(applicationContext, jobKey) }
             throw c
         } catch (t: Throwable) {
             Log.e(TAG, "audio-only job failed", t)
-            runCatching { JobStore.delete(applicationContext, jobKey) }
-            return fail(Preflight.messageFor(t))
+            if (!resumable) runCatching { JobStore.delete(applicationContext, jobKey) }
+            return fail(Preflight.messageFor(t), resumable = resumable)
         } finally {
-            stats.finish("shape=audio")
+            stats.finish("shape=audio resumable=$resumable")
         }
     }
 
@@ -798,13 +798,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     }
 
     // ---- Music-only: audio 1..97, mux 97..99, video passthrough from the original Uri ----
-    private suspend fun runMusicOnly(inputUri: Uri, durationMs: Long): Result {
+    private suspend fun runMusicOnly(inputUri: Uri, resumable: Boolean): Result {
         setForeground(foregroundInfo(stage(R.string.stage_separating), 1))
 
         val audioTemp = File(workDir, "audio.m4a")
-        // There is no video pass to segment here, so "long" only buys the resumable separator. Same
-        // 30-minute threshold as everything else, so the product has one notion of a long job.
-        val resumable = durationMs >= Eta.CONFIRM_THRESHOLD_MS
+        // There is no video pass to segment here, so "long" only buys the resumable separator.
         try {
             val sep = stage(R.string.stage_separating)
             stats.stage("separate")
@@ -832,7 +830,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         } catch (t: Throwable) {
             Log.e(TAG, "music job failed", t)
             if (!resumable) runCatching { JobStore.delete(applicationContext, jobKey) }
-            return fail(Preflight.messageFor(t))
+            return fail(Preflight.messageFor(t), resumable = resumable)
         } finally {
             stats.finish("shape=music resumable=$resumable")
         }
