@@ -1304,7 +1304,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     ): Result {
         val quarantined = Downloader.isQuarantined(applicationContext, inputUri)
         if (quarantined) Downloader.discard(applicationContext, inputUri)
-        queued { it.copy(state = Queue.State.DONE, outputUri = outputUri.toString()) }
+        finished()
         JobNotifications.done(
             applicationContext, displayName, outputUri.toString(),
             inputUri.toString().takeUnless { quarantined }, mime,

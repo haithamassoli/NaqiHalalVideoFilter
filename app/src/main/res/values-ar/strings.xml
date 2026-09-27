@@ -166,6 +166,10 @@
     <!-- Library list. "Movies/Naqi" is a real on-disk path — keep it Latin, untranslated. -->
     <string name="jobs_library">المكتبة</string>
     <string name="jobs_library_empty">تُحفظ الملفات المُفلترة في Movies/Naqi، والصوت في Music/Naqi.</string>
+    <!-- Library overflow → Delete. %1$s = the file name. -->
+    <string name="jobs_delete_title">حذف هذا الملف؟</string>
+    <string name="jobs_delete_body">سيُحذف %1$s من هذا الجهاز ولا يمكن استرجاعه.</string>
+    <string name="jobs_delete_failed">تعذّر حذف الملف — احذفه من المعرض بدلًا من ذلك.</string>
 
     <!-- Progress card. jobs_stage_starting fills the instant before the worker publishes its first stage_* value. -->
     <string name="jobs_stage_starting">جارٍ البدء…</string>

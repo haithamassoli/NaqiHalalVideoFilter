@@ -73,7 +73,9 @@ internal object Queue {
         if (!file.exists()) return emptyList<Item>().also { _items.value = it }
         val parsed = runCatching {
             val array = JSONArray(file.readText())
+            // DONE rows written before finished items left the queue: their output is in the library.
             (0 until array.length()).map { fromJson(context, array.getJSONObject(it)) }
+                .filterNot { it.state == State.DONE }
         }.getOrElse {
             // A truncated or hand-edited file must not brick the queue screen forever.
             Log.w(TAG, "queue.json unreadable, starting empty", it)

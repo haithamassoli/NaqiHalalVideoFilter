@@ -171,6 +171,10 @@
     <!-- Library list. "Movies/Naqi" is a real on-disk path — keep it Latin, untranslated. -->
     <string name="jobs_library">Library</string>
     <string name="jobs_library_empty">Filtered files are saved to Movies/Naqi, audio to Music/Naqi.</string>
+    <!-- Library overflow → Delete. %1$s = the file name. -->
+    <string name="jobs_delete_title">Delete this file?</string>
+    <string name="jobs_delete_body">%1$s will be removed from this device and can’t be recovered.</string>
+    <string name="jobs_delete_failed">Couldn’t delete the file — remove it from your gallery instead.</string>
 
     <!-- Progress card. jobs_stage_starting fills the instant before the worker publishes its first stage_* value. -->
     <string name="jobs_stage_starting">Starting…</string>

@@ -121,13 +121,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
                     Publish.video(applicationContext, file, name, mime) { isStopped }
                 }
                 Downloader.discard(applicationContext, fileUri)
-                queued {
-                    it.copy(
-                        title = it.title ?: downloadedTitle,
-                        state = Queue.State.DONE,
-                        outputUri = outputUri.toString(),
-                    )
-                }
+                finished()
                 JobNotifications.done(
                     applicationContext, name, outputUri.toString(), null,
                     mime,
