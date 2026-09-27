@@ -10,6 +10,7 @@ import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -172,20 +173,26 @@ object Downloader {
                     }
                 }
 
-            retryOnceAfterYtDlpFailure(
-                afterFailure = { first ->
-                    Log.w(TAG, "yt-dlp failed; updating and retrying once", first)
-                    runCatching { updateLocked(context) }
-                        .onFailure { Log.w(TAG, "yt-dlp recovery update failed; retrying installed version", it) }
-                },
-            ) {
-                YoutubeDL.getInstance().execute(request(), processId) { progress, etaSeconds, _ ->
-                    if (!onSpaceCheck()) {
-                        // The only way to stop a running yt-dlp: kill the process by the id we passed in.
-                        Log.w(TAG, "aborting download: out of space")
-                        YoutubeDL.getInstance().destroyProcessById(processId)
+            // runInterruptible, not a bare blocking call: execute() waits on the process, and a cancelled
+            // worker used to leave yt-dlp running to completion while still holding processMutex — every
+            // download queued behind it sat waiting on an orphan. Interrupting the waiting thread makes
+            // the library destroy the process and rethrow, which surfaces here as a CancellationException.
+            runInterruptible {
+                retryOnceAfterYtDlpFailure(
+                    afterFailure = { first ->
+                        Log.w(TAG, "yt-dlp failed; updating and retrying once", first)
+                        runCatching { updateLocked(context) }
+                            .onFailure { Log.w(TAG, "yt-dlp recovery update failed; retrying installed version", it) }
+                    },
+                ) {
+                    YoutubeDL.getInstance().execute(request(), processId) { progress, etaSeconds, _ ->
+                        if (!onSpaceCheck()) {
+                            // The only way to stop a running yt-dlp: kill the process by the id we passed in.
+                            Log.w(TAG, "aborting download: out of space")
+                            YoutubeDL.getInstance().destroyProcessById(processId)
+                        }
+                        onProgress(progress.toInt().coerceIn(0, 100), etaSeconds)
                     }
-                    onProgress(progress.toInt().coerceIn(0, 100), etaSeconds)
                 }
             }
 

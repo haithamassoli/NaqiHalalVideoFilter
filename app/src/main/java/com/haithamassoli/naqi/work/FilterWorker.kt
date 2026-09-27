@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.MediaExtractor
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.graphics.Bitmap
 import android.util.Log
 import androidx.core.net.toUri
@@ -29,6 +30,7 @@ import com.haithamassoli.naqi.audio.ConcatPart
 import com.haithamassoli.naqi.audio.MuxOut
 import com.haithamassoli.naqi.audio.Remux
 import com.haithamassoli.naqi.audio.TrackSource
+import com.haithamassoli.naqi.audio.canMuxVideo
 import com.haithamassoli.naqi.audio.concatAudio
 import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.edl.Edl
@@ -197,7 +199,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     /** `noBackupFilesDir/naqi-work/<jobKey>/` — see [JobStore] for why neither `cacheDir` nor `filesDir`. */
     private val workDir by lazy { JobStore.dir(applicationContext, jobKey) }
 
-    override suspend fun doWork(): Result {
+    override suspend fun work(): Result {
         val removeMusic = ops.removeMusic
         // Whether, never which: every branch below asks only whether faces are censored, which is what
         // FilterOps.censorFaces is and why "everyone" is byte for byte the old `true` path. Which faces
@@ -289,7 +291,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             audioOnly -> runAudioOnly(inputUri, resumableAudio)
             segmented -> runSegmented(inputUri, plan, removeMusic, audioPlan, durationMs, meta!!)
             removeMusic && censorFaces -> runCombined(inputUri, meta!!)
-            removeMusic -> runMusicOnly(inputUri, resumableAudio)
+            removeMusic -> runMusicOnly(inputUri, resumableAudio, meta!!)
             else -> runCensorOnly(inputUri, meta!!) // M1's unsegmented path
         }
     }
@@ -342,7 +344,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
     /** Separate an audio source directly into Music/Naqi, using PCM checkpoints for long jobs. */
     private suspend fun runAudioOnly(inputUri: Uri, resumable: Boolean): Result {
-        setForeground(foregroundInfo(stage(R.string.stage_separating), 1))
+        tryForeground(foregroundInfo(stage(R.string.stage_separating), 1))
 
         val audioTemp = File(workDir, "audio.m4a")
         try {
@@ -393,7 +395,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         durationMs: Long,
         meta: VideoMeta,
     ): Result {
-        setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
+        tryForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val audioTemp = File(workDir, "audio.m4a")
         // Progress bands: analyze 0..8, render 8..17, separate 17..97, concat 97..99 (combined);
@@ -771,7 +773,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
     // ---- Censor-only: M1's shape, extracted into a function ----
     private suspend fun runCensorOnly(inputUri: Uri, meta: VideoMeta): Result {
-        setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
+        tryForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val tempFile = File(workDir, "render.mp4")
         val faceTracker = FaceTracker(genderVoter, censorWho)
@@ -798,12 +800,24 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     }
 
     // ---- Music-only: audio 1..97, mux 97..99, video passthrough from the original Uri ----
-    private suspend fun runMusicOnly(inputUri: Uri, resumable: Boolean): Result {
-        setForeground(foregroundInfo(stage(R.string.stage_separating), 1))
+    private suspend fun runMusicOnly(inputUri: Uri, resumable: Boolean, meta: VideoMeta): Result {
+        tryForeground(foregroundInfo(stage(R.string.stage_separating), 1))
 
         val audioTemp = File(workDir, "audio.m4a")
         // There is no video pass to segment here, so "long" only buys the resumable separator.
         try {
+            // The mux below copies the video track, and MediaMuxer's MP4 writer refuses VP9 — so a WebM
+            // (YouTube "Best") failed at addTrack after the whole separation. Render it first instead:
+            // with an empty EDL media3 transcodes only what it cannot transmux, and failing here costs
+            // seconds rather than the separation.
+            val video = if (canMuxVideo(applicationContext, inputUri)) {
+                TrackSource.FromUri(inputUri)
+            } else {
+                Log.i(TAG, "music-only: video track not MP4-muxable, rendering it first")
+                val renderTemp = File(workDir, "render.mp4")
+                render(inputUri, renderTemp, Edl(emptyList(), emptyList()), meta, removeAudio = true, progressBase = 0, progressSpan = 1)
+                TrackSource.FromFile(renderTemp)
+            }
             val sep = stage(R.string.stage_separating)
             stats.stage("separate")
             AudioPipeline.removeMusic(
@@ -817,7 +831,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             stats.stage("mux")
             val displayName = outputName(inputUri)
             val outputUri = Publish.muxedVideo(applicationContext, displayName) { fd ->
-                Remux.mux(applicationContext, TrackSource.FromUri(inputUri), audioTemp, MuxOut.ToFd(fd),
+                Remux.mux(applicationContext, video, audioTemp, MuxOut.ToFd(fd),
                     onProgress = { p -> reportBand(mux, p, Eta.Bands.MUX_BASE, Eta.Bands.MUX) })
             }
             JobStore.delete(applicationContext, jobKey)
@@ -838,7 +852,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
     // ---- Combined: analyze 0..8, render 8..17, separate 17..97, mux 97..99 (see Eta.Bands) ----
     private suspend fun runCombined(inputUri: Uri, meta: VideoMeta): Result {
-        setForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
+        tryForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val renderTemp = File(workDir, "render.mp4")
         val audioTemp = File(workDir, "audio.m4a")
@@ -946,6 +960,10 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
      */
     private fun reportAsync(stage: String, overall: Int) {
         stats.tick()
+        // Render ticks per frame; above ~5 notifications/s the system sheds them and the bar freezes.
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastReportMs < REPORT_INTERVAL_MS) return
+        lastReportMs = now
         setProgressAsync(workDataOf(KEY_PROGRESS to overall, KEY_STAGE to stage, KEY_ETA_MS to stats.etaMs(overall)))
         setForegroundAsync(foregroundInfo(stage, overall))
     }
@@ -1318,10 +1336,13 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         return "${source.substringBeforeLast('.')}-naqi-${System.currentTimeMillis()}.$ext"
     }
 
+    @Volatile
+    private var lastReportMs = 0L
+
     private suspend fun report(stage: String, pct: Int) {
         stats.tick()
         setProgress(workDataOf(KEY_PROGRESS to pct, KEY_STAGE to stage, KEY_ETA_MS to stats.etaMs(pct)))
-        setForeground(foregroundInfo(stage, pct))
+        tryForeground(foregroundInfo(stage, pct))
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo =
@@ -1392,6 +1413,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
         /** Ties this run to its [Queue] item. Absent = the picker/debug path, which keeps real failures. */
         const val KEY_QUEUE_ID = "queue_id"
+
+        private const val REPORT_INTERVAL_MS = 1000L
 
         private const val TAG = "FilterWorker"
 

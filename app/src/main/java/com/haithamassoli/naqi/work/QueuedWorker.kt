@@ -1,12 +1,16 @@
 package com.haithamassoli.naqi.work
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.StringRes
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.Data
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.model.FilterOps
+import kotlinx.coroutines.CancellationException
 
 /**
  * What [FilterWorker] and [com.haithamassoli.naqi.download.DownloadWorker] share: the link back to the
@@ -28,6 +32,39 @@ abstract class QueuedWorker(ctx: Context, params: WorkerParameters) : CoroutineW
 
     /** Non-null when this run came from the share queue rather than the picker or the debug intent. */
     internal val queueId: String? = inputData.getString(FilterWorker.KEY_QUEUE_ID)
+
+    /** The worker's body. Implement this, not [doWork]. */
+    internal abstract suspend fun work(): Result
+
+    /**
+     * Enforces the rule above for failures nobody caught — `setForeground` throwing on API 31+ when a
+     * chained item starts while the app is in the background, a crash between two stages. Escaping
+     * doWork marked the request FAILED, WorkManager cascaded that to every item chained behind it, and
+     * `queue.json` kept all of them in DOWNLOADING/PENDING forever: the "stuck in the queue" bug.
+     */
+    final override suspend fun doWork(): Result = try {
+        work()
+    } catch (c: CancellationException) {
+        throw c
+    } catch (t: Throwable) {
+        Log.e("QueuedWorker", "uncaught failure in ${javaClass.simpleName}", t)
+        fail(R.string.err_generic)
+    }
+
+    /**
+     * `setForeground` that degrades instead of throwing. On API 31+ a chained item that starts while
+     * the app is in the background is refused an FGS (unless the user exempted Naqi from battery
+     * optimization) — the second item of every queue drained with the screen off. Running as a plain
+     * job is slower and the system may stop it, but a stopped worker is re-run and resumes; a thrown
+     * one failed the item for nothing.
+     */
+    internal suspend fun tryForeground(info: ForegroundInfo) {
+        try {
+            setForeground(info)
+        } catch (e: IllegalStateException) { // ForegroundServiceStartNotAllowedException is one
+            Log.w("QueuedWorker", "foreground refused; continuing as a background job", e)
+        }
+    }
 
     internal fun queued(transform: (Queue.Item) -> Queue.Item) {
         queueId?.let { Queue.update(applicationContext, it, transform) }

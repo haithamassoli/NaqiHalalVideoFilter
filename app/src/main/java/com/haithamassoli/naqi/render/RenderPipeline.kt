@@ -24,6 +24,7 @@ import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import com.haithamassoli.naqi.analysis.VideoMeta
 import com.haithamassoli.naqi.edl.Edl
+import com.haithamassoli.naqi.audio.canMuxVideo
 import com.haithamassoli.naqi.media.firstTrackFormat
 import com.haithamassoli.naqi.media.intOrNull
 import kotlinx.coroutines.Dispatchers
@@ -109,7 +110,11 @@ object RenderPipeline {
         // re-encoded one carries the encoder's, and Remux.concat can only write one track format —
         // MediaMuxer exposes no way to put a second stsd entry in a single track. A mixed concat produces
         // a file whose second sample entry is silently wrong. Hence the `segment == null`.
-        val passthrough = segment == null && edl.censorIntervalsMs.isEmpty() && edl.faceTracks.isEmpty()
+        //
+        // And only for a codec MP4 can carry: media3 does try to transmux a WebM's VP9 and dies on the
+        // missing csd-0 ("vpcC box") instead of falling back to a transcode, as it was assumed to.
+        val passthrough = segment == null && edl.censorIntervalsMs.isEmpty() && edl.faceTracks.isEmpty() &&
+            canMuxVideo(context, inputUri)
 
         val mediaItem = MediaItem.Builder().setUri(inputUri).apply {
             if (segment != null) {
@@ -146,9 +151,6 @@ object RenderPipeline {
         // is `!requestedVideoEncoderSettings.equals(DEFAULT)`, and shouldTranscodeVideo() returns true on
         // that before it reaches the effects list — a tuned factory alone would re-encode the whole film.
         // Resolving the bitrate goes with it, so a passthrough job opens no container of its own.
-        // ponytail: if media3 then finds the source cannot be transmuxed into MP4 (VP9/WebM, say) it
-        // transcodes anyway, at its own default bitrate rather than the tier below. Rare, and the only
-        // alternative is probing the source codec here to decide — the cap is a ceiling, not a target.
         val encoderFactory = if (passthrough) null else DefaultEncoderFactory.Builder(context)
             .setRequestedVideoEncoderSettings(
                 VideoEncoderSettings.Builder()

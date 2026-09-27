@@ -30,14 +30,17 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.haithamassoli.naqi.BuildConfig
 import com.haithamassoli.naqi.R
+import com.haithamassoli.naqi.data.Battery
 import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.ml.ModelSmoke
 import com.haithamassoli.naqi.ml.SmokeReport
 import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.NaqiTopBar
 import com.haithamassoli.naqi.ui.SectionHeader
+import com.haithamassoli.naqi.ui.ToggleTile
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -108,8 +111,12 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 )
             }
 
+            Spacer(Modifier.height(NaqiTokens.space6))
+            SectionHeader(stringResource(R.string.settings_eyebrow))
+            NaqiCard(contentPadding = 0.dp) { BatteryToggle() }
+
             if (System.currentTimeMillis() >= DOWNLOADER_VISIBLE_FROM) {
-                Spacer(Modifier.height(NaqiTokens.space6))
+                Spacer(Modifier.height(NaqiTokens.space5))
                 SectionHeader(stringResource(R.string.about_eyebrow_downloader))
                 NaqiCard { DownloaderCard() }
             }
@@ -256,6 +263,26 @@ private fun DownloaderCard() {
     ) {
         Text(stringResource(if (updating) R.string.about_updating else R.string.about_update))
     }
+}
+
+/**
+ * Mirrors the system's battery-optimization exemption for Naqi — see [Battery]. The state lives in the
+ * system, so it is re-read on every resume rather than remembered: the user flips it in a system screen.
+ */
+@Composable
+private fun BatteryToggle() {
+    val context = LocalContext.current
+    var unrestricted by remember { mutableStateOf(Battery.unrestricted(context)) }
+    LifecycleResumeEffect(Unit) {
+        unrestricted = Battery.unrestricted(context)
+        onPauseOrDispose {}
+    }
+    ToggleTile(
+        title = stringResource(R.string.battery_setting_title),
+        desc = stringResource(R.string.battery_setting_desc),
+        checked = unrestricted,
+        onCheckedChange = { on -> if (on) Battery.request(context) else Battery.openSettings(context) },
+    )
 }
 
 /** ORT execution providers plus one line per bundled model — what to read out when a device misbehaves. */

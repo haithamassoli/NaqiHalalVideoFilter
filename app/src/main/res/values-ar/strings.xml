@@ -274,14 +274,31 @@
     <string name="queue_clear_finished">مسح المكتملة</string>
 
     <!-- ============================================================
+         App update card (UpdateCard, on the pick screen).
+         ============================================================ -->
+    <!-- BRAND: "نقي" then the Latin version number, wrapped in RTL marks so it reads correctly. -->
+    <string name="update_available">نقي ‏%1$s‏ متاح</string>
+    <string name="update_sub">‏%1$s‏ · لديك ‏%2$s</string>
+    <string name="update_action">تحديث</string>
+    <string name="update_downloading">جارٍ تنزيل نقي ‏%1$s</string>
+    <string name="update_bytes">‏%1$s‏ من ‏%2$s</string>
+    <string name="update_ready">نقي ‏%1$s‏ جاهز للتثبيت</string>
+    <string name="update_ready_sub">ستبقى مقاطعك وإعداداتك كما هي.</string>
+    <string name="update_install">تثبيت</string>
+    <string name="update_failed">تعذّر التنزيل</string>
+    <string name="update_failed_sub">تحقّق من اتصالك ثم أعد المحاولة.</string>
+    <string name="update_retry">إعادة المحاولة</string>
+    <string name="update_dismiss">تجاهل</string>
+
+    <!-- ============================================================
          About / open-source licences (M4). AboutScreen.
          ============================================================ -->
-    <string name="about_title">عن نقي</string>
+    <string name="about_title">الإعدادات وعن التطبيق</string>
     <!-- %1$s = version name, %2$d = version code. -->
     <string name="about_version">الإصدار %1$s ‏(%2$d)</string>
     <!-- BRAND/LEGAL: the licence identifier stays Latin in every locale. -->
     <string name="about_license">مرخّص بموجب GPL-3.0-or-later.</string>
-    <string name="about_open">عن التطبيق والتراخيص</string>
+    <string name="about_open">الإعدادات وعن التطبيق</string>
 
     <string name="about_eyebrow_downloader">أداة التنزيل</string>
     <string name="about_eyebrow_licenses">المصادر المفتوحة</string>
@@ -320,4 +337,12 @@
     <string name="onb_music_body">يستطيع نقي إزالة الموسيقى وإبقاء الحوار.</string>
     <string name="onb_ready_title">كل شيء جاهز</string>
     <string name="onb_ready_body">اختر فيديو ونقي يتكفّل بالباقي. يمكنك تغيير هذه الخيارات قبل كل فيديو.</string>
+    <!-- استثناء تحسين البطارية: بطاقة شاشة النشاط والإعداد المقابل لها. -->
+    <string name="battery_card_title">تسريع المعالجة في الخلفية</string>
+    <string name="battery_card_body">اسمح لنقي بالعمل بدون قيود البطارية حتى يستمر تنزيل الفيديوهات وفلترتها بسرعتها الكاملة بعد خروجك من التطبيق. يمكنك تغيير ذلك في أي وقت من الإعدادات.</string>
+    <string name="battery_card_allow">السماح</string>
+    <string name="battery_card_later">ليس الآن</string>
+    <string name="settings_eyebrow">الإعدادات</string>
+    <string name="battery_setting_title">معالجة أسرع في الخلفية</string>
+    <string name="battery_setting_desc">تُبقي الفيديوهات في قائمة الانتظار تُعالَج بسرعتها الكاملة ونقي في الخلفية. لإيقافها اختر «مُحسَّن» من إعدادات البطارية.</string>
 </resources>

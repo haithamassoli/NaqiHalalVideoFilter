@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,8 +49,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
+import com.haithamassoli.naqi.data.Battery
+import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.ui.NaqiBottomAction
 import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.NaqiIcons
@@ -123,6 +127,14 @@ fun JobsScreen(
             ?.let { withContext(Dispatchers.IO) { shareableUri(context, Uri.parse(it)) } }
     }
 
+    // Re-read on resume: "Allow" leaves for a system dialog, and the card must be gone when the user
+    // comes back from granting it.
+    var showBatteryCard by remember { mutableStateOf(false) }
+    LifecycleResumeEffect(Unit) {
+        showBatteryCard = !Battery.unrestricted(context) && !Prefs.batteryCardDismissed(context)
+        onPauseOrDispose {}
+    }
+
     var library by remember { mutableStateOf(emptyList<LibraryItem>()) }
     // Re-read on every job state change so a fresh save shows up without a manual refresh.
     LaunchedEffect(info?.state, outputName) {
@@ -149,6 +161,13 @@ fun JobsScreen(
                 .padding(horizontal = NaqiTokens.gutter)
                 .padding(top = NaqiTokens.space2, bottom = NaqiTokens.space5),
         ) {
+            if (showBatteryCard) {
+                BatteryCard(
+                    onAllow = { Battery.request(context) },
+                    onLater = { Prefs.dismissBatteryCard(context); showBatteryCard = false },
+                )
+                Spacer(Modifier.height(NaqiTokens.space5))
+            }
             when {
                 running -> JobProgressCard(stageText, progress, etaMs, onCancel)
                 showSaved -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context)
@@ -483,3 +502,29 @@ private fun share(context: Context, uri: Uri) {
 private fun formatSize(bytes: Long): String =
     if (bytes >= 1_000_000_000) stringResource(R.string.jobs_size_gb, bytes / 1e9f)
     else stringResource(R.string.jobs_size_mb, bytes / 1e6f)
+
+/** Why the battery exemption matters, asked where the user watches the queue — see [Battery]. */
+@Composable
+private fun BatteryCard(onAllow: () -> Unit, onLater: () -> Unit) {
+    NaqiCard {
+        Text(
+            stringResource(R.string.battery_card_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(NaqiTokens.space1))
+        Text(
+            stringResource(R.string.battery_card_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(NaqiTokens.space3))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onLater) { Text(stringResource(R.string.battery_card_later)) }
+            Spacer(Modifier.width(NaqiTokens.space2))
+            Button(onClick = onAllow, shape = RoundedCornerShape(NaqiTokens.radiusButton)) {
+                Text(stringResource(R.string.battery_card_allow))
+            }
+        }
+    }
+}

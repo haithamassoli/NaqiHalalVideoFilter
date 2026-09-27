@@ -3,6 +3,7 @@ package com.haithamassoli.naqi.work
 import android.content.Context
 import android.util.Log
 import androidx.annotation.StringRes
+import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.model.FilterOps
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,7 +46,9 @@ internal object Queue {
      * @param sourceUri the file being filtered — a `file://` quarantine path for a download, or the
      *   shared `content://` for a local file. Null until a download produces one.
      * @param error a `@StringRes` id, never a message: resource ids re-localize if the app language
-     *   changes after the item failed, which a stored sentence cannot.
+     *   changes after the item failed, which a stored sentence cannot. On disk it is the resource's
+     *   *name* — the numeric id shifts whenever a build adds a string, and a stored one then pointed
+     *   at an unrelated string ("%1$d min" under a failed item).
      */
     data class Item(
         val id: String = UUID.randomUUID().toString(),
@@ -70,7 +73,7 @@ internal object Queue {
         if (!file.exists()) return emptyList<Item>().also { _items.value = it }
         val parsed = runCatching {
             val array = JSONArray(file.readText())
-            (0 until array.length()).map { fromJson(array.getJSONObject(it)) }
+            (0 until array.length()).map { fromJson(context, array.getJSONObject(it)) }
         }.getOrElse {
             // A truncated or hand-edited file must not brick the queue screen forever.
             Log.w(TAG, "queue.json unreadable, starting empty", it)
@@ -113,7 +116,7 @@ internal object Queue {
         load(context).filter { it.state == State.PENDING_DOWNLOAD || it.state == State.PENDING_FILTER }
 
     private fun write(context: Context, items: List<Item>) {
-        val array = JSONArray().apply { items.forEach { put(toJson(it)) } }
+        val array = JSONArray().apply { items.forEach { put(toJson(context, it)) } }
         val dest = File(context.filesDir, FILE)
         val temp = File(context.filesDir, "$FILE.tmp")
         runCatching {
@@ -125,14 +128,14 @@ internal object Queue {
         _items.value = items
     }
 
-    private fun toJson(i: Item) = JSONObject().apply {
+    private fun toJson(context: Context, i: Item) = JSONObject().apply {
         put("id", i.id)
         put("url", i.url)
         put("sourceUri", i.sourceUri)
         put("title", i.title)
         put("state", i.state.name)
         put("quality", i.quality)
-        put("error", i.error ?: JSONObject.NULL)
+        put("error", i.error?.let { runCatching { context.resources.getResourceEntryName(it) }.getOrNull() } ?: JSONObject.NULL)
         put("outputUri", i.outputUri)
         put(
             "ops",
@@ -150,7 +153,7 @@ internal object Queue {
         )
     }
 
-    private fun fromJson(o: JSONObject) = Item(
+    private fun fromJson(context: Context, o: JSONObject) = Item(
         id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
         url = o.optStringOrNull("url"),
         sourceUri = o.optStringOrNull("sourceUri"),
@@ -159,7 +162,13 @@ internal object Queue {
         // than crashing the screen that is supposed to show the user what went wrong.
         state = runCatching { State.valueOf(o.optString("state")) }.getOrDefault(State.FAILED),
         quality = o.optStringOrNull("quality"),
-        error = o.opt("error").let { if (it is Int) it else null },
+        error = when (val e = o.opt("error")) {
+            is String -> context.resources.getIdentifier(e, "string", context.packageName).takeIf { it != 0 }
+                ?: R.string.err_generic
+            // A bare id from an older build: whatever it points at now is meaningless.
+            is Int -> R.string.err_generic
+            else -> null
+        },
         outputUri = o.optStringOrNull("outputUri"),
         ops = opsFromJson(o.optJSONObject("ops") ?: JSONObject()),
     )

@@ -132,8 +132,30 @@ object JobController {
         ?.firstOrNull { it.startsWith(ITEM_TAG_PREFIX) }
         ?.removePrefix(ITEM_TAG_PREFIX)
 
+    /**
+     * Cancel the running picker job. The cancel cascades to shared items chained behind it, exactly
+     * as in [cancelItem], so they are re-appended the same way instead of sitting in PENDING_FILTER.
+     */
     fun cancel(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(FilterWorker.UNIQUE_WORK)
+        Queue.pending(context).filter { it.state == Queue.State.PENDING_FILTER }.forEach { submit(context, it) }
+    }
+
+    /**
+     * Re-submit every unfinished queue item that no live work request backs any more. Whatever orphaned
+     * it — a cascade, a crash, a build that predates a fix — the item would otherwise show "waiting"
+     * forever. [retry] resumes from wherever it got to. Called once per cold start, off the main thread.
+     */
+    internal fun reconcile(context: Context) {
+        val wm = WorkManager.getInstance(context)
+        for (item in Queue.load(context).filterNot { it.state.isTerminal }) {
+            val alive = runCatching {
+                wm.getWorkInfosByTag(itemTag(item.id)).get().any { !it.state.isFinished }
+            }.getOrDefault(true)
+            if (alive) continue
+            Log.w(TAG, "reconcile: ${item.id} stuck in ${item.state} with no live work; resubmitting")
+            retry(context, item)
+        }
     }
 
     // ---------------------------------------------------------------------------------------------

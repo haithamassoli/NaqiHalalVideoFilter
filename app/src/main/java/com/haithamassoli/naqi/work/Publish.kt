@@ -38,9 +38,15 @@ internal object Publish {
     const val MIME_M4A = "audio/mp4"
 
     /** Filtered video → `Movies/Naqi`. */
-    fun video(context: Context, tempFile: File, displayName: String, isStopped: () -> Boolean): Uri =
+    fun video(
+        context: Context,
+        tempFile: File,
+        displayName: String,
+        mime: String = MIME_MP4,
+        isStopped: () -> Boolean,
+    ): Uri =
         into(
-            context, tempFile, displayName, MIME_MP4, Environment.DIRECTORY_MOVIES,
+            context, tempFile, displayName, mime, Environment.DIRECTORY_MOVIES,
             MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), isStopped,
         )
 

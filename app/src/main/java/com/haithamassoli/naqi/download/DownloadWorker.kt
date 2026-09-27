@@ -2,7 +2,9 @@ package com.haithamassoli.naqi.download
 
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
+import android.webkit.MimeTypeMap
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
@@ -33,7 +35,7 @@ import kotlinx.coroutines.CancellationException
  */
 class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun work(): Result {
         val url = inputData.getString(KEY_URL)?.takeIf { it.isNotBlank() } ?: return Result.failure()
         val quality = Downloader.Quality.of(inputData.getString(KEY_QUALITY))
         // Face censoring is meaningless on an audio-only item; the sheet hides it, and this is the half
@@ -61,7 +63,10 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
         // this a transient failure (network drop) that later succeeds leaves its message on the item,
         // and the row renders a stale "Download failed" under a green DONE tick.
         queued { it.copy(state = Queue.State.DOWNLOADING, error = null) }
-        setForeground(foregroundInfo(title, 0))
+        tryForeground(foregroundInfo(title, 0))
+        // yt-dlp prints a progress line per network chunk — hundreds a second on Wi-Fi. Forwarding each
+        // one made the system shed our notifications (>5/s is its limit) and froze the bar mid-download.
+        var lastTick = 0L
         try {
             val file = Downloader.download(
                 applicationContext, url, quality, processId = id.toString(),
@@ -73,6 +78,9 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
                 // (bytes on disk ÷ percent) if aborting at 90 % ever proves too late to be useful.
                 onSpaceCheck = { applicationContext.noBackupFilesDir.usableSpace > SPACE_FLOOR },
             ) { pct, etaSeconds ->
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastTick < PROGRESS_INTERVAL_MS) return@download
+                lastTick = now
                 setProgressAsync(
                     workDataOf(
                         FilterWorker.KEY_PROGRESS to pct,
@@ -91,10 +99,17 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
                 // where a downloaded file reaches the gallery without passing through FilterWorker.
                 val name = "${file.nameWithoutExtension}-naqi-${System.currentTimeMillis()}.${file.extension}"
                 val audio = quality == Downloader.Quality.AUDIO
+                // "Best" is often VP9/Opus in WebM. Labelled video/mp4, MediaStore appended ".mp4" to
+                // the name and players that trust the mime refused the file.
+                val mime = if (audio) {
+                    Publish.MIME_M4A
+                } else {
+                    MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension) ?: Publish.MIME_MP4
+                }
                 val outputUri = if (audio) {
                     Publish.audio(applicationContext, file, name) { isStopped }
                 } else {
-                    Publish.video(applicationContext, file, name) { isStopped }
+                    Publish.video(applicationContext, file, name, mime) { isStopped }
                 }
                 Downloader.discard(applicationContext, fileUri)
                 queued {
@@ -106,7 +121,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
                 }
                 JobNotifications.done(
                     applicationContext, name, outputUri.toString(), null,
-                    if (audio) Publish.MIME_M4A else Publish.MIME_MP4,
+                    mime,
                 )
                 return Result.success(
                     workDataOf(
@@ -179,6 +194,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
 
         /** Abort a running download below this much free space — the PRD's slack, minus the temps. */
         private const val SPACE_FLOOR = 2L * 1024 * 1024 * 1024
+
+        private const val PROGRESS_INTERVAL_MS = 1000L
 
         private const val TAG = "DownloadWorker"
     }

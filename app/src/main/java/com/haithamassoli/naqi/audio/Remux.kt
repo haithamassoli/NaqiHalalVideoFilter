@@ -7,6 +7,7 @@ import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
 import android.net.Uri
+import android.os.Build
 import com.haithamassoli.naqi.media.firstTrackFormat
 import com.haithamassoli.naqi.media.requireTrackIndex
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,29 @@ sealed interface MuxOut {
 
 /** What MPEG-4 `MediaMuxer` will accept as an audio track (framework `MPEG4Writer`). */
 private val MUXABLE_AUDIO = setOf("audio/mp4a-latm", "audio/3gpp", "audio/amr-wb")
+
+/**
+ * Can framework MediaMuxer's MP4 writer take [uri]'s video track as-is? It carries H.264/HEVC/MPEG-4/
+ * H.263 (and AV1 from API 34) — not the VP8/VP9 in every WebM, which is what YouTube's "Best" usually is.
+ * Undecidable answers true: [Remux.mux] then fails with the real cause rather than a guess.
+ */
+fun canMuxVideo(context: Context, uri: Uri): Boolean {
+    val ext = MediaExtractor()
+    return try {
+        ext.setDataSource(context, uri, null)
+        val mime = ext.firstTrackFormat("video/")?.getString(MediaFormat.KEY_MIME) ?: return true
+        mime in MUXABLE_VIDEO || (mime == MediaFormat.MIMETYPE_VIDEO_AV1 && Build.VERSION.SDK_INT >= 34)
+    } catch (_: Throwable) {
+        true
+    } finally {
+        runCatching { ext.release() }
+    }
+}
+
+private val MUXABLE_VIDEO = setOf(
+    MediaFormat.MIMETYPE_VIDEO_AVC, MediaFormat.MIMETYPE_VIDEO_HEVC,
+    MediaFormat.MIMETYPE_VIDEO_MPEG4, MediaFormat.MIMETYPE_VIDEO_H263,
+)
 
 /** What the segmented route must do with [uri]'s audio to get it through [Remux.concat]. */
 enum class ConcatAudio {
