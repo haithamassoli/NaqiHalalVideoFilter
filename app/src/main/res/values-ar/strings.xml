@@ -278,7 +278,7 @@
     <string name="queue_state_done">تم الحفظ</string>
     <string name="queue_state_failed">فشل</string>
     <string name="queue_dismiss">إخفاء</string>
-    <string name="queue_clear_finished">مسح المكتملة</string>
+    <string name="queue_clear_failed">مسح الفاشلة</string>
 
     <!-- ============================================================
          App update card (UpdateCard, on the pick screen).

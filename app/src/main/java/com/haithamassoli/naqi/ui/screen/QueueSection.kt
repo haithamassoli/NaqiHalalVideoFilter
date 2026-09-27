@@ -57,7 +57,7 @@ import kotlinx.coroutines.launch
  * a row of text buttons, ~130dp each — so three shared links filled the screen before the running job
  * was even visible. Now: one card, one 56dp row per item, a status glyph carrying the state that used
  * to need its own line, and exactly one action per row. Opening a finished item is the row tap itself,
- * which frees that one slot for Share. "Clear finished" moved into the section header, where it reads
+ * which frees that one slot for Share. "Clear failed" moved into the section header, where it reads
  * as a list action instead of a stray button under the last item.
  *
  * State comes from `queue.json` rather than `WorkInfo`, because a queue-driven run always returns
@@ -75,7 +75,7 @@ internal fun QueueCard(items: List<Queue.Item>) {
         trailing = {
             if (items.any { it.state.isTerminal }) {
                 TextButton(onClick = { Queue.clearTerminal(context) }) {
-                    Text(stringResource(R.string.queue_clear_finished), style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.queue_clear_failed), style = MaterialTheme.typography.labelLarge)
                 }
             }
         },
@@ -146,7 +146,7 @@ private fun QueueRow(item: Queue.Item, stateLabel: Int, live: Data?) {
         Spacer(Modifier.width(NaqiTokens.space2))
         // Exactly one action per row. Tapping the row opens a finished item, so an "Open" button here
         // would only repeat it — the slot goes to Share instead. A failed item offers the only thing
-        // worth doing to it; getting rid of it is "Clear finished" in the header, which does the lot.
+        // worth doing to it; getting rid of it is "Clear failed" in the header, which does the lot.
         when {
             output != null -> IconButton(onClick = { scope.launch { shareOutput(context, output) } }) {
                 Icon(NaqiIcons.Share, stringResource(R.string.action_share), tint = cs.onSurfaceVariant)

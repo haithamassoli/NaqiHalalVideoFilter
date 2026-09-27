@@ -291,7 +291,7 @@
     <string name="queue_state_done">Saved</string>
     <string name="queue_state_failed">Failed</string>
     <string name="queue_dismiss">Dismiss</string>
-    <string name="queue_clear_finished">Clear finished</string>
+    <string name="queue_clear_failed">Clear failed</string>
 
     <!-- ============================================================
          App update card (UpdateCard, on the pick screen). Naqi ships from GitHub Releases, so it
