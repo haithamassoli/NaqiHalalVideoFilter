@@ -58,6 +58,8 @@ internal object Queue {
         val state: State = State.PENDING_DOWNLOAD,
         val ops: FilterOps = FilterOps(),
         val quality: String? = null,
+        /** The share sheet's size estimate for the chosen quality; 0 = unknown (older builds, probe failed). */
+        val sizeBytes: Long = 0L,
         @param:StringRes val error: Int? = null,
         val outputUri: String? = null,
     )
@@ -137,6 +139,7 @@ internal object Queue {
         put("title", i.title)
         put("state", i.state.name)
         put("quality", i.quality)
+        put("sizeBytes", i.sizeBytes)
         put("error", i.error?.let { runCatching { context.resources.getResourceEntryName(it) }.getOrNull() } ?: JSONObject.NULL)
         put("outputUri", i.outputUri)
         put(
@@ -164,6 +167,7 @@ internal object Queue {
         // than crashing the screen that is supposed to show the user what went wrong.
         state = runCatching { State.valueOf(o.optString("state")) }.getOrDefault(State.FAILED),
         quality = o.optStringOrNull("quality"),
+        sizeBytes = o.optLong("sizeBytes", 0L),
         error = when (val e = o.opt("error")) {
             is String -> context.resources.getIdentifier(e, "string", context.packageName).takeIf { it != 0 }
                 ?: R.string.err_generic

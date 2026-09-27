@@ -232,7 +232,11 @@
     <!-- Download failures (M4). Kept separate from the filtering taxonomy above: a download fails for
          reasons filtering never sees, and "this video uses a codec…" would be nonsense for any of them. -->
     <string name="err_low_space_download">Not enough free space to download this video. Free up some space and try again.</string>
-    <string name="err_download_unsupported">Naqi can\'t download from this link. The site may not be supported, or the video may be private.</string>
+    <string name="err_download_unsupported">This video can\'t be downloaded. It may be private, removed, need an account, or be on a site Naqi doesn\'t support.</string>
+    <string name="err_download_geo">This video isn\'t available in your country.</string>
+    <string name="err_download_rate_limited">The site is limiting downloads right now. Try again in a few minutes.</string>
+    <string name="err_download_forbidden">The site refused the download. Try again in a few minutes.</string>
+    <string name="err_download_extractor">Naqi couldn\'t read this video, even after updating its downloader. Try again later.</string>
     <string name="err_download_network">Download failed. Check your connection and try again.</string>
     <string name="err_download_generic">Download failed.</string>
 

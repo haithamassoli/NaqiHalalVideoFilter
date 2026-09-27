@@ -213,7 +213,7 @@ object JobController {
             Queue.State.PENDING_DOWNLOAD -> item.url?.let {
                 download(
                     context, it, Downloader.Quality.of(item.quality), item.ops,
-                    title = item.title, queueId = item.id,
+                    title = item.title, sizeBytes = item.sizeBytes, queueId = item.id,
                 )
             }
 

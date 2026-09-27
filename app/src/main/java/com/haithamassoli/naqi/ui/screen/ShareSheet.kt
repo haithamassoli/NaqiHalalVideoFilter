@@ -6,8 +6,11 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.text.format.DateUtils
+import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -30,8 +32,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -69,8 +73,10 @@ sealed interface Shared {
 /**
  * The one sheet both share flows land in (PRD flows A and B).
  *
- * It opens immediately and leaves metadata discovery to the queued download, matching Seal's quick
- * path. A network round-trip before showing the controls would make sharing feel like an app launch.
+ * It opens immediately, matching Seal's quick path: a network round-trip before showing the controls
+ * would make sharing feel like an app launch. Metadata arrives *behind* the controls instead —
+ * [Downloader.probe] fills in the title, duration and size when it lands, and the download it queues
+ * starts from that same extraction. Nothing waits on it; Download works the moment the sheet opens.
  *
  * The two flows differ in three places and are otherwise the same screen: a file has no Quality (there
  * is nothing to choose — the file exists), its primary button says Filter, and that button is disabled
@@ -108,12 +114,23 @@ fun ShareSheet(
     // What the faces toggle turns back ON to. Turning a filter off must not erase its saved Who choice.
     var lastWho by rememberSaveable { mutableStateOf(Prefs.lastWho(context)) }
 
-    val title = (shared as? Shared.LocalFile)?.name
+    // Kept across quality changes: the re-probe replaces it when it lands, and a failed one keeps the last.
+    var info by remember { mutableStateOf<Downloader.Info?>(null) }
 
     // Audio has no picture to blur, so the option is disabled rather than obeyed-and-ignored. Disabled
     // rather than hidden: switching quality must not make the row under the user's finger disappear.
     val audioOnly = isLink && quality == Downloader.Quality.AUDIO
     val effectiveOps = if (audioOnly) ops.copy(censorWho = FilterOps.NONE) else ops
+
+    // Re-keyed on what changes the format choice: the size shown is always for what would be fetched.
+    // The first run goes to the network; the rest re-select locally from the saved extraction (~0.3 s).
+    if (shared is Shared.Link) {
+        LaunchedEffect(quality, effectiveOps.any) {
+            Downloader.probe(context, shared.url, quality, effectiveOps.any)?.let { info = it }
+        }
+    }
+    val title = (shared as? Shared.LocalFile)?.name ?: info?.title
+    val sizeBytes = info?.sizeBytes?.coerceAtLeast(0L) ?: 0L
 
     fun queue() {
         Prefs.save(context, ops, quality)
@@ -126,6 +143,7 @@ fun ShareSheet(
                 state = Queue.State.PENDING_DOWNLOAD,
                 ops = effectiveOps,
                 quality = quality.name,
+                sizeBytes = sizeBytes,
             )
 
             is Shared.LocalFile -> Queue.Item(
@@ -155,7 +173,7 @@ fun ShareSheet(
     // Space is checked here rather than only in the worker so the refusal arrives before the item is
     // queued — "it failed four items later" is not a useful thing to tell someone about disk space.
     val spaceError = if (isLink) {
-        Preflight.checkSpaceForDownload(context, 0L, effectiveOps) ?: 0
+        Preflight.checkSpaceForDownload(context, sizeBytes, effectiveOps) ?: 0
     } else {
         0
     }
@@ -180,7 +198,7 @@ fun ShareSheet(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                subtitle(shared)?.let {
+                subtitle(shared, info)?.let {
                     Text(
                         it,
                         style = MaterialTheme.typography.bodySmall,
@@ -292,11 +310,19 @@ fun ShareSheet(
     }
 }
 
-/** `youtube.com` for a link; nothing for a local file, whose name is already the title. */
+/**
+ * `youtube.com · 2:26 · 55 MB` for a link, each part once known; nothing for a local file, whose name is
+ * already the title.
+ */
 @Composable
-private fun subtitle(shared: Shared): String? {
+private fun subtitle(shared: Shared, info: Downloader.Info?): String? {
     if (shared !is Shared.Link) return null
-    return runCatching { shared.url.toUri().host?.removePrefix("www.") }.getOrNull()
+    val context = LocalContext.current
+    return listOfNotNull(
+        runCatching { shared.url.toUri().host?.removePrefix("www.") }.getOrNull(),
+        info?.durationSec?.takeIf { it > 0 }?.let { DateUtils.formatElapsedTime(it) },
+        info?.sizeBytes?.takeIf { it > 0 }?.let { Formatter.formatShortFileSize(context, it) },
+    ).joinToString(" · ").ifEmpty { null }
 }
 
 private fun qualityLabel(q: Downloader.Quality) = when (q) {

@@ -1,6 +1,5 @@
 package com.haithamassoli.naqi.download
 
-import com.yausername.youtubedl_android.YoutubeDLException
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -42,8 +41,9 @@ class DownloaderTest {
 
     @Test
     fun requestCarriesSpeedAndResilienceFlags() {
-        val cmd = Downloader.buildRequest("https://x.test/v", "/q/%(title)s.%(ext)s", Downloader.Quality.BEST, true, emptyMap(), Downloader.Aria2("/lib/libaria2c.so", "/py/cert.pem"))
-            .buildCommand()
+        val cmd = Downloader.buildRequest("https://x.test/v", "/q/%(title)s.%(ext)s", Downloader.Quality.BEST, true, emptyMap(),
+            Downloader.Attempt(Downloader.Aria2("/lib/libaria2c.so", "/py/cert.pem"), infoJson = "/q/info.json", ipv4 = false),
+        ).buildCommand()
         fun values(flag: String) = cmd.indices.filter { cmd[it] == flag }.map { cmd[it + 1] }
 
         // Absolute path, so the library doesn't add its own (overriding) aria2c args; ours carry both.
@@ -55,10 +55,15 @@ class DownloaderTest {
         assert("--abort-on-unavailable-fragments" in cmd)
         assert("--no-playlist" in cmd)
         assert("--extract-audio" !in cmd)
+        assertEquals(listOf("/q/info.json"), values("--load-info-json"))
+        assert("--force-ipv4" !in cmd)
 
-        val native = Downloader.buildRequest("https://x.test/v", "/q/o", Downloader.Quality.BEST, true, emptyMap(), aria2 = null)
-            .buildCommand()
+        val native = Downloader.buildRequest("https://x.test/v", "/q/o", Downloader.Quality.BEST, true, emptyMap(),
+            Downloader.Attempt(aria2 = null, infoJson = null, ipv4 = true),
+        ).buildCommand()
         assert("--downloader" !in native)
+        assert("--load-info-json" !in native)
+        assert("--force-ipv4" in native)
     }
 
     @Test
@@ -119,19 +124,62 @@ class DownloaderTest {
     }
 
     @Test
-    fun ytDlpFailureUpdatesAndRetriesExactlyOnce() {
-        var attempts = 0
-        var updates = 0
+    fun classifiesRealYtDlpErrors() {
+        val cases = mapOf(
+            // Real messages (yt-dlp 2026.09, S23 logcat and Mac runs), including the warnings that precede them.
+            "WARNING: [vimeo] The extractor is attempting impersonation, but no impersonate target is available. If you encounter errors, then see ...\n" +
+                "ERROR: [vimeo] 1084537: The web client only works when logged-in. Use --cookies, --cookies-from-browser" to Downloader.DlError.UNAVAILABLE,
+            "ERROR: [youtube] aaaaaaaaaaa: Video unavailable. This video is not available" to Downloader.DlError.UNAVAILABLE,
+            // Exactly what the S23 got for a non-existent id on 2026-09-27.
+            "ERROR: [youtube] aaaaaaaaaaa: This video is unavailable" to Downloader.DlError.UNAVAILABLE,
+            "ERROR: [youtube] x: Private video. Sign in if you've been granted access to this video" to Downloader.DlError.UNAVAILABLE,
+            "ERROR: Unsupported URL: https://example.com/" to Downloader.DlError.UNAVAILABLE,
+            "ERROR: [youtube] x: Sign in to confirm you're not a bot. Use --cookies-from-browser" to Downloader.DlError.EXTRACTOR,
+            "ERROR: [youtube] x: The uploader has not made this video available in your country" to Downloader.DlError.GEO,
+            "ERROR: unable to download video data: HTTP Error 403: Forbidden" to Downloader.DlError.FORBIDDEN,
+            "ERROR: [youtube] x: HTTP Error 429: Too Many Requests" to Downloader.DlError.RATE_LIMITED,
+            "ERROR: [youtube] x: Requested format is not available. Use --list-formats" to Downloader.DlError.EXTRACTOR,
+            "ERROR: [generic] Unable to download webpage: <urlopen error [Errno 7] No address associated with hostname>" to Downloader.DlError.NETWORK,
+            "ERROR: unable to download video data: <urlopen error _ssl.c:1000: The handshake operation timed out>" to Downloader.DlError.NETWORK,
+            "No space left on device (download aborted)" to Downloader.DlError.NO_SPACE,
+            // A warning about a retried fragment must not decide the class of an unrelated error.
+            "WARNING: [download] Got error: Connection reset. Retrying fragment 3\nERROR: [youtube] x: Video unavailable" to Downloader.DlError.UNAVAILABLE,
+            "something new and strange" to Downloader.DlError.UNKNOWN,
+        )
+        for ((message, expected) in cases) assertEquals(message, expected, Downloader.classify(message))
+    }
 
-        val result = Downloader.retryOnceAfterYtDlpFailure(
-            afterFailure = { updates++ },
-        ) {
-            if (++attempts == 1) throw YoutubeDLException("stale extractor")
-            "downloaded"
+    @Test
+    fun eachFailureGetsItsOwnRecovery() {
+        val aria = Downloader.Attempt(Downloader.Aria2("/a", "/c"), infoJson = null, ipv4 = false)
+        val plain = Downloader.Attempt(aria2 = null, infoJson = null, ipv4 = false)
+        val reused = plain.copy(infoJson = "/q/info.json")
+        fun r(e: Downloader.DlError, first: Downloader.Attempt, update: Boolean = true) = Downloader.recoveryFor(e, first, update)
+
+        // Retrying cannot help these.
+        for (e in listOf(Downloader.DlError.UNAVAILABLE, Downloader.DlError.GEO, Downloader.DlError.NO_SPACE)) {
+            assertEquals(null, r(e, aria))
         }
+        // Stale extractor: update (when allowed) and retry natively.
+        assertEquals(Downloader.Retry(update = true, attempt = plain), r(Downloader.DlError.EXTRACTOR, aria))
+        assertEquals(Downloader.Retry(update = false, attempt = plain), r(Downloader.DlError.UNKNOWN, plain, update = false))
+        // 403: fresh extraction over IPv4, never an update.
+        assertEquals(Downloader.Retry(update = false, attempt = plain.copy(ipv4 = true)), r(Downloader.DlError.FORBIDDEN, reused))
+        // Network / rate limit: yt-dlp already retried — only worth another go without the shortcuts.
+        assertEquals(null, r(Downloader.DlError.NETWORK, plain))
+        assertEquals(null, r(Downloader.DlError.RATE_LIMITED, plain))
+        assertEquals(Downloader.Retry(update = false, attempt = plain), r(Downloader.DlError.RATE_LIMITED, aria))
+        assertEquals(Downloader.Retry(update = false, attempt = plain), r(Downloader.DlError.NETWORK, reused))
+    }
 
-        assertEquals("downloaded", result)
-        assertEquals(2, attempts)
-        assertEquals(1, updates)
+    @Test
+    fun parsesProbeJson() {
+        // Trimmed from real `-J` output: merged selections report filesize_approx, single streams filesize.
+        assertEquals(
+            Downloader.Info("\"Caminandes 2: Gran Dillama\" - Blender Animated Short", 146, 55105605),
+            Downloader.parseInfo("""{"title": "\"Caminandes 2: Gran Dillama\" - Blender Animated Short", "duration": 146, "filesize": null, "filesize_approx": 55105605}"""),
+        )
+        assertEquals(Downloader.Info("a", 146, 2365262), Downloader.parseInfo("""{"title": "a", "duration": 146.0, "filesize": 2365262, "filesize_approx": 2365251}"""))
+        assertEquals(Downloader.Info(null, -1, -1), Downloader.parseInfo("""{"title": ""}"""))
     }
 }

@@ -4,7 +4,7 @@
 **Reference studied:** [deniscerri/ytdlnis](https://github.com/deniscerri/ytdlnis) (cloned at HEAD, `YTDLPUtil.kt`, `RuntimeManager.kt`, `work/DownloadWorker.kt`)
 **Library in use:** `io.github.junkfood02.youtubedl-android` 0.18.1 (latest on Maven Central)
 
-**Status (2026-09-27):** Phases 0, 1, 3, 4 and 6 shipped on branch `download-speed-reliability`, measured on an S23 — results in §8. Phases 2, 5, 7 not started.
+**Status (2026-09-27):** Phases 0–6 shipped on branch `download-speed-reliability`, measured on an S23 — results in §8. Phase 7 (parallel downloads) not started.
 
 ---
 
@@ -135,6 +135,8 @@ Notes:
 
 ### Phase 2 — Error taxonomy and targeted recovery
 
+**Shipped.** `Downloader.classify` / `recoveryFor`, table-tested with real yt-dlp messages. Differences from the design below: GEO and UNAVAILABLE fail without retry; NETWORK / RATE_LIMITED retry once only when the first attempt used a shortcut (aria2c or the saved extraction), since either can be the cause; every retry is a plain native run from a fresh extraction. An out-of-space abort is no longer mistaken for a yt-dlp failure and retried. Verified on the S23: removed video → "can't be downloaded" in 3.4 s, no retry, no update; unsupported site → same; unresolvable host → network message, no update.
+
 **Goal:** each error class gets the matching recovery, and none gets the wrong one.
 
 Replace the substring `messageFor` and the blanket `retryOnceAfterYtDlpFailure` with one classifier used by both:
@@ -226,6 +228,8 @@ internal fun classify(text: String): DlError  // text = all causes' messages, lo
 ---
 
 ### Phase 5 — YouTube resilience extras
+
+**Shipped (item 1).** `Downloader.probe`: the sheet still opens instantly; the header fills in title · duration · size when the probe lands (~5–7 s), and changing quality or filters re-selects locally from the saved JSON in ~0.3 s, so the size (and the space check) always match the choice. The download starts from that JSON when it is under an hour old. The global mutex became an update gate (any number of yt-dlp runs share it; an update waits for all of them), so the probe runs while another download is in progress — verified. Measured: the same 720p YouTube download took **4.0 s from the sheet vs 11.0–11.5 s** without the prefetch (first byte at 2.5 s vs 9.5–10 s). Caveat found on a Mac: roughly 1 in 4 extractions produced stream URLs that 403 when reused; that costs ~1 s before Phase 2's FORBIDDEN recovery re-extracts.
 
 1. **Info prefetch in the share sheet (revives the size preflight).**
    - Sheet calls `getInfo`-equivalent with `--dump-single-json --socket-timeout 10 -f <selector> -S <sort>`, writes the JSON to `quarantineDir/info.json`, shows title/duration/size, passes `sizeBytes` to `JobController.download` (fixes §1 dead code).

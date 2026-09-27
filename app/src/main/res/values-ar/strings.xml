@@ -226,7 +226,11 @@
 
     <!-- Download failures (M4). -->
     <string name="err_low_space_download">لا توجد مساحة كافية لتنزيل هذا الفيديو. فرّغ بعض المساحة ثم أعد المحاولة.</string>
-    <string name="err_download_unsupported">لا يستطيع نقي التنزيل من هذا الرابط. قد يكون الموقع غير مدعوم أو الفيديو خاصًا.</string>
+    <string name="err_download_unsupported">لا يمكن تنزيل هذا الفيديو. قد يكون خاصًا أو محذوفًا أو يتطلّب حسابًا، أو من موقع لا يدعمه نقي.</string>
+    <string name="err_download_geo">هذا الفيديو غير متاح في بلدك.</string>
+    <string name="err_download_rate_limited">الموقع يحدّ من التنزيلات حاليًا. أعد المحاولة بعد بضع دقائق.</string>
+    <string name="err_download_forbidden">رفض الموقع التنزيل. أعد المحاولة بعد بضع دقائق.</string>
+    <string name="err_download_extractor">تعذّر على نقي قراءة هذا الفيديو حتى بعد تحديث أداة التنزيل. أعد المحاولة لاحقًا.</string>
     <string name="err_download_network">فشل التنزيل. تحقّق من اتصالك ثم أعد المحاولة.</string>
     <string name="err_download_generic">فشل التنزيل.</string>
 

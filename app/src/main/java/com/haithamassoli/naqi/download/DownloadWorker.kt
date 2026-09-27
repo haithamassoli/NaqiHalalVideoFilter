@@ -164,17 +164,20 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
 
     /**
      * Downloads fail for reasons filtering never sees — a dead extractor, a geo-block, no network — so
-     * they get their own small taxonomy rather than [Preflight.messageFor]'s codec-shaped one.
+     * they get their own taxonomy ([Downloader.classify], shared with the retry decision) rather than
+     * [Preflight.messageFor]'s codec-shaped one.
      */
     private fun messageFor(t: Throwable): Int {
-        val text = generateSequence(t) { it.cause }.mapNotNull { it.message }.joinToString(" ").lowercase()
-        return when {
-            "enospc" in text || "no space left" in text || "space" in text -> Preflight.LOW_SPACE_DOWNLOAD
-            "unsupported url" in text || "unable to extract" in text ||
-                "no video formats" in text -> R.string.err_download_unsupported
-            "unable to download" in text || "timed out" in text ||
-                "connection" in text || "network" in text -> R.string.err_download_network
-            else -> R.string.err_download_generic
+        val text = generateSequence(t) { it.cause }.mapNotNull { it.message }.joinToString("\n")
+        return when (Downloader.classify(text)) {
+            Downloader.DlError.NO_SPACE -> Preflight.LOW_SPACE_DOWNLOAD
+            Downloader.DlError.UNAVAILABLE -> R.string.err_download_unsupported
+            Downloader.DlError.GEO -> R.string.err_download_geo
+            Downloader.DlError.RATE_LIMITED -> R.string.err_download_rate_limited
+            Downloader.DlError.FORBIDDEN -> R.string.err_download_forbidden
+            Downloader.DlError.EXTRACTOR -> R.string.err_download_extractor
+            Downloader.DlError.NETWORK -> R.string.err_download_network
+            Downloader.DlError.UNKNOWN -> R.string.err_download_generic
         }
     }
 
