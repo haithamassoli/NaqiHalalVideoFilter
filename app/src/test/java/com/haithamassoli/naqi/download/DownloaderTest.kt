@@ -1,5 +1,6 @@
 package com.haithamassoli.naqi.download
 
+import com.haithamassoli.naqi.model.FilterOps
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -17,31 +18,46 @@ class DownloaderTest {
     }
 
     @Test
-    fun formatChoiceFollowsFiltersAndHardware() {
+    fun formatChoiceFollowsWhatTheFiltersDoToTheFrames() {
         val s23 = mapOf("avc" to 2160, "hevc" to 2160, "vp9" to 2160, "av1" to 2160)
-        val noAv1 = mapOf("avc" to 1080, "vp9" to 1080)
-        fun f(q: Downloader.Quality, filtered: Boolean, hw: Map<String, Int>) =
-            Downloader.formatArgs(q, filtered, hw).let { it[1] to it[3] }
+        val old = mapOf("avc" to 1080, "hevc" to 1080, "vp9" to 1080) // no AV1 decoder, 1080p max
+        val none = Downloader.Processing.NONE
+        val music = Downloader.Processing.MUSIC
+        val visual = Downloader.Processing.VISUAL
+        fun f(q: Downloader.Quality, p: Downloader.Processing, hw: Map<String, Int>, sdk: Int = 36) =
+            Downloader.formatArgs(q, p, hw, sdk).joinToString(" ")
 
-        // Filtered "Best": capped at 1080p, ≤30 fps preferred, h264 first.
-        assertEquals("bv*+ba/b" to "res:1080,fps:30,+vcodec:avc,+acodec:m4a", f(Downloader.Quality.BEST, true, s23))
-        // Unfiltered "Best": only the hardware limits it.
-        assertEquals("bv*+ba/b" to "res:2160,+vcodec:avc,+acodec:m4a", f(Downloader.Quality.BEST, false, s23))
-        // No HW AV1 decoder: AV1 excluded, with a fallback for AV1-only sources; HW caps at 1080.
+        // No filters: yt-dlp's own best, capped only by the hardware.
+        assertEquals("-f bv*+ba/b -S res:2160", f(Downloader.Quality.BEST, none, s23))
         assertEquals(
-            "bv*[vcodec!^=av01]+ba/b/bv*+ba" to "res:1080,+vcodec:avc,+acodec:m4a",
-            f(Downloader.Quality.BEST, false, noAv1),
+            "-f bv*[vcodec!^=?av01]+ba/b[vcodec!^=?av01]/bv*+ba/b -S res:1080",
+            f(Downloader.Quality.BEST, none, old),
         )
-        // An explicit user cap below the hardware wins.
-        assertEquals("bv*+ba/b" to "res:720,fps:30,+vcodec:avc,+acodec:m4a", f(Downloader.Quality.P720, true, s23))
-        // Probe failed: exclude nothing, cap only by the user's choice.
-        assertEquals("bv*+ba/b" to "+vcodec:avc,+acodec:m4a", f(Downloader.Quality.BEST, false, emptyMap()))
-        assertEquals("ba/b" to "+acodec:m4a", f(Downloader.Quality.AUDIO, true, s23))
+        // Music only: full resolution and fps kept; never VP9; H.264 first at equal resolution.
+        assertEquals(
+            "-f bv*[vcodec!^=?vp09][vcodec!^=?vp9]+ba/b[vcodec!^=?vp09][vcodec!^=?vp9]/bv*+ba/b -S res:2160,+vcodec:avc,+acodec:m4a",
+            f(Downloader.Quality.BEST, music, s23),
+        )
+        // ...and not AV1 either below Android 14, where MediaMuxer can't carry it.
+        assertEquals(
+            "-f bv*[vcodec!^=?av01][vcodec!^=?vp09][vcodec!^=?vp9]+ba/b[vcodec!^=?av01][vcodec!^=?vp09][vcodec!^=?vp9]/bv*+ba/b " +
+                "-S res:2160,+vcodec:avc,+acodec:m4a",
+            f(Downloader.Quality.BEST, music, s23, sdk = 33),
+        )
+        // Visual filter (with or without music): ≤1080p, ≤30 fps, SDR, most efficient HW codec (default order).
+        assertEquals("-f bv*+ba/b -S res:1080,fps:30,hdr:sdr,+acodec:m4a", f(Downloader.Quality.BEST, visual, s23))
+        assertEquals("-f bv*+ba/b -S res:720,fps:30,hdr:sdr,+acodec:m4a", f(Downloader.Quality.P720, visual, s23))
+        assertEquals(visual, Downloader.Processing.of(FilterOps(removeMusic = true, censorWho = FilterOps.DEFAULT_WHO)))
+        assertEquals(music, Downloader.Processing.of(FilterOps(removeMusic = true)))
+        assertEquals(none, Downloader.Processing.of(FilterOps()))
+        // Probe failed: exclude nothing for hardware reasons, cap only by the user.
+        assertEquals("-f bv*+ba/b", f(Downloader.Quality.BEST, none, emptyMap()))
+        assertEquals("-f ba/b -S +acodec:m4a", f(Downloader.Quality.AUDIO, visual, s23))
     }
 
     @Test
     fun requestCarriesSpeedAndResilienceFlags() {
-        val cmd = Downloader.buildRequest("https://x.test/v", "/q/%(title)s.%(ext)s", Downloader.Quality.BEST, true, emptyMap(),
+        val cmd = Downloader.buildRequest("https://x.test/v", "/q/%(title)s.%(ext)s", Downloader.Quality.BEST, Downloader.Processing.VISUAL, emptyMap(),
             Downloader.Attempt(Downloader.Aria2("/lib/libaria2c.so", "/py/cert.pem"), infoJson = "/q/info.json", ipv4 = false),
         ).buildCommand()
         fun values(flag: String) = cmd.indices.filter { cmd[it] == flag }.map { cmd[it + 1] }
@@ -58,7 +74,7 @@ class DownloaderTest {
         assertEquals(listOf("/q/info.json"), values("--load-info-json"))
         assert("--force-ipv4" !in cmd)
 
-        val native = Downloader.buildRequest("https://x.test/v", "/q/o", Downloader.Quality.BEST, true, emptyMap(),
+        val native = Downloader.buildRequest("https://x.test/v", "/q/o", Downloader.Quality.BEST, Downloader.Processing.VISUAL, emptyMap(),
             Downloader.Attempt(aria2 = null, infoJson = null, ipv4 = true),
         ).buildCommand()
         assert("--downloader" !in native)

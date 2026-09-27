@@ -4,10 +4,12 @@ import android.content.Context
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
+import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import com.haithamassoli.naqi.BuildConfig
 import com.haithamassoli.naqi.data.Prefs
+import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.work.JobStore
 import com.yausername.aria2c.Aria2c
 import com.yausername.ffmpeg.FFmpeg
@@ -180,14 +182,14 @@ object Downloader {
      * local format selection against that JSON (0.3 s, no network), so the size always matches the
      * choice on screen. Null on any failure: the sheet never blocks on this.
      */
-    suspend fun probe(context: Context, url: String, quality: Quality, filtered: Boolean): Info? =
+    suspend fun probe(context: Context, url: String, quality: Quality, processing: Processing): Info? =
         withContext(Dispatchers.IO) {
             runCatching {
                 sharing {
                     ensureInit(context)
                     val saved = freshInfoJson(context, url)
                     val request = YoutubeDLRequest(url).apply {
-                        formatArgs(quality, filtered, DeviceCodecs.hwDecodeHeights).chunked(2).forEach { (k, v) -> addOption(k, v) }
+                        formatArgs(quality, processing, DeviceCodecs.hwDecodeHeights, Build.VERSION.SDK_INT).chunked(2).forEach { (k, v) -> addOption(k, v) }
                         addOption("--dump-single-json")
                         addOption("--no-playlist")
                         if (saved != null) addOption("--load-info-json", saved.absolutePath) else addOption("--socket-timeout", 10)
@@ -231,8 +233,7 @@ object Downloader {
      *
      * One attempt, then at most one retry whose shape depends on what failed ([recoveryFor]).
      *
-     * @param filtered a filter will run on the result: caps "Best" at 1080p and prefers ≤30 fps, because
-     *   filter time scales with pixels × frames and a 4K60 source costs ~8× a 1080p30 one.
+     * @param processing what the filters will do to the frames; decides the format ([Processing]).
      * @param onProgress bytes, speed and ETA for the whole download, video and audio streams summed.
      *   Called from the reader thread of the yt-dlp process, not from a coroutine.
      * @param onSpaceCheck called on each progress tick; returning false aborts the download. This is the
@@ -242,7 +243,7 @@ object Downloader {
         context: Context,
         url: String,
         quality: Quality,
-        filtered: Boolean,
+        processing: Processing,
         processId: String,
         onSpaceCheck: () -> Boolean = { true },
         onProgress: (DlProgress) -> Unit,
@@ -262,7 +263,7 @@ object Downloader {
             // aria2c writes segments at scattered offsets, so its .part is not a prefix the native
             // downloader can append to. Resuming one natively would stitch a corrupt file.
             if (attempt.aria2 == null) dropAria2Partials(dir)
-            val request = buildRequest(url, output, quality, filtered, hw, attempt)
+            val request = buildRequest(url, output, quality, processing, hw, attempt)
             val streams = StreamTotals()
             // Called for every output line, not just progress; parseProgress picks the progress out.
             YoutubeDL.getInstance().execute(request, processId) { _, _, line ->
@@ -405,12 +406,13 @@ object Downloader {
         url: String,
         output: String,
         quality: Quality,
-        filtered: Boolean,
+        processing: Processing,
         hw: Map<String, Int>,
         attempt: Attempt,
+        sdk: Int = Build.VERSION.SDK_INT,
     ): YoutubeDLRequest = YoutubeDLRequest(url).apply {
         val aria2 = attempt.aria2
-        formatArgs(quality, filtered, hw).chunked(2).forEach { (k, v) -> addOption(k, v) }
+        formatArgs(quality, processing, hw, sdk).chunked(2).forEach { (k, v) -> addOption(k, v) }
         // Start from the share sheet's extraction instead of repeating it (~5 s on YouTube). yt-dlp
         // re-runs format selection on it with the -f/-S above and ignores the URL, with a warning.
         attempt.infoJson?.let { addOption("--load-info-json", it) }
@@ -541,33 +543,82 @@ object Downloader {
     }
 
     /**
-     * `-f` and `-S` for [quality] on this device. `-S res:H` rather than `-f [height<=H]`: `res` is the
-     * *smaller* side, so a portrait Short at 1080×1920 counts as 1080p instead of being filtered out.
+     * What will be done to the downloaded frames, which is what decides the format worth fetching.
      *
-     * `+vcodec:avc` orders h264 > h265 > vp9 > av01 (yt-dlp README): MP4-muxable codecs first, which is
-     * what lets a music-only job pass the video through instead of rendering a VP9 WebM first. `res`
-     * comes before it, so the codec preference never costs resolution below the cap.
+     * - [NONE]: the file is published as-is — yt-dlp's own best, minus what this device can't play
+     *   smoothly (no hardware decoder, or above its hardware size).
+     * - [MUSIC]: the video track is copied untouched into the MP4 output, so it must be a codec MP4 can
+     *   carry: H.264 > HEVC > AV1 (Android 14+). Never VP9 — that one forces a full video re-encode
+     *   (`FilterWorker.runMusicOnly`). Resolution and fps are kept: no frame is processed.
+     * - [VISUAL]: every frame is decoded, analysed and re-encoded, so cost scales with pixels × frames:
+     *   ≤1080p, ≤30 fps preferred, SDR, and the most efficient codec the device decodes in hardware
+     *   (yt-dlp's default order, AV1 > VP9 > H.264 — the output is re-encoded anyway, so the smallest
+     *   download wins). AAC audio, since the audio track is copied into the MP4 as-is.
+     */
+    enum class Processing {
+        NONE, MUSIC, VISUAL;
+
+        companion object {
+            fun of(ops: FilterOps): Processing = when {
+                ops.censorFaces -> VISUAL
+                ops.removeMusic -> MUSIC
+                else -> NONE
+            }
+        }
+    }
+
+    /**
+     * `-f` and `-S` for [quality] and [processing] on this device. `-S res:H` rather than
+     * `-f [height<=H]`: `res` is the *smaller* side, so a portrait Short at 1080×1920 counts as 1080p
+     * instead of being filtered out. `res` always leads the sort, so no codec preference costs resolution
+     * below the cap.
+     *
+     * Excluded codecs use `!^=?`: a format whose codec the site doesn't report still qualifies. Each
+     * selector ends in an unfiltered `bv*+ba/b`, so a source offering only excluded codecs still
+     * downloads (and pays whatever that costs) instead of failing.
      *
      * ponytail: one height for all codecs (the best HW decoder's). Split per codec if a device ever
      * decodes VP9 in hardware at a lower size than H.264 — no such device has shown up.
      */
-    internal fun formatArgs(quality: Quality, filtered: Boolean, hw: Map<String, Int>): List<String> {
+    internal fun formatArgs(quality: Quality, processing: Processing, hw: Map<String, Int>, sdk: Int): List<String> {
         // AAC taken as-is, rather than Opus re-encoded to m4a by --extract-audio.
         if (quality == Quality.AUDIO) return listOf("-f", "ba/b", "-S", "+acodec:m4a")
-        val cap = quality.maxHeight ?: if (filtered) FILTERED_MAX_HEIGHT else null
-        val height = listOfNotNull(cap, hw.values.maxOrNull()).minOrNull()
-        // An empty map means the probe failed, not "no hardware"; exclude nothing then.
-        val selector = if (hw.isNotEmpty() && "av1" !in hw) "bv*[vcodec!^=av01]+ba/b/bv*+ba" else "bv*+ba/b"
-        val sort = listOfNotNull(
-            height?.let { "res:$it" },
+        val banned = buildSet {
+            // An empty map means the probe failed, not "no hardware"; exclude nothing for that reason then.
+            if (hw.isNotEmpty()) {
+                if ("av1" !in hw) add("av01")
+                if ("vp9" !in hw) addAll(VP9)
+                if ("hevc" !in hw) addAll(HEVC)
+            }
+            if (processing == Processing.MUSIC) {
+                addAll(VP9)
+                // MediaMuxer's MP4 writer takes AV1 only from API 34 (Remux.canMuxVideo).
+                if (sdk < 34) add("av01")
+            }
+        }
+        val only = banned.sorted().joinToString("") { "[vcodec!^=?$it]" }
+        val selector = if (only.isEmpty()) "bv*+ba/b" else "bv*$only+ba/b$only/bv*+ba/b"
+
+        val cap = listOfNotNull(
+            quality.maxHeight,
+            hw.values.maxOrNull(),
+            VISUAL_MAX_HEIGHT.takeIf { processing == Processing.VISUAL },
+        ).minOrNull()
+        val sort = listOfNotNull(cap?.let { "res:$it" }) + when (processing) {
+            Processing.NONE -> emptyList()
+            Processing.MUSIC -> listOf("+vcodec:avc", "+acodec:m4a")
             // After res on purpose: YouTube only serves a 60 fps source at 60 fps from 720p up, so fps
             // first would trade 1080p60 for 480p30.
-            if (filtered) "fps:30" else null,
-            "+vcodec:avc",
-            "+acodec:m4a",
-        ).joinToString(",")
-        return listOf("-f", selector, "-S", sort)
+            // AAC because the pipeline copies the audio through: Opus from a WebM source lands as
+            // Opus-in-MP4, which iOS and some messaging apps mishandle once the result is shared.
+            // Audio is sorted separately from video, so this costs the video choice nothing.
+            Processing.VISUAL -> listOf("fps:30", "hdr:sdr", "+acodec:m4a")
+        }
+        return listOf("-f", selector) + if (sort.isEmpty()) emptyList() else listOf("-S", sort.joinToString(","))
     }
+
+    private val VP9 = listOf("vp9", "vp09")
+    private val HEVC = listOf("hev1", "hvc1")
 
     /**
      * The measurement line every later speed change is judged by (plan Phase 0): time to first progress
@@ -638,7 +689,7 @@ object Downloader {
     private const val STALE_MS = 7L * 24 * 60 * 60 * 1000
     // `aria2` is aria2c's resume control file, left next to its `.part` until the transfer completes.
     private val IN_FLIGHT = setOf("part", "ytdl", "temp", "aria2")
-    private const val FILTERED_MAX_HEIGHT = 1080
+    private const val VISUAL_MAX_HEIGHT = 1080
     private const val INFO_JSON = "info.json"
     private const val INFO_MAX_AGE_MS = 60L * 60 * 1000
     private const val RECOVERY_UPDATE_MIN_MS = 6L * 60 * 60 * 1000

@@ -72,7 +72,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
         var pct = 0
         try {
             val file = Downloader.download(
-                applicationContext, url, quality, filtered = ops.any, processId = id.toString(),
+                applicationContext, url, quality, Downloader.Processing.of(ops), processId = id.toString(),
                 // The PRD's "abort early once yt-dlp reports total bytes", without parsing yt-dlp's
                 // progress lines: the only thing the check actually needs is whether the volume we are
                 // filling still has room, and that is a syscall.

@@ -125,8 +125,9 @@ fun ShareSheet(
     // Re-keyed on what changes the format choice: the size shown is always for what would be fetched.
     // The first run goes to the network; the rest re-select locally from the saved extraction (~0.3 s).
     if (shared is Shared.Link) {
-        LaunchedEffect(quality, effectiveOps.any) {
-            Downloader.probe(context, shared.url, quality, effectiveOps.any)?.let { info = it }
+        val processing = Downloader.Processing.of(effectiveOps)
+        LaunchedEffect(quality, processing) {
+            Downloader.probe(context, shared.url, quality, processing)?.let { info = it }
         }
     }
     val title = (shared as? Shared.LocalFile)?.name ?: info?.title

@@ -202,6 +202,21 @@ internal fun classify(text: String): DlError  // text = all causes' messages, lo
 
 ### Phase 4 — Hardware-aware format selection
 
+**Revised 2026-09-27 (shipped): format by what the filters do to the frames** (`Downloader.Processing`). The first version applied H.264-first and the 1080p/30 fps cap to *every* filtered job; that doubled YouTube data for no reason and threw away resolution in music-only jobs, which never touch a frame.
+
+| Filters | Video | Resolution / fps | Audio |
+|---|---|---|---|
+| none | yt-dlp default best, minus codecs without a HW decoder | device HW limit only | default |
+| remove music only | H.264 > HEVC > AV1 (API 34+); **never VP9** — MediaMuxer can't copy it, so it forces a full re-encode | kept (60 fps too) | AAC |
+| any visual filter (± music) | most efficient HW-decodable (yt-dlp default: AV1 > VP9 > H.264), SDR | ≤1080p, ≤30 fps preferred | AAC — the audio is copied into the MP4, and Opus-in-MP4 breaks on iOS/some apps |
+| audio only | — | — | AAC as-is |
+
+User decisions: music-only takes the highest resolution available in a passthrough codec, dropping to e.g. 1080p H.264 rather than accepting a VP9-only 4K that would need re-encoding; unfiltered downloads still exclude codecs the device can't decode in hardware.
+
+Verified on the S23 (API 36): music-only on a 59 s 4K clip downloaded AV1 3840×2160 and published AV1 3840×2160 + AAC with a 1.3 s mux (no re-encode), 48 s total. No filters: AV1 1080p WebM. Face censoring: AV1 1080p source through the full visual pipeline (26 s for 2:30), output H.264 + AAC. Big Buck Bunny selections checked with yt-dlp `--print`: none → AV1 4K60 (723 MB); music → AV1 4K60 + AAC; music on API 33 → H.264 1080p60; visual → AV1 1080p (135 MB).
+
+The design notes below describe the first version.
+
 **Goal:** download what this device decodes in hardware and what MP4 can carry, so the filter pipeline can pass it through or at least decode it fast.
 
 1. **Device probe** (new file `download/DeviceCodecs.kt`, computed once, cached in memory):
@@ -352,4 +367,4 @@ Network outage (airplane mode 15 s, 5 s into the download): baseline and new bot
 
 **Correction:** the `first_progress_ms` values in the rows above (1.2–2.8 s) measured the first output line of any kind, not the first progress line — the library calls back on every line. Fixed with Phase 3's parser. Re-measured: **YouTube 5.2 s**, archive.org 4.5 s from start to the first byte of progress. On YouTube that is extraction + QuickJS challenge solving, about a third of a 14 s 1080p download, so Phase 5's info prefetch (and measuring deno vs QuickJS) is worth doing, particularly for short videos.
 
-**Trade-off to watch:** preferring H.264 roughly doubles the bytes for YouTube 1080p60 compared with VP9. Filtered jobs are capped at 1080p, so the worst case is the one above. If mobile-data cost matters more than decode speed, restrict `+vcodec:avc` to filtered jobs.
+**Trade-off (resolved by the Phase 4 revision):** preferring H.264 roughly doubled the bytes for YouTube 1080p60 compared with VP9. H.264 is now preferred only for music-only jobs, where it avoids a re-encode.
