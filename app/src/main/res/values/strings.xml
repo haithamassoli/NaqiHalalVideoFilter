@@ -72,6 +72,10 @@
     <string name="dur_under_min">under a minute</string>
     <string name="dur_min">%1$d min</string>
     <string name="dur_h_min">%1$d h %2$d min</string>
+    <string name="dur_sec">%1$d s</string>
+    <!-- Download stats: "45 MB / 120 MB", "3.1 MB/s". The sizes arrive already localized. -->
+    <string name="dl_done_of_total">%1$s / %2$s</string>
+    <string name="dl_speed">%1$s/s</string>
 
     <!-- ============================================================
          Options — step 2, OptionsScreen

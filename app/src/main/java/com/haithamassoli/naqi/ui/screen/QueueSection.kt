@@ -19,6 +19,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,12 +31,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.work.Data
+import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
+import com.haithamassoli.naqi.download.DownloadWorker
 import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.NaqiIcons
 import com.haithamassoli.naqi.ui.NaqiRowDivider
 import com.haithamassoli.naqi.ui.SectionHeader
+import com.haithamassoli.naqi.ui.downloadStatsText
 import com.haithamassoli.naqi.ui.theme.NaqiTokens
+import com.haithamassoli.naqi.work.FilterWorker
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.Queue
 import kotlinx.coroutines.launch
@@ -58,6 +66,9 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun QueueCard(items: List<Queue.Item>) {
     val context = LocalContext.current
+    // One download runs at a time, so the running download's progress belongs to the DOWNLOADING row.
+    val downloads by remember { JobController.observeDownloads(context) }.collectAsState(initial = emptyList())
+    val live = downloads.firstOrNull { it.state == WorkInfo.State.RUNNING }?.progress
 
     SectionHeader(
         stringResource(R.string.queue_eyebrow),
@@ -72,13 +83,13 @@ internal fun QueueCard(items: List<Queue.Item>) {
     NaqiCard(contentPadding = 0.dp) {
         items.forEachIndexed { index, item ->
             if (index > 0) NaqiRowDivider()
-            QueueRow(item, stateLabel(item.state, items))
+            QueueRow(item, stateLabel(item.state, items), live.takeIf { item.state == Queue.State.DOWNLOADING })
         }
     }
 }
 
 @Composable
-private fun QueueRow(item: Queue.Item, stateLabel: Int) {
+private fun QueueRow(item: Queue.Item, stateLabel: Int, live: Data?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val cs = MaterialTheme.colorScheme
@@ -101,7 +112,17 @@ private fun QueueRow(item: Queue.Item, stateLabel: Int) {
             .padding(start = NaqiTokens.space4, end = NaqiTokens.space2, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatusGlyph(item.state)
+        val percent = live?.getInt(FilterWorker.KEY_PROGRESS, 0) ?: 0
+        val stats = live?.let {
+            downloadStatsText(
+                context,
+                it.getLong(DownloadWorker.KEY_DL_DONE, -1),
+                it.getLong(DownloadWorker.KEY_DL_TOTAL, -1),
+                it.getLong(DownloadWorker.KEY_DL_BPS, -1),
+                it.getLong(FilterWorker.KEY_ETA_MS, 0),
+            )
+        }?.takeIf { it.isNotEmpty() }
+        StatusGlyph(item.state, percent)
         Spacer(Modifier.width(NaqiTokens.space3))
         Column(Modifier.weight(1f)) {
             Text(
@@ -115,7 +136,7 @@ private fun QueueRow(item: Queue.Item, stateLabel: Int) {
             // repeat what the red glyph already says.
             val error = item.error?.takeIf { it != 0 }
             Text(
-                stringResource(error ?: stateLabel),
+                stats ?: stringResource(error ?: stateLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (failed) cs.error else cs.onSurfaceVariant,
                 maxLines = 2,
@@ -153,12 +174,22 @@ private fun QueueRow(item: Queue.Item, stateLabel: Int) {
  * padding, so sized on its own it lands a couple of dp off the column the other glyphs line up on.
  */
 @Composable
-private fun StatusGlyph(state: Queue.State) {
+private fun StatusGlyph(state: Queue.State, percent: Int) {
     val cs = MaterialTheme.colorScheme
     Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
         when (state) {
-            Queue.State.DOWNLOADING, Queue.State.FILTERING ->
+            // Determinate once a download reports a size; spinning while it resolves formats or filters.
+            Queue.State.DOWNLOADING, Queue.State.FILTERING -> if (state == Queue.State.DOWNLOADING && percent > 0) {
+                CircularProgressIndicator(
+                    progress = { percent / 100f },
+                    modifier = Modifier.size(18.dp),
+                    color = cs.primary,
+                    strokeWidth = 2.5.dp,
+                    trackColor = cs.surfaceContainerHighest,
+                )
+            } else {
                 CircularProgressIndicator(Modifier.size(18.dp), color = cs.primary, strokeWidth = 2.5.dp)
+            }
 
             Queue.State.DONE -> Box(
                 Modifier

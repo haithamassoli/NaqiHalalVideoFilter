@@ -189,6 +189,7 @@ dependencies {
     // M4: yt-dlp + a bundled ffmpeg. GPL-3.0 — linking these relicenses the app (see LICENSE).
     implementation(libs.youtubedl.android)
     implementation(libs.youtubedl.ffmpeg)
+    implementation(libs.youtubedl.aria2c)
 
     testImplementation(libs.junit)
     testImplementation(libs.json) // real org.json impl so Edl JSON round-trip tests run on the JVM

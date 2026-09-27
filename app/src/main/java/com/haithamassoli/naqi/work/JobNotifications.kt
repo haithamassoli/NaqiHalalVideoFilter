@@ -114,12 +114,25 @@ internal object JobNotifications {
      * `dataSync`, never `mediaProcessing`: on API 35+ the two foreground-service types draw from
      * separate 6 h/24 h budgets, so a download does not spend the filter pipeline's allowance.
      */
-    fun downloadForegroundInfo(context: Context, workId: UUID, title: String, progress: Int): ForegroundInfo {
+    /**
+     * @param stats "45 MB / 120 MB · 3.1 MB/s · ~30 s remaining" once yt-dlp reports it, else null. With
+     *   stats the video title moves up to the title line, since the stats line is what changes.
+     */
+    fun downloadForegroundInfo(
+        context: Context,
+        workId: UUID,
+        title: String,
+        progress: Int,
+        stats: String?,
+    ): ForegroundInfo {
         ensureChannel(context)
         // 1..100, not 0..100: yt-dlp sits at 0 while it resolves formats, and a determinate bar frozen at
         // zero reads as stuck where an indeterminate one reads as working.
-        val notification =
+        val notification = if (stats.isNullOrEmpty()) {
             ongoing(context, workId, context.getString(R.string.download_notif_title), title, progress, 1..100)
+        } else {
+            ongoing(context, workId, title, stats, progress, 1..100)
+        }
         return if (Build.VERSION.SDK_INT >= 34) {
             ForegroundInfo(DOWNLOAD_NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {

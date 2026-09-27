@@ -130,6 +130,9 @@
     <string name="dur_under_min">أقل من دقيقة</string>
     <string name="dur_min">%1$d دقيقة</string>
     <string name="dur_h_min">%1$d ساعة و%2$d دقيقة</string>
+    <string name="dur_sec">%1$d ثانية</string>
+    <string name="dl_done_of_total">‏%1$s من %2$s</string>
+    <string name="dl_speed">‏%1$s/ث</string>
 
     <!-- Up-front time estimate above Start. %1$s = a dur_* string. Deliberately worded as a FLOOR:
          every measurement behind it came from a flagship, so "at least" is the only honest framing. -->
