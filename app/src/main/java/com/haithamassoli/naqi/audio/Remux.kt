@@ -9,6 +9,7 @@ import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Build
 import com.haithamassoli.naqi.media.firstTrackFormat
+import com.haithamassoli.naqi.media.firstTrackIndex
 import com.haithamassoli.naqi.media.requireTrackIndex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -288,9 +289,82 @@ object Remux {
         }
     }
 
-    private fun MuxOut.muxer(): MediaMuxer = when (this) {
-        is MuxOut.ToFile -> MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        is MuxOut.ToFd -> MediaMuxer(fd, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    /**
+     * Copy [uri]'s samples from [startUs] up to [endUs] into [out], rebased to start at 0 — one
+     * publish-ready part, ZERO re-encode. [startUs] must be a video keyframe (the splitter only cuts on
+     * them) and the video stops at the keyframe at [endUs], which is the next part's first sample.
+     * Audio is cut by timestamp: every AAC frame is a sync sample.
+     *
+     * [webm] writes a WebM part, for VP8/VP9 video the MP4 writer cannot carry. [audioM4a] replaces the
+     * source's audio with an already-transcoded AAC of it (same timeline), for audio the MP4 writer
+     * rejects — Opus in a YouTube WebM: "Unsupported mime 'audio/opus'" on a S23.
+     */
+    suspend fun copyRange(
+        context: Context,
+        uri: Uri,
+        startUs: Long,
+        endUs: Long,
+        out: MuxOut,
+        webm: Boolean = false,
+        audioM4a: File? = null,
+    ) =
+        withContext(Dispatchers.IO) {
+            val vExt = MediaExtractor()
+            val aExt = MediaExtractor()
+            var muxer: MediaMuxer? = null
+            var failed = true
+            try {
+                vExt.setDataSource(context, uri, null)
+                val vIx = vExt.requireTrackIndex("video/")
+                vExt.selectTrack(vIx)
+                val vFormat = vExt.getTrackFormat(vIx)
+                if (audioM4a != null) aExt.setDataSource(audioM4a.absolutePath) else aExt.setDataSource(context, uri, null)
+                val aIx = aExt.firstTrackIndex("audio/")
+
+                muxer = out.muxer(
+                    if (webm) MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM else MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4,
+                )
+                val video = Src(vExt, muxer.addTrack(vFormat), allocFor(vFormat))
+                val audio = aIx?.let { ix ->
+                    aExt.selectTrack(ix)
+                    val f = aExt.getTrackFormat(ix)
+                    Src(aExt, muxer.addTrack(f), allocFor(f))
+                }
+                // MP4 only: the WebM writer has no rotation field.
+                if (!webm) muxer.setOrientationHint(rotationOf(context, TrackSource.FromUri(uri), vFormat))
+                muxer.start()
+
+                vExt.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                if (audio != null) {
+                    aExt.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                    while (aExt.sampleTime in 0 until startUs) aExt.advance() // belongs to the previous part
+                }
+
+                val info = MediaCodec.BufferInfo()
+                while (true) {
+                    ensureActive()
+                    val vt = vExt.sampleTime
+                    val vIn = vt >= 0 && !(vt >= endUs && vExt.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0)
+                    val at = if (audio == null) -1L else aExt.sampleTime
+                    val aIn = at in 0 until endUs
+                    if (!vIn && !aIn) break
+                    if (vIn && (!aIn || vt <= at)) writeOne(muxer, video, info, -startUs)
+                    else writeOne(muxer, audio!!, info, -startUs)
+                }
+
+                muxer.stop()
+                failed = false
+            } finally {
+                runCatching { muxer?.release() }
+                runCatching { vExt.release() }
+                runCatching { aExt.release() }
+                if (failed) out.discard()
+            }
+        }
+
+    private fun MuxOut.muxer(format: Int = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4): MediaMuxer = when (this) {
+        is MuxOut.ToFile -> MediaMuxer(file.absolutePath, format)
+        is MuxOut.ToFd -> MediaMuxer(fd, format)
     }
 
     /** Half-written mp4 cleanup. See [MuxOut] for why the descriptor case is deliberately a no-op. */
