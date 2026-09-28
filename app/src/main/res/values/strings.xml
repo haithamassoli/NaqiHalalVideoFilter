@@ -342,6 +342,11 @@
     <!-- Repo card. action_open is its trailing label. -->
     <string name="about_repo_title">Github</string>
     <string name="about_repo_desc">Naqi is open source. Read the code, report a problem, or build it yourself.</string>
+    <!-- Feedback card: opens the mail app with a pre-filled message. action_open is its trailing label. -->
+    <string name="about_eyebrow_contact">Contact</string>
+    <string name="about_feedback_title">Feedback &amp; suggestions</string>
+    <string name="about_feedback_desc">Tell us what works, what doesn\'t, or what you\'d like to see.</string>
+    <string name="about_feedback_subject">Naqi feedback</string>
     <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
     <string name="about_notices_title">Open-source notices</string>
     <string name="about_notice_missing">Open-source notices are unavailable in this build.</string>

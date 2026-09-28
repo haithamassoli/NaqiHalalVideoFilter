@@ -323,6 +323,11 @@
     <!-- BRAND: the service name stays Latin in every locale. -->
     <string name="about_repo_title">Github</string>
     <string name="about_repo_desc">نقي مفتوح المصدر. اطّلع على الكود، أبلغ عن مشكلة، أو ابنِ التطبيق بنفسك.</string>
+    <!-- Feedback card: opens the mail app with a pre-filled message. action_open is its trailing label. -->
+    <string name="about_eyebrow_contact">تواصل معنا</string>
+    <string name="about_feedback_title">الاقتراحات والملاحظات</string>
+    <string name="about_feedback_desc">أخبرنا بما يعمل جيدًا، وما لا يعمل، أو ما تودّ رؤيته.</string>
+    <string name="about_feedback_subject">ملاحظات حول نقي</string>
     <!-- Header of the collapsed licence block; action_show/action_hide are its two states. -->
     <string name="about_notices_title">إشعارات المصادر المفتوحة</string>
     <string name="about_notice_missing">إشعارات المصادر المفتوحة غير متوفّرة في هذه النسخة.</string>
