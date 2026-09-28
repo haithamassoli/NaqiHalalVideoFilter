@@ -78,6 +78,10 @@ object NaqiIcons {
         circle(18f, 6f, 2.4f); circle(6f, 12f, 2.4f); circle(18f, 18f, 2.4f)
     }
 
+    val Play = icon("Play") {
+        moveTo(8f, 5f); lineTo(19f, 12f); lineTo(8f, 19f); close()
+    }
+
     /** Overflow "kebab" — carries the entries that used to be full-width cards on the pick screen. */
     val More = icon("More") {
         circle(12f, 5.2f, 1.9f); circle(12f, 12f, 1.9f); circle(12f, 18.8f, 1.9f)

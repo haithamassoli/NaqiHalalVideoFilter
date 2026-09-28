@@ -60,18 +60,19 @@ import kotlinx.coroutines.withContext
  * Closing the sheet mid-split cancels it, and [Splitter.split] then removes the parts it already wrote.
  */
 @Composable
-fun PublishSheet(uri: Uri, name: String, onDismiss: () -> Unit) {
+fun PublishSheet(uri: Uri, name: String, onDismiss: () -> Unit, initial: String? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val baseName = name.substringBeforeLast('.')
 
     // Installed apps only, most used first, ties in ALL's order (the sort is stable). Fixed while the
-    // sheet is open so a chip never moves under the user's finger, and the first one is what the sheet opens on.
+    // sheet is open so a chip never moves under the user's finger, and the first one is what the sheet opens on
+    // unless the tap that opened it already named one.
     val order = remember {
         (PublishPreset.ALL.filter { it.isInstalled(context) }.map { it.id } + PublishPreset.CUSTOM)
             .sortedByDescending { Prefs.presetUses(context, it) }
     }
-    var selected by rememberSaveable { mutableStateOf(order.first()) }
+    var selected by rememberSaveable { mutableStateOf(initial ?: order.first()) }
     var customSeconds by rememberSaveable { mutableIntStateOf(60) }
     val preset = PublishPreset.ALL.firstOrNull { it.id == selected } ?: PublishPreset.custom(customSeconds)
 

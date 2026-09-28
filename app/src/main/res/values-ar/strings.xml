@@ -179,11 +179,12 @@
          Hidden entirely until the worker has enough throughput to mean it (KEY_ETA_MS == 0). -->
     <string name="jobs_eta_remaining">يتبقّى نحو ‏%1$s</string>
 
-    <!-- Success card. %1$s = the saved file name; the Movies/Naqi/ segment is a real path and stays Latin. -->
+    <!-- Success card. -->
     <string name="jobs_saved_label">تم الحفظ</string>
-    <string name="jobs_saved_path">Movies/Naqi/%1$s</string>
-    <!-- The audio-only shape publishes an .m4a into Music/Naqi instead; same path rule. -->
-    <string name="jobs_saved_path_audio">Music/Naqi/%1$s</string>
+    <!-- %1$s = the video length, e.g. 2:26. -->
+    <string name="jobs_saved_meta">تم الحفظ · %1$s</string>
+    <!-- Beside a Delete button on the saved card, which asks before deleting the source video. -->
+    <string name="jobs_original_still_here">الأصلي ما زال على جهازك</string>
 
     <!-- Header of the system share sheet. -->
     <string name="jobs_share_chooser_title">مشاركة الفيديو</string>

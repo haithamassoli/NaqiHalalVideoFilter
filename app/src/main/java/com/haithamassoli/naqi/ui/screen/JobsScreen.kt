@@ -11,6 +11,22 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
+import android.text.format.DateUtils
+import android.util.Size
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
+import androidx.core.graphics.drawable.toBitmap
+import com.haithamassoli.naqi.media.containerDurationMs
+import com.haithamassoli.naqi.publish.PublishPreset
+import com.haithamassoli.naqi.ui.NaqiRowDivider
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -160,8 +176,8 @@ fun JobsScreen(
     }
 
     var pendingDelete by remember { mutableStateOf<LibraryItem?>(null) }
-    var publishing by remember { mutableStateOf<Pair<Uri, String>?>(null) }
-    publishing?.let { (uri, name) -> PublishSheet(uri, name, onDismiss = { publishing = null }) }
+    var publishing by remember { mutableStateOf<Triple<Uri, String, String?>?>(null) }
+    publishing?.let { (uri, name, preset) -> PublishSheet(uri, name, onDismiss = { publishing = null }, initial = preset) }
     val scope = rememberCoroutineScope()
     val systemDelete = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
         if (it.resultCode == Activity.RESULT_OK) libraryVersion++
@@ -223,8 +239,8 @@ fun JobsScreen(
             item(key = "status") {
                 when {
                     running -> JobProgressCard(stageText, progress, etaMs, onCancel)
-                    showSaved -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context) { uri ->
-                        publishing = uri to outputName.orEmpty()
+                    showSaved -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context) { uri, preset ->
+                        publishing = Triple(uri, outputName.orEmpty(), preset)
                     }
                     failed -> NaqiCard {
                         Text(
@@ -296,7 +312,7 @@ fun JobsScreen(
                     item,
                     onOpen = { item.uri?.let { view(context, it) } },
                     onDelete = { pendingDelete = item },
-                    onPublish = { item.uri?.let { publishing = it to item.name } },
+                    onPublish = { item.uri?.let { publishing = Triple(it, item.name, null) } },
                     modifier = Modifier
                         .padding(top = if (index == 0) 0.dp else 2.dp)
                         .clip(shape)
@@ -394,73 +410,166 @@ private fun SavedCard(
     sourceUri: String?,
     onDeleteOriginal: (Uri, String?) -> Unit,
     context: Context,
-    onPublish: (Uri) -> Unit,
+    onPublish: (Uri, String?) -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
+    val audio = isAudioOutput(name)
+    val thumb by produceState<ImageBitmap?>(null, uri) {
+        value = uri?.let {
+            withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.loadThumbnail(it, Size(320, 320), null).asImageBitmap() }.getOrNull()
+            }
+        }
+    }
+    // Null until read: a tap before then goes through the sheet, which can wait for it.
+    val durationMs by produceState<Long?>(null, uri) {
+        value = uri?.let { withContext(Dispatchers.IO) { context.containerDurationMs(it) } }
+    }
+    // Installed apps only, most used first — the same order the sheet's chips use. Audio has nothing
+    // to post to a video platform, so it gets the system chooser alone.
+    val apps by produceState(emptyList<Pair<PublishPreset, ImageBitmap>>(), audio) {
+        if (!audio) value = withContext(Dispatchers.IO) {
+            PublishPreset.ALL
+                .mapNotNull { p ->
+                    p.installedPackage(context)?.let { pkg ->
+                        runCatching { p to context.packageManager.getApplicationIcon(pkg).toBitmap(96, 96).asImageBitmap() }
+                            .getOrNull()
+                    }
+                }
+                .sortedByDescending { Prefs.presetUses(context, it.first.id) }
+        }
+    }
+
     NaqiCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(NaqiTokens.radiusButton))
+                .clickable(enabled = uri != null, onClickLabel = stringResource(R.string.action_open)) {
+                    uri?.let { view(context, it) }
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Box(
                 Modifier
-                    .size(36.dp)
+                    .size(width = 88.dp, height = 56.dp)
                     .clip(RoundedCornerShape(NaqiTokens.radiusButton))
-                    .background(cs.primary),
+                    .background(cs.surfaceContainerHighest),
                 contentAlignment = Alignment.Center,
-            ) { Icon(NaqiIcons.Check, null, tint = cs.onPrimary, modifier = Modifier.size(20.dp)) }
+            ) {
+                thumb?.let { Image(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                // The thumbnail is the Open button now, so it wears a play mark to say so.
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(NaqiIcons.Play, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+            }
             Spacer(Modifier.width(NaqiTokens.space3))
             Column(Modifier.weight(1f)) {
                 Text(
-                    stringResource(R.string.jobs_saved_label),
-                    style = MaterialTheme.typography.titleMedium,
+                    name.orEmpty(),
+                    style = MaterialTheme.typography.titleSmall,
                     color = cs.onSurface,
-                )
-                Text(
-                    // The audio-only shape publishes into Music/Naqi, so the one path label this app
-                    // shows has to follow it — naming the wrong folder is worse than naming none.
-                    stringResource(savedPathRes(name), name.orEmpty()),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = cs.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                Spacer(Modifier.height(NaqiTokens.space1))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(NaqiIcons.Check, null, tint = cs.primary, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(NaqiTokens.space1))
+                    Text(
+                        durationMs?.takeIf { it > 0 }
+                            ?.let { stringResource(R.string.jobs_saved_meta, DateUtils.formatElapsedTime(it / 1000)) }
+                            ?: stringResource(R.string.jobs_saved_label),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = cs.primary,
+                    )
+                }
             }
         }
         // No uri (missing key, or a pre-Q file the scanner hasn't indexed yet) means nothing safe to hand out.
         if (uri != null) {
             Spacer(Modifier.height(NaqiTokens.space4))
-            Row {
-                Button(
-                    onClick = { view(context, uri) },
-                    shape = RoundedCornerShape(NaqiTokens.radiusButton),
-                    modifier = Modifier.weight(1f),
-                ) { Text(stringResource(R.string.action_open)) }
-                Spacer(Modifier.width(NaqiTokens.space3))
-                OutlinedButton(
-                    onClick = { share(context, uri) },
-                    shape = RoundedCornerShape(NaqiTokens.radiusButton),
-                    modifier = Modifier.weight(1f),
-                ) { Text(stringResource(R.string.action_share)) }
-            }
-            // Audio has nothing to post to a video platform.
-            if (!isAudioOutput(name)) {
-                Spacer(Modifier.height(NaqiTokens.space2))
-                OutlinedButton(
-                    onClick = { onPublish(uri) },
-                    shape = RoundedCornerShape(NaqiTokens.radiusButton),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.action_prepare_publish)) }
+            // A tap on an app is the whole flow when the video fits it; only a video that has to be cut
+            // goes through the sheet, already on that app's chip.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+            ) {
+                apps.forEach { (preset, icon) ->
+                    ShareTile(stringResource(preset.labelRes), { Image(icon, null, Modifier.fillMaxSize()) }) {
+                        val d = durationMs
+                        if (d == null || preset.requiresSplitting(d)) {
+                            onPublish(uri, preset.id)
+                        } else {
+                            Prefs.countPresetUse(context, preset.id)
+                            Splitter.share(context, preset, listOf(uri))
+                        }
+                    }
+                }
+                ShareTile(
+                    stringResource(if (apps.isEmpty()) R.string.action_share else R.string.action_more),
+                    {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .background(cs.surfaceContainerHighest),
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(NaqiIcons.Share, null, tint = cs.onSurfaceVariant) }
+                    },
+                ) { share(context, uri) }
             }
         }
-        // Offered here as well as on the notification, which is gone the moment it is swiped. Text, not
-        // a third button in that row: it is the one destructive thing on the screen and must not read
-        // as a peer of Open and Share. It only ASKS — the confirm dialog is the same one the
-        // notification action opens, and the deleting happens there.
+        // Offered here as well as on the notification, which is gone the moment it is swiped. A hint with
+        // its action rather than a lone button: the sentence says why you would delete. It only ASKS —
+        // the confirm dialog is the same one the notification action opens, and the deleting happens there.
         if (sourceUri != null) {
-            TextButton(
-                onClick = { onDeleteOriginal(sourceUri.toUri(), name) },
-                colors = ButtonDefaults.textButtonColors(contentColor = cs.error),
-                modifier = Modifier.align(Alignment.Start),
-            ) { Text(stringResource(R.string.action_delete_original)) }
+            Spacer(Modifier.height(NaqiTokens.space3))
+            NaqiRowDivider()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.jobs_original_still_here),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = { onDeleteOriginal(sourceUri.toUri(), name) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = cs.error),
+                ) { Text(stringResource(R.string.action_delete)) }
+            }
         }
+    }
+}
+
+@Composable
+private fun ShareTile(label: String, icon: @Composable () -> Unit, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .width(76.dp)
+            .clip(RoundedCornerShape(NaqiTokens.radiusButton))
+            .clickable(onClick = onClick)
+            .padding(vertical = NaqiTokens.space2),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(48.dp)) { icon() }
+        Spacer(Modifier.height(NaqiTokens.space1))
+        // Two lines: "Instagram Story" and "Instagram Reels" are told apart by their second word.
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -552,9 +661,6 @@ private data class LibraryItem(val name: String, val bytes: Long, val uri: Uri?)
  * mp4 — [FilterWorker]'s `outputName(uri, ext = "m4a")` is the one place it comes from.
  */
 private fun isAudioOutput(name: String?): Boolean = name?.endsWith(".m4a", ignoreCase = true) == true
-
-private fun savedPathRes(name: String?) =
-    if (isAudioOutput(name)) R.string.jobs_saved_path_audio else R.string.jobs_saved_path
 
 /** Newest first, straight out of MediaStore — our own contributions need no permission to read back. */
 private fun loadLibrary(context: Context): List<LibraryItem> = runCatching {

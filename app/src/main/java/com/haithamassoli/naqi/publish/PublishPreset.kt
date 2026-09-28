@@ -34,8 +34,11 @@ data class PublishPreset(
     fun requiresSplitting(durationMs: Long): Boolean = maxSegmentMs != null && durationMs > maxSegmentMs
 
     /** Any of [targets] on the device. Needs the manifest's `<queries>` SEND entry to see them on API 30+. */
-    fun isInstalled(context: Context): Boolean = targets.any {
-        runCatching { context.packageManager.getPackageInfo(it.substringBefore('/'), 0) }.isSuccess
+    fun isInstalled(context: Context): Boolean = installedPackage(context) != null
+
+    /** The first of [targets]' packages on the device — the one whose icon stands for this preset. */
+    fun installedPackage(context: Context): String? = targets.map { it.substringBefore('/') }.firstOrNull {
+        runCatching { context.packageManager.getPackageInfo(it, 0) }.isSuccess
     }
 
     companion object {
