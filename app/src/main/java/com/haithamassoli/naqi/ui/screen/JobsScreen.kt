@@ -1,17 +1,26 @@
 package com.haithamassoli.naqi.ui.screen
 
+import android.app.Activity
+import android.app.RecoverableSecurityException
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
+import android.content.IntentSender
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,11 +29,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,8 +50,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,7 +71,6 @@ import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.ui.NaqiBottomAction
 import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.NaqiIcons
-import com.haithamassoli.naqi.ui.NaqiRowDivider
 import com.haithamassoli.naqi.ui.NaqiTopBar
 import com.haithamassoli.naqi.ui.SectionHeader
 import com.haithamassoli.naqi.ui.durationText
@@ -66,6 +79,7 @@ import com.haithamassoli.naqi.work.FilterWorker
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.Queue
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val MIME_MP4 = "video/mp4"
@@ -136,9 +150,39 @@ fun JobsScreen(
     }
 
     var library by remember { mutableStateOf(emptyList<LibraryItem>()) }
-    // Re-read on every job state change so a fresh save shows up without a manual refresh.
-    LaunchedEffect(info?.state, outputName) {
+    // Bumped after a delete, so the list re-reads MediaStore instead of guessing what is left.
+    var libraryVersion by remember { mutableIntStateOf(0) }
+    // Re-read on every job state change so a fresh save shows up without a manual refresh; the queue
+    // size too, because a queued item leaves the queue at the moment its output lands in the library.
+    LaunchedEffect(info?.state, outputName, queue.size, libraryVersion) {
         library = withContext(Dispatchers.IO) { loadLibrary(context) }
+    }
+
+    var pendingDelete by remember { mutableStateOf<LibraryItem?>(null) }
+    val scope = rememberCoroutineScope()
+    val systemDelete = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
+        if (it.resultCode == Activity.RESULT_OK) libraryVersion++
+    }
+    pendingDelete?.let { item ->
+        DeleteOutputDialog(
+            name = item.name,
+            onDismiss = { pendingDelete = null },
+            onConfirm = {
+                pendingDelete = null
+                val uri = item.uri ?: return@DeleteOutputDialog
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) { runCatching { deleteOutput(context, uri) } }
+                    when (val sender = result.getOrNull()) {
+                        null -> if (result.isSuccess) {
+                            libraryVersion++
+                        } else {
+                            Toast.makeText(context, R.string.jobs_delete_failed, Toast.LENGTH_SHORT).show()
+                        }
+                        else -> systemDelete.launch(IntentSenderRequest.Builder(sender).build())
+                    }
+                }
+            },
+        )
     }
 
     Scaffold(
@@ -153,82 +197,143 @@ fun JobsScreen(
         },
         modifier = modifier,
     ) { pad ->
-        Column(
+        // Lazy: the library is every file Naqi ever saved, and a plain scrolling Column composed all
+        // of them up front.
+        LazyColumn(
             Modifier
                 .padding(pad)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = NaqiTokens.gutter)
-                .padding(top = NaqiTokens.space2, bottom = NaqiTokens.space5),
+                .fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = NaqiTokens.gutter,
+                end = NaqiTokens.gutter,
+                top = NaqiTokens.space2,
+                bottom = NaqiTokens.space5,
+            ),
         ) {
-            if (showBatteryCard) {
+            if (showBatteryCard) item(key = "battery") {
                 BatteryCard(
                     onAllow = { Battery.request(context) },
                     onLater = { Prefs.dismissBatteryCard(context); showBatteryCard = false },
                 )
                 Spacer(Modifier.height(NaqiTokens.space5))
             }
-            when {
-                running -> JobProgressCard(stageText, progress, etaMs, onCancel)
-                showSaved -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context)
-                failed -> NaqiCard {
-                    Text(
-                        stringResource(if (outputMessageId != 0) outputMessageId else R.string.err_generic),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    // A long job that died past its first segment kept every finished segment on disk.
-                    // Resuming re-runs only what is missing — the whole point of Phase 2.
-                    if (resumable && onResume != null) {
-                        Spacer(Modifier.height(NaqiTokens.space2))
+            item(key = "status") {
+                when {
+                    running -> JobProgressCard(stageText, progress, etaMs, onCancel)
+                    showSaved -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context)
+                    failed -> NaqiCard {
                         Text(
-                            stringResource(R.string.jobs_resume_hint),
+                            stringResource(if (outputMessageId != 0) outputMessageId else R.string.err_generic),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        // A long job that died past its first segment kept every finished segment on disk.
+                        // Resuming re-runs only what is missing — the whole point of Phase 2.
+                        if (resumable && onResume != null) {
+                            Spacer(Modifier.height(NaqiTokens.space2))
+                            Text(
+                                stringResource(R.string.jobs_resume_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(NaqiTokens.space3))
+                            Button(
+                                onClick = onResume,
+                                shape = RoundedCornerShape(NaqiTokens.radiusButton),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(stringResource(R.string.action_resume)) }
+                        }
+                    }
+                    // Nothing to report and nothing queued: one muted line, not an empty card that looks
+                    // like something went missing.
+                    queue.isEmpty() -> Text(
+                        stringResource(R.string.jobs_none_running),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = NaqiTokens.space1),
+                    )
+                }
+            }
+
+            if (queue.isNotEmpty()) item(key = "queue") {
+                Column {
+                    if (running || showSaved || failed) Spacer(Modifier.height(NaqiTokens.space5))
+                    QueueCard(queue)
+                }
+            }
+
+            item(key = "library-header") {
+                Column {
+                    Spacer(Modifier.height(NaqiTokens.space6))
+                    SectionHeader(stringResource(R.string.jobs_library))
+                    if (library.isEmpty()) {
+                        Text(
+                            stringResource(R.string.jobs_library_empty),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = NaqiTokens.space1),
                         )
-                        Spacer(Modifier.height(NaqiTokens.space3))
-                        Button(
-                            onClick = onResume,
-                            shape = RoundedCornerShape(NaqiTokens.radiusButton),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.action_resume)) }
                     }
                 }
-                // Nothing to report and nothing queued: one muted line, not an empty card that looks
-                // like something went missing.
-                queue.isEmpty() -> Text(
-                    stringResource(R.string.jobs_none_running),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = NaqiTokens.space1),
-                )
             }
-
-            if (queue.isNotEmpty()) {
-                if (running || showSaved || failed) Spacer(Modifier.height(NaqiTokens.space5))
-                QueueCard(queue)
-            }
-
-            Spacer(Modifier.height(NaqiTokens.space6))
-            SectionHeader(stringResource(R.string.jobs_library))
-            if (library.isEmpty()) {
-                Text(
-                    stringResource(R.string.jobs_library_empty),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = NaqiTokens.space1),
+            // One segment per row rather than one card around all of them: a lazy list cannot wrap its
+            // items in a single parent, so the card's outer corners go on the first and last segment.
+            itemsIndexed(library, key = { _, item -> item.uri?.toString() ?: item.name }) { index, item ->
+                val outer = 24.dp
+                val inner = 6.dp
+                val shape = RoundedCornerShape(
+                    topStart = if (index == 0) outer else inner,
+                    topEnd = if (index == 0) outer else inner,
+                    bottomStart = if (index == library.lastIndex) outer else inner,
+                    bottomEnd = if (index == library.lastIndex) outer else inner,
                 )
-            } else {
-                NaqiCard(contentPadding = 0.dp) {
-                    library.forEachIndexed { index, item ->
-                        if (index > 0) NaqiRowDivider()
-                        LibraryRow(item) { item.uri?.let { view(context, it) } }
-                    }
-                }
+                LibraryRow(
+                    item,
+                    onOpen = { item.uri?.let { view(context, it) } },
+                    onDelete = { pendingDelete = item },
+                    modifier = Modifier
+                        .padding(top = if (index == 0) 0.dp else 2.dp)
+                        .clip(shape)
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
+                )
             }
         }
     }
 }
+
+/** Same shape as the delete-original confirm; this one is about Naqi's own output. */
+@Composable
+private fun DeleteOutputDialog(name: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.jobs_delete_title)) },
+        text = { Text(stringResource(R.string.jobs_delete_body, name), style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text(stringResource(R.string.action_delete)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_keep)) } },
+    )
+}
+
+/**
+ * Deletes a file Naqi published. Our own MediaStore rows need no permission — until a reinstall drops
+ * that ownership, and then the system has to ask. Returns that system prompt, or null when already done.
+ */
+private fun deleteOutput(context: Context, uri: Uri): IntentSender? = try {
+    context.contentResolver.delete(uri, null, null)
+    null
+} catch (e: SecurityException) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        MediaStore.createDeleteRequest(context.contentResolver, listOf(uri)).intentSender
+    } else {
+        (e as? RecoverableSecurityException)?.userAction?.actionIntent?.intentSender ?: throw e
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun JobProgressCard(stage: String, progress: Int, etaMs: Long, onCancel: (() -> Unit)?) {
@@ -344,12 +449,12 @@ private fun SavedCard(
 }
 
 @Composable
-private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit) {
+private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
     val cs = MaterialTheme.colorScheme
     val context = LocalContext.current
     val uri = item.uri
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             // The tap is the only way to open now, so it has to say so out loud to a screen reader.
             .clickable(enabled = uri != null, onClickLabel = stringResource(R.string.action_open), onClick = onOpen)
@@ -386,13 +491,26 @@ private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit) {
             )
             Text(formatSize(item.bytes), style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
         }
-        // Tapping the row already opens it, so a trailing "Open" only repeated the row. Share is the
-        // other thing worth doing to a finished file, and as an icon it costs the row nothing.
+        // Tapping the row already opens it, so a trailing "Open" only repeated the row. Share and Delete
+        // sit behind one overflow: Delete is destructive and must not be a one-tap peer of Share.
         // [loadLibrary] builds this uri with ContentUris, so it is content:// and safe to hand out as is.
         if (uri != null) {
             Spacer(Modifier.width(NaqiTokens.space2))
-            IconButton(onClick = { share(context, uri) }) {
-                Icon(NaqiIcons.Share, stringResource(R.string.action_share), tint = cs.onSurfaceVariant)
+            var menu by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { menu = true }) {
+                    Icon(NaqiIcons.More, stringResource(R.string.action_more), tint = cs.onSurfaceVariant)
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_share)) },
+                        onClick = { menu = false; share(context, uri) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_delete), color = cs.error) },
+                        onClick = { menu = false; onDelete() },
+                    )
+                }
             }
         }
     }

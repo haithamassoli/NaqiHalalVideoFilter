@@ -16,7 +16,7 @@ Reference product: [Seal](https://github.com/JunkFood02/Seal). Reference library
 | Share flow | Always show the sheet, pre-filled from last used. No zero-tap path |
 | Quarantine | Download → `noBackupFilesDir/naqi-downloads/`. Published to `Movies/Naqi` only after filtering. Original deleted on success |
 | ffmpeg | Bundled. All formats, all qualities, mp3/m4a extraction |
-| aria2c | Not bundled. Saves 6.8 MB, yt-dlp's native downloader is sufficient |
+| aria2c | Bundled since 2026-09-27 (+6.8 MB) for non-YouTube https; YouTube stays native because it throttles aria2c. See `download-speed-reliability-plan.md` §8 |
 | Concurrency | FIFO queue, persisted. Downloads and filtering run concurrently (network-bound vs CPU-bound); one of each at a time. WorkManager chains are the scheduler |
 | yt-dlp updates | Weekly auto-check on app open + manual button on the About/licenses screen, `UpdateChannel.STABLE`. F-Droid would tag this a non-free-network anti-feature |
 | Trust copy | "Nothing leaves your phone" → "Your videos never leave your phone" (EN + AR) |

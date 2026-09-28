@@ -111,6 +111,9 @@ object Prefs {
     fun updateDue(context: Context): Boolean =
         System.currentTimeMillis() - prefs(context).getLong(KEY_LAST_UPDATE_CHECK, 0L) > UPDATE_INTERVAL_MS
 
+    /** When yt-dlp last updated successfully; 0 = never. */
+    fun lastUpdateCheck(context: Context): Long = prefs(context).getLong(KEY_LAST_UPDATE_CHECK, 0L)
+
     fun markUpdateChecked(context: Context) {
         prefs(context).edit().putLong(KEY_LAST_UPDATE_CHECK, System.currentTimeMillis()).apply()
     }

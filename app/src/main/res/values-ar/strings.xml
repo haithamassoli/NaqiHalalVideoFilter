@@ -130,6 +130,9 @@
     <string name="dur_under_min">أقل من دقيقة</string>
     <string name="dur_min">%1$d دقيقة</string>
     <string name="dur_h_min">%1$d ساعة و%2$d دقيقة</string>
+    <string name="dur_sec">%1$d ثانية</string>
+    <string name="dl_done_of_total">‏%1$s من %2$s</string>
+    <string name="dl_speed">‏%1$s/ث</string>
 
     <!-- Up-front time estimate above Start. %1$s = a dur_* string. Deliberately worded as a FLOOR:
          every measurement behind it came from a flagship, so "at least" is the only honest framing. -->
@@ -163,6 +166,10 @@
     <!-- Library list. "Movies/Naqi" is a real on-disk path — keep it Latin, untranslated. -->
     <string name="jobs_library">المكتبة</string>
     <string name="jobs_library_empty">تُحفظ الملفات المُفلترة في Movies/Naqi، والصوت في Music/Naqi.</string>
+    <!-- Library overflow → Delete. %1$s = the file name. -->
+    <string name="jobs_delete_title">حذف هذا الملف؟</string>
+    <string name="jobs_delete_body">سيُحذف %1$s من هذا الجهاز ولا يمكن استرجاعه.</string>
+    <string name="jobs_delete_failed">تعذّر حذف الملف — احذفه من المعرض بدلًا من ذلك.</string>
 
     <!-- Progress card. jobs_stage_starting fills the instant before the worker publishes its first stage_* value. -->
     <string name="jobs_stage_starting">جارٍ البدء…</string>
@@ -219,7 +226,11 @@
 
     <!-- Download failures (M4). -->
     <string name="err_low_space_download">لا توجد مساحة كافية لتنزيل هذا الفيديو. فرّغ بعض المساحة ثم أعد المحاولة.</string>
-    <string name="err_download_unsupported">لا يستطيع نقي التنزيل من هذا الرابط. قد يكون الموقع غير مدعوم أو الفيديو خاصًا.</string>
+    <string name="err_download_unsupported">لا يمكن تنزيل هذا الفيديو. قد يكون خاصًا أو محذوفًا أو يتطلّب حسابًا، أو من موقع لا يدعمه نقي.</string>
+    <string name="err_download_geo">هذا الفيديو غير متاح في بلدك.</string>
+    <string name="err_download_rate_limited">الموقع يحدّ من التنزيلات حاليًا. أعد المحاولة بعد بضع دقائق.</string>
+    <string name="err_download_forbidden">رفض الموقع التنزيل. أعد المحاولة بعد بضع دقائق.</string>
+    <string name="err_download_extractor">تعذّر على نقي قراءة هذا الفيديو حتى بعد تحديث أداة التنزيل. أعد المحاولة لاحقًا.</string>
     <string name="err_download_network">فشل التنزيل. تحقّق من اتصالك ثم أعد المحاولة.</string>
     <string name="err_download_generic">فشل التنزيل.</string>
 
@@ -271,7 +282,7 @@
     <string name="queue_state_done">تم الحفظ</string>
     <string name="queue_state_failed">فشل</string>
     <string name="queue_dismiss">إخفاء</string>
-    <string name="queue_clear_finished">مسح المكتملة</string>
+    <string name="queue_clear_failed">مسح الفاشلة</string>
 
     <!-- ============================================================
          App update card (UpdateCard, on the pick screen).

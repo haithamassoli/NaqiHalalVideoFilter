@@ -1,20 +1,33 @@
 package com.haithamassoli.naqi.download
 
 import android.content.Context
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.net.Uri
+import android.os.Build
+import android.os.SystemClock
 import android.util.Log
+import com.haithamassoli.naqi.BuildConfig
 import com.haithamassoli.naqi.data.Prefs
+import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.work.JobStore
+import com.yausername.aria2c.Aria2c
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
+import java.io.IOException
+import java.net.URI
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Everything the app knows about yt-dlp, in one file.
@@ -34,17 +47,18 @@ object Downloader {
     private const val ROOT = "naqi-downloads"
 
     /**
-     * The quality choices the sheet offers, and the yt-dlp format selectors behind them. Fixed
-     * strings on purpose — the PRD forbids ever rendering yt-dlp's raw format table at the user.
+     * The quality choices the sheet offers, as a resolution cap; [formatArgs] turns it into yt-dlp's
+     * `-f`/`-S`. The PRD forbids ever rendering yt-dlp's raw format table at the user. The names are a
+     * wire format (queue JSON, Prefs).
      */
-    enum class Quality(val selector: String) {
-        BEST("bv*+ba/b"),
-        P1080("bv*[height<=1080]+ba/b[height<=1080]"),
-        P720("bv*[height<=720]+ba/b[height<=720]"),
-        P480("bv*[height<=480]+ba/b[height<=480]"),
+    enum class Quality(val maxHeight: Int?) {
+        BEST(null),
+        P1080(1080),
+        P720(720),
+        P480(480),
 
         /** Paired with `--extract-audio --audio-format m4a` in [download]; the result is an `.m4a`. */
-        AUDIO("ba/b"),
+        AUDIO(null),
         ;
 
         companion object {
@@ -55,9 +69,30 @@ object Downloader {
     @Volatile
     private var ready = false
 
-    // ponytail: one lock because yt-dlp updates replace files used by every active process. Split only
-    // if the library gains an atomic updater that is safe while a download is running.
-    private val processMutex = Mutex()
+    /**
+     * An update replaces the zipapp every yt-dlp process is running from, so it must never overlap one;
+     * two processes (a download and the share sheet's [probe]) may overlap each other freely. That is a
+     * read/write lock: [sharing] is the read side, [exclusive] the write side. Holding [gate] while
+     * waiting for [running] to drain is what stops new readers from starving an update.
+     *
+     * Not a JDK ReentrantReadWriteLock: that one is owned by a thread, and these holders suspend.
+     */
+    private val gate = Mutex()
+    private val running = AtomicInteger()
+
+    private suspend fun <T> sharing(block: suspend () -> T): T {
+        gate.withLock { running.incrementAndGet() }
+        try {
+            return block()
+        } finally {
+            running.decrementAndGet()
+        }
+    }
+
+    private suspend fun <T> exclusive(block: () -> T): T = gate.withLock {
+        while (running.get() > 0) delay(250)
+        block()
+    }
 
     /**
      * Unzip CPython, the yt-dlp zipapp and ffmpeg out of the extracted native libs. First call costs a
@@ -73,6 +108,8 @@ object Downloader {
         val app = context.applicationContext
         YoutubeDL.getInstance().init(app)
         FFmpeg.getInstance().init(app)
+        // Unzips aria2c's shared libs next to ffmpeg's; without it aria2c cannot start.
+        Aria2c.getInstance().init(app)
         ready = true
         Log.i(TAG, "yt-dlp ready, version=${version(app)}")
     }
@@ -92,7 +129,7 @@ object Downloader {
      * Nightly matches Seal's default and gets extractor fixes before the next stable release.
      */
     suspend fun update(context: Context): YoutubeDL.UpdateStatus? = withContext(Dispatchers.IO) {
-        processMutex.withLock { updateLocked(context) }
+        exclusive { updateLocked(context) }
     }
 
     private fun updateLocked(context: Context): YoutubeDL.UpdateStatus? {
@@ -109,16 +146,17 @@ object Downloader {
      *
      * Fire-and-forget and deliberately failure-tolerant: this runs on a cold start, the user has not
      * asked for anything yet, and a failed check must cost them nothing. The clock is only advanced on
-     * success, so a week offline does not silently consume the interval.
+     * success, so a week offline does not silently consume the interval. Checked before taking the gate,
+     * so the six days out of seven it isn't due never make a share-sheet probe wait on a download.
      */
     suspend fun updateIfDue(context: Context) = withContext(Dispatchers.IO) {
-        processMutex.withLock { updateIfDueLocked(context) }
-    }
-
-    private fun updateIfDueLocked(context: Context) {
-        if (!Prefs.updateDue(context)) return
-        runCatching { updateLocked(context) }
-            .onFailure { Log.w(TAG, "weekly yt-dlp check failed; will retry next launch", it) }
+        if (!Prefs.updateDue(context)) return@withContext
+        exclusive {
+            if (Prefs.updateDue(context)) {
+                runCatching { updateLocked(context) }
+                    .onFailure { Log.w(TAG, "weekly yt-dlp check failed; will retry next launch", it) }
+            }
+        }
     }
 
     /**
@@ -132,6 +170,58 @@ object Downloader {
     fun quarantineDir(context: Context, url: String): File =
         File(File(context.noBackupFilesDir, ROOT), JobStore.keyOf(url)).apply { mkdirs() }
 
+    /** What the share sheet shows about a link before it is queued. -1 = the extractor didn't say. */
+    data class Info(val title: String?, val durationSec: Long, val sizeBytes: Long)
+
+    /**
+     * Title, duration and size of [url] for this [quality], and the extraction the download will reuse.
+     *
+     * The first call per URL goes to the network (~5 s on YouTube, the whole of a download's startup)
+     * and saves yt-dlp's info JSON to the quarantine directory; [download] then starts from it instead
+     * of extracting again. Every later call — the user changing quality or filters — re-runs only the
+     * local format selection against that JSON (0.3 s, no network), so the size always matches the
+     * choice on screen. Null on any failure: the sheet never blocks on this.
+     */
+    suspend fun probe(context: Context, url: String, quality: Quality, processing: Processing): Info? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                sharing {
+                    ensureInit(context)
+                    val saved = freshInfoJson(context, url)
+                    val request = YoutubeDLRequest(url).apply {
+                        formatArgs(quality, processing, DeviceCodecs.hwDecodeHeights, Build.VERSION.SDK_INT).chunked(2).forEach { (k, v) -> addOption(k, v) }
+                        addOption("--dump-single-json")
+                        addOption("--no-playlist")
+                        if (saved != null) addOption("--load-info-json", saved.absolutePath) else addOption("--socket-timeout", 10)
+                    }
+                    val json = runInterruptible { YoutubeDL.getInstance().execute(request).out }
+                    // Only a network extraction is worth keeping; a local re-selection is derived from it.
+                    if (saved == null) {
+                        val tmp = File(quarantineDir(context, url), "$INFO_JSON.tmp")
+                        tmp.writeText(json)
+                        tmp.renameTo(File(tmp.parentFile, INFO_JSON))
+                    }
+                    parseInfo(json)
+                }
+            }.onFailure {
+                if (it is CancellationException) throw it
+                Log.w(TAG, "probe failed for $url", it)
+            }.getOrNull()
+        }
+
+    /** The saved extraction, if young enough that its stream URLs are still valid (YouTube's last ~6 h). */
+    private fun freshInfoJson(context: Context, url: String): File? =
+        File(quarantineDir(context, url), INFO_JSON)
+            .takeIf { it.isFile && System.currentTimeMillis() - it.lastModified() < INFO_MAX_AGE_MS }
+
+    internal fun parseInfo(json: String): Info {
+        val o = JSONObject(json)
+        fun long(key: String) = o.optDouble(key, -1.0).takeIf { !it.isNaN() }?.toLong() ?: -1L
+        // A merged video+audio selection reports only the estimate; a single stream has the exact size.
+        val size = long("filesize").takeIf { it > 0 } ?: long("filesize_approx")
+        return Info(o.optString("title").takeIf { it.isNotBlank() }, long("duration"), size)
+    }
+
     /**
      * Fetch [url] into its quarantine directory and return the finished file.
      *
@@ -141,7 +231,10 @@ object Downloader {
      * `outputName` takes the source filename and appends `-naqi-<ts>`, so the published file is already
      * `<video title>-naqi-<ts>.mp4`.
      *
-     * @param onProgress percent 0..100 and yt-dlp's own ETA in seconds (-1 when it hasn't said yet).
+     * One attempt, then at most one retry whose shape depends on what failed ([recoveryFor]).
+     *
+     * @param processing what the filters will do to the frames; decides the format ([Processing]).
+     * @param onProgress bytes, speed and ETA for the whole download, video and audio streams summed.
      *   Called from the reader thread of the yt-dlp process, not from a coroutine.
      * @param onSpaceCheck called on each progress tick; returning false aborts the download. This is the
      *   PRD's "abort early once yt-dlp reports total bytes" for sources whose size was unknown up front.
@@ -150,58 +243,408 @@ object Downloader {
         context: Context,
         url: String,
         quality: Quality,
+        processing: Processing,
         processId: String,
         onSpaceCheck: () -> Boolean = { true },
-        onProgress: (Int, Long) -> Unit,
+        onProgress: (DlProgress) -> Unit,
     ): File = withContext(Dispatchers.IO) {
-        processMutex.withLock {
-            // A user can live entirely in the translucent share flow and never open MainActivity, so
-            // this is the one route that can guarantee the nightly check precedes the actual process.
-            updateIfDueLocked(context)
-            ensureInit(context)
-            val dir = quarantineDir(context, url)
-            fun request() = YoutubeDLRequest(url)
-                .addOption("-f", quality.selector)
-                .addOption("-o", File(dir, "%(title).80B.%(ext)s").absolutePath)
-                // A shared link often carries a playlist id; without this a single share downloads 200 videos.
-                .addOption("--no-playlist")
-                // Keep the download timestamp rather than the upload date, so the gallery sorts it as new.
-                .addOption("--no-mtime")
-                .apply {
-                    if (quality == Quality.AUDIO) {
-                        addOption("--extract-audio").addOption("--audio-format", "m4a")
-                    }
-                }
+        // A user can live entirely in the translucent share flow and never open MainActivity, so
+        // this is the one route that can guarantee the weekly check precedes the actual process.
+        updateIfDue(context)
+        ensureInit(context)
+        val dir = quarantineDir(context, url)
+        val output = File(dir, "%(title).80B.%(ext)s").absolutePath
+        val hw = DeviceCodecs.hwDecodeHeights
+        val started = SystemClock.elapsedRealtime()
+        var firstProgressMs = -1L
+        var outOfSpace = false
 
-            // runInterruptible, not a bare blocking call: execute() waits on the process, and a cancelled
-            // worker used to leave yt-dlp running to completion while still holding processMutex — every
-            // download queued behind it sat waiting on an orphan. Interrupting the waiting thread makes
-            // the library destroy the process and rethrow, which surfaces here as a CancellationException.
-            runInterruptible {
-                retryOnceAfterYtDlpFailure(
-                    afterFailure = { first ->
-                        Log.w(TAG, "yt-dlp failed; updating and retrying once", first)
-                        runCatching { updateLocked(context) }
-                            .onFailure { Log.w(TAG, "yt-dlp recovery update failed; retrying installed version", it) }
-                    },
-                ) {
-                    YoutubeDL.getInstance().execute(request(), processId) { progress, etaSeconds, _ ->
-                        if (!onSpaceCheck()) {
-                            // The only way to stop a running yt-dlp: kill the process by the id we passed in.
-                            Log.w(TAG, "aborting download: out of space")
-                            YoutubeDL.getInstance().destroyProcessById(processId)
-                        }
-                        onProgress(progress.toInt().coerceIn(0, 100), etaSeconds)
-                    }
+        fun runAttempt(attempt: Attempt) {
+            // aria2c writes segments at scattered offsets, so its .part is not a prefix the native
+            // downloader can append to. Resuming one natively would stitch a corrupt file.
+            if (attempt.aria2 == null) dropAria2Partials(dir)
+            val request = buildRequest(url, output, quality, processing, hw, attempt)
+            val streams = StreamTotals()
+            // Called for every output line, not just progress; parseProgress picks the progress out.
+            YoutubeDL.getInstance().execute(request, processId) { _, _, line ->
+                val p = parseProgress(line) ?: run {
+                    // What yt-dlp said that wasn't progress: the first thing to read when stats go missing.
+                    if (BuildConfig.DEBUG_HOOKS) Log.d(TAG, "yt-dlp: $line")
+                    return@execute
+                }
+                if (firstProgressMs < 0) firstProgressMs = SystemClock.elapsedRealtime() - started
+                if (!outOfSpace && !onSpaceCheck()) {
+                    // The only way to stop a running yt-dlp: kill the process by the id we passed in.
+                    Log.w(TAG, "aborting download: out of space")
+                    outOfSpace = true
+                    YoutubeDL.getInstance().destroyProcessById(processId)
+                }
+                onProgress(streams.add(p))
+            }
+        }
+
+        val first = Attempt(
+            aria2 = if (useAria2(url)) aria2Paths(context) else null,
+            infoJson = freshInfoJson(context, url)?.absolutePath,
+            ipv4 = false,
+        )
+        // runInterruptible, not a bare blocking call: execute() waits on the process, and a cancelled
+        // worker used to leave yt-dlp running to completion — every download queued behind it sat
+        // waiting on an orphan. Interrupting the waiting thread makes the library destroy the process
+        // and rethrow, which surfaces here as a CancellationException.
+        try {
+            sharing { runInterruptible { runAttempt(first) } }
+        } catch (e: YoutubeDLException) {
+            // A kill we asked for is not a yt-dlp failure, and retrying would only fill the disk again.
+            if (outOfSpace) throw IOException("No space left on device (download aborted)", e)
+            val error = classify(e.message.orEmpty())
+            val retry = recoveryFor(error, first, updateAllowed = updateAllowed(context))
+            Log.w(TAG, "yt-dlp failed ($error); ${retry ?: "not retrying"}", e)
+            if (retry == null) throw e
+            // A stale saved extraction is the likeliest cause of whatever just failed; never reuse it.
+            File(dir, INFO_JSON).delete()
+            if (retry.update) {
+                exclusive {
+                    runCatching { updateLocked(context) }
+                        .onFailure { Log.w(TAG, "yt-dlp recovery update failed; retrying installed version", it) }
                 }
             }
-
-            // The per-URL directory has one completed file; partials use an in-flight extension.
-            dir.listFiles()
-                ?.filter { it.isFile && it.extension !in IN_FLIGHT }
-                ?.maxByOrNull { it.length() }
-                ?: error("download reported success but produced no file")
+            sharing { runInterruptible { runAttempt(retry.attempt) } }
         }
+        if (outOfSpace) throw IOException("No space left on device (download aborted)")
+
+        // The per-URL directory has one completed file; partials use an in-flight extension.
+        val file = dir.listFiles()
+            ?.filter { it.isFile && it.extension !in IN_FLIGHT && !it.name.startsWith(INFO_JSON) }
+            ?.maxByOrNull { it.length() }
+            ?: error("download reported success but produced no file")
+        logSummary(url, file, started, firstProgressMs, first)
+        file
+    }
+
+    /** How one run of yt-dlp is shaped, beyond the user's choices. */
+    internal data class Attempt(val aria2: Aria2?, val infoJson: String?, val ipv4: Boolean)
+
+    /** The retry after a failed first [Attempt]: always the plain native downloader from a fresh extraction. */
+    internal data class Retry(val update: Boolean, val attempt: Attempt)
+
+    /**
+     * What a download failure was, from yt-dlp's `ERROR:` lines. Each class gets its own message in
+     * [DownloadWorker] and its own recovery in [recoveryFor]; the point is that no class gets another's.
+     */
+    internal enum class DlError { NO_SPACE, UNAVAILABLE, GEO, RATE_LIMITED, FORBIDDEN, EXTRACTOR, NETWORK, UNKNOWN }
+
+    /**
+     * Only the `ERROR:` lines are read when there are any: yt-dlp's warnings mention things like
+     * "unable to download" on fragments it then retried successfully, and would misclassify the real
+     * error. Order matters — the first match wins, most specific first.
+     */
+    internal fun classify(message: String): DlError {
+        val errors = message.lines().filter { "ERROR:" in it }
+        val t = (errors.ifEmpty { listOf(message) }).joinToString("\n").lowercase()
+        fun has(vararg s: String) = s.any { it in t }
+        return when {
+            has("no space left", "errno 28", "enospc") -> DlError.NO_SPACE
+            // "Sign in to confirm you're not a bot" is YouTube's anti-bot wall, which a newer yt-dlp is
+            // the fix for — not a login the user could provide.
+            has("not a bot") -> DlError.EXTRACTOR
+            has(
+                "private video", "video unavailable", "is unavailable", "has been removed", "no longer available",
+                "members-only", "join this channel", "confirm your age", "age-restricted", "sign in",
+                "logged-in", "log in", "login", "--cookies", "unsupported url", "is not a valid url",
+                "does not exist", "http error 404", "http error 410",
+            ) -> DlError.UNAVAILABLE
+            has("in your country", "geo restrict", "geo-restrict", "in your location", "geo-blocked") -> DlError.GEO
+            has("http error 429", "too many requests", "try again later", "rate-limit", "rate limit") -> DlError.RATE_LIMITED
+            has("http error 403", "forbidden") -> DlError.FORBIDDEN
+            has(
+                "requested format is not available", "unable to extract", "nsig", "signature",
+                "challenge", "no video formats", "unable to decrypt", "player response",
+            ) -> DlError.EXTRACTOR
+            has(
+                "timed out", "connection reset", "connection refused", "connection aborted",
+                "network is unreachable", "name resolution", "failed to resolve", "no address associated",
+                "unable to download", "incompleteread", "http error 5", "remote end closed", "ssl",
+                "errno 7", "errno 101", "errno 104", "errno 110", "errno 111",
+            ) -> DlError.NETWORK
+            else -> DlError.UNKNOWN
+        }
+    }
+
+    /**
+     * The one retry a failure earns, or null when retrying cannot help.
+     *
+     * - UNAVAILABLE / GEO / NO_SPACE: nothing a second run changes. Fail now, with the right message.
+     * - EXTRACTOR / UNKNOWN: a newer yt-dlp is the usual fix — update (at most every 6 h, see
+     *   [updateAllowed], so a burst of failures doesn't hammer GitHub's 60/h anonymous limit) and retry.
+     * - FORBIDDEN: an expired or IP-bound stream URL. Re-extract, over IPv4 — IPv6 ranges get 403 more
+     *   often on some carriers. No update: that isn't what's wrong.
+     * - NETWORK / RATE_LIMITED: yt-dlp already retried with backoff, and WorkManager's CONNECTED
+     *   constraint restarts the worker when the network returns. A second run now would fail the same
+     *   way — unless the first used aria2c or the saved extraction, either of which can be the cause
+     *   (aria2c's 16 connections trip rate limits that one connection doesn't).
+     */
+    internal fun recoveryFor(error: DlError, first: Attempt, updateAllowed: Boolean): Retry? {
+        val plain = Attempt(aria2 = null, infoJson = null, ipv4 = first.ipv4)
+        val usedShortcut = first.aria2 != null || first.infoJson != null
+        return when (error) {
+            DlError.UNAVAILABLE, DlError.GEO, DlError.NO_SPACE -> null
+            DlError.EXTRACTOR, DlError.UNKNOWN -> Retry(update = updateAllowed, attempt = plain)
+            DlError.FORBIDDEN -> Retry(update = false, attempt = plain.copy(ipv4 = true))
+            DlError.NETWORK, DlError.RATE_LIMITED -> if (usedShortcut) Retry(update = false, attempt = plain) else null
+        }
+    }
+
+    private fun updateAllowed(context: Context) =
+        System.currentTimeMillis() - Prefs.lastUpdateCheck(context) > RECOVERY_UPDATE_MIN_MS
+
+    /**
+     * Everything yt-dlp is told for one download. Pure (no process, no Android), so the flag set is
+     * pinned by a unit test rather than rediscovered on a device.
+     */
+    internal fun buildRequest(
+        url: String,
+        output: String,
+        quality: Quality,
+        processing: Processing,
+        hw: Map<String, Int>,
+        attempt: Attempt,
+        sdk: Int = Build.VERSION.SDK_INT,
+    ): YoutubeDLRequest = YoutubeDLRequest(url).apply {
+        val aria2 = attempt.aria2
+        formatArgs(quality, processing, hw, sdk).chunked(2).forEach { (k, v) -> addOption(k, v) }
+        // Start from the share sheet's extraction instead of repeating it (~5 s on YouTube). yt-dlp
+        // re-runs format selection on it with the -f/-S above and ignores the URL, with a warning.
+        attempt.infoJson?.let { addOption("--load-info-json", it) }
+        if (attempt.ipv4) addOption("--force-ipv4")
+        addOption("-o", output)
+        // A shared link often carries a playlist id; without this a single share downloads 200 videos.
+        addOption("--no-playlist")
+        // Keep the download timestamp rather than the upload date, so the gallery sorts it as new.
+        addOption("--no-mtime")
+        if (aria2 != null) {
+            // Plain https through aria2c's parallel connections. An absolute path on purpose: for the bare
+            // `libaria2c.so` token the library appends two `aria2c:` downloader-args of its own, and yt-dlp
+            // keeps only the last per key, so --summary-interval was dropped and aria2c printed no
+            // progress at all. Passing the path skips that, and both options go in one entry here.
+            addOption("--downloader", aria2.bin)
+            addOption("--downloader-args", "aria2c:--summary-interval=1 --ca-certificate=${aria2.caCert}")
+            // HLS/DASH stay native: -N below already parallelises them.
+            addOption("--downloader", "dash,m3u8:native")
+        }
+        // Fragments fetched in parallel. 4, not more: some CDNs answer 429 beyond ~5.
+        addOption("-N", 4)
+        // yt-dlp retries 10× by default but back-to-back; spread them so a 30 s network blip survives.
+        addOption("--retry-sleep", "http:exp=1:30")
+        addOption("--retry-sleep", "fragment:exp=1:30")
+        // Default is to skip a lost fragment and "succeed" with a hole in the video. Fail instead; the
+        // .part/.ytdl stays in quarantine and the next attempt resumes it.
+        addOption("--abort-on-unavailable-fragments")
+        // Below this yt-dlp assumes throttling (typically an unsolved YouTube n-challenge) and re-extracts.
+        addOption("--throttled-rate", "100K")
+        // One progress line a second instead of one per network chunk: less stdout for Python to write.
+        addOption("--progress-delta", 1)
+        addOption("--progress-template", PROGRESS_TEMPLATE)
+        if (quality == Quality.AUDIO) {
+            addOption("--extract-audio").addOption("--audio-format", "m4a")
+        }
+    }
+
+    /**
+     * aria2c everywhere except YouTube. Measured 2026-09-27 on the same Wi-Fi: archive.org 7.07 MiB/s
+     * with aria2c vs 2.24 native (3.2×); YouTube 32 KiB/s with aria2c vs full speed native — YouTube
+     * throttles anything that doesn't fetch in yt-dlp's ranged chunks.
+     */
+    internal fun useAria2(url: String): Boolean {
+        val host = runCatching { URI(url).host }.getOrNull()?.lowercase() ?: return false
+        return YOUTUBE_HOSTS.none { host == it || host.endsWith(".$it") }
+    }
+
+    private val YOUTUBE_HOSTS = listOf("youtube.com", "youtu.be", "youtube-nocookie.com")
+
+    /** Where the library installs aria2c and the CA bundle its Python uses (youtubedl-android 0.18.1 layout). */
+    internal class Aria2(val bin: String, val caCert: String)
+
+    private fun aria2Paths(context: Context) = Aria2(
+        bin = File(context.applicationInfo.nativeLibraryDir, "libaria2c.so").absolutePath,
+        caCert = File(context.noBackupFilesDir, "youtubedl-android/packages/python/usr/etc/tls/cert.pem").absolutePath,
+    )
+
+    private fun dropAria2Partials(dir: File) {
+        dir.listFiles { f -> f.extension == "aria2" }?.forEach { control ->
+            File(control.parentFile, control.nameWithoutExtension).delete()
+            control.delete()
+        }
+    }
+
+    /**
+     * One progress reading. -1 = yt-dlp didn't say (unknown size, speed not measured yet).
+     * [stream] tells consecutive streams apart: yt-dlp's format id, or aria2c's download gid.
+     */
+    data class DlProgress(val done: Long, val total: Long, val bytesPerSec: Long, val etaSec: Long, val stream: String?) {
+        val percent: Int get() = if (total > 0) (done * 100 / total).toInt().coerceIn(0, 100) else -1
+    }
+
+    /**
+     * `bv*+ba` downloads the video, then the audio, and each restarts at 0 bytes. Adding each finished
+     * stream's size keeps the byte count climbing instead of resetting.
+     *
+     * ponytail: the grand total is only known once the audio starts, so the bar dips from 100 % to ~90 %
+     * at the switch (audio is ~10 % of a video's bytes). Prefetch both sizes (plan Phase 5) to remove it.
+     */
+    internal class StreamTotals {
+        private var stream: String? = null
+        private var carried = 0L
+        private var last: DlProgress? = null
+
+        fun add(p: DlProgress): DlProgress {
+            val prev = last
+            if (prev != null && p.stream != stream) carried += if (prev.total > 0) prev.total else prev.done
+            stream = p.stream
+            last = p
+            return p.copy(done = carried + p.done, total = if (p.total > 0) carried + p.total else -1)
+        }
+    }
+
+    /** Machine-readable progress; the `[download] NN.N% … ETA` prefix is kept for the library's own regex. */
+    private const val PROGRESS_TEMPLATE =
+        "download:[download] %(progress._percent_str)s ETA %(progress._eta_str)s |naqi|%(progress.downloaded_bytes)s" +
+            "|%(progress.total_bytes,progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s|%(info.format_id)s"
+
+    /**
+     * aria2c's `--summary-interval` line, e.g. `[#642275 1.1MiB/59MiB(1%) CN:16 DL:0.9MiB ETA:1m]`. The
+     * `(N%)` is absent while the total is still unknown, so it is optional.
+     */
+    private val ARIA2 = Regex(
+        """\[#(\w+) ([\d.]+)([KMG]?i?B)/([\d.]+)([KMG]?i?B)(?:\(\d+%\))?.*?DL:([\d.]+)([KMG]?i?B)(?: ETA:(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?)?]""",
+    )
+
+    /** A yt-dlp `--progress-template` line or an aria2c summary line; null for any other output. */
+    internal fun parseProgress(line: String): DlProgress? {
+        val tail = line.substringAfter("|naqi|", "")
+        if (tail.isNotEmpty()) {
+            val f = tail.split('|')
+            if (f.size < 5) return null
+            fun num(s: String) = s.trim().toDoubleOrNull()?.toLong() ?: -1L
+            val done = num(f[0]).takeIf { it >= 0 } ?: return null
+            return DlProgress(done, num(f[1]), num(f[2]), num(f[3]), f[4].trim())
+        }
+        val m = ARIA2.find(line) ?: return null
+        val g = m.groupValues
+        fun bytes(n: String, unit: String) = (n.toDouble() * when (unit) {
+            "KiB" -> 1024.0
+            "MiB" -> 1024.0 * 1024
+            "GiB" -> 1024.0 * 1024 * 1024
+            else -> 1.0
+        }).toLong()
+        val eta = if (g[8] + g[9] + g[10] == "") -1L else
+            (g[8].toLongOrNull() ?: 0) * 3600 + (g[9].toLongOrNull() ?: 0) * 60 + (g[10].toLongOrNull() ?: 0)
+        return DlProgress(bytes(g[2], g[3]), bytes(g[4], g[5]), bytes(g[6], g[7]), eta, g[1])
+    }
+
+    /**
+     * What will be done to the downloaded frames, which is what decides the format worth fetching.
+     *
+     * - [NONE]: the file is published as-is — yt-dlp's own best, minus what this device can't play
+     *   smoothly (no hardware decoder, or above its hardware size).
+     * - [MUSIC]: the video track is copied untouched into the MP4 output, so it must be a codec MP4 can
+     *   carry: H.264 > HEVC > AV1 (Android 14+). Never VP9 — that one forces a full video re-encode
+     *   (`FilterWorker.runMusicOnly`). Resolution and fps are kept: no frame is processed.
+     * - [VISUAL]: every frame is decoded, analysed and re-encoded, so cost scales with pixels × frames:
+     *   ≤1080p, ≤30 fps preferred, SDR, and the most efficient codec the device decodes in hardware
+     *   (yt-dlp's default order, AV1 > VP9 > H.264 — the output is re-encoded anyway, so the smallest
+     *   download wins). AAC audio, since the audio track is copied into the MP4 as-is.
+     */
+    enum class Processing {
+        NONE, MUSIC, VISUAL;
+
+        companion object {
+            fun of(ops: FilterOps): Processing = when {
+                ops.censorFaces -> VISUAL
+                ops.removeMusic -> MUSIC
+                else -> NONE
+            }
+        }
+    }
+
+    /**
+     * `-f` and `-S` for [quality] and [processing] on this device. `-S res:H` rather than
+     * `-f [height<=H]`: `res` is the *smaller* side, so a portrait Short at 1080×1920 counts as 1080p
+     * instead of being filtered out. `res` always leads the sort, so no codec preference costs resolution
+     * below the cap.
+     *
+     * Excluded codecs use `!^=?`: a format whose codec the site doesn't report still qualifies. Each
+     * selector ends in an unfiltered `bv*+ba/b`, so a source offering only excluded codecs still
+     * downloads (and pays whatever that costs) instead of failing.
+     *
+     * ponytail: one height for all codecs (the best HW decoder's). Split per codec if a device ever
+     * decodes VP9 in hardware at a lower size than H.264 — no such device has shown up.
+     */
+    internal fun formatArgs(quality: Quality, processing: Processing, hw: Map<String, Int>, sdk: Int): List<String> {
+        // AAC taken as-is, rather than Opus re-encoded to m4a by --extract-audio.
+        if (quality == Quality.AUDIO) return listOf("-f", "ba/b", "-S", "+acodec:m4a")
+        val banned = buildSet {
+            // An empty map means the probe failed, not "no hardware"; exclude nothing for that reason then.
+            if (hw.isNotEmpty()) {
+                if ("av1" !in hw) add("av01")
+                if ("vp9" !in hw) addAll(VP9)
+                if ("hevc" !in hw) addAll(HEVC)
+            }
+            if (processing == Processing.MUSIC) {
+                addAll(VP9)
+                // MediaMuxer's MP4 writer takes AV1 only from API 34 (Remux.canMuxVideo).
+                if (sdk < 34) add("av01")
+            }
+        }
+        val only = banned.sorted().joinToString("") { "[vcodec!^=?$it]" }
+        val selector = if (only.isEmpty()) "bv*+ba/b" else "bv*$only+ba/b$only/bv*+ba/b"
+
+        val cap = listOfNotNull(
+            quality.maxHeight,
+            hw.values.maxOrNull(),
+            VISUAL_MAX_HEIGHT.takeIf { processing == Processing.VISUAL },
+        ).minOrNull()
+        val sort = listOfNotNull(cap?.let { "res:$it" }) + when (processing) {
+            Processing.NONE -> emptyList()
+            Processing.MUSIC -> listOf("+vcodec:avc", "+acodec:m4a")
+            // After res on purpose: YouTube only serves a 60 fps source at 60 fps from 720p up, so fps
+            // first would trade 1080p60 for 480p30.
+            // AAC because the pipeline copies the audio through: Opus from a WebM source lands as
+            // Opus-in-MP4, which iOS and some messaging apps mishandle once the result is shared.
+            // Audio is sorted separately from video, so this costs the video choice nothing.
+            Processing.VISUAL -> listOf("fps:30", "hdr:sdr", "+acodec:m4a")
+        }
+        return listOf("-f", selector) + if (sort.isEmpty()) emptyList() else listOf("-S", sort.joinToString(","))
+    }
+
+    private val VP9 = listOf("vp9", "vp09")
+    private val HEVC = listOf("hev1", "hvc1")
+
+    /**
+     * The measurement line every later speed change is judged by (plan Phase 0): time to first progress
+     * is extraction + JS challenge solving, the rest is transfer. Codec/height come from the file, not
+     * from what we asked for.
+     */
+    private fun logSummary(url: String, file: File, started: Long, firstProgressMs: Long, first: Attempt) {
+        val totalMs = SystemClock.elapsedRealtime() - started
+        val video = runCatching {
+            val ex = MediaExtractor().apply { setDataSource(file.absolutePath) }
+            try {
+                (0 until ex.trackCount).map { ex.getTrackFormat(it) }
+                    .firstOrNull { it.getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true }
+                    ?.let { "${it.getString(MediaFormat.KEY_MIME)} ${it.getInteger(MediaFormat.KEY_WIDTH)}x${it.getInteger(MediaFormat.KEY_HEIGHT)}" }
+            } finally {
+                ex.release()
+            }
+        }.getOrNull() ?: "none"
+        val bytes = file.length()
+        val transferMs = (totalMs - firstProgressMs.coerceAtLeast(0)).coerceAtLeast(1)
+        Log.i(
+            "NaqiDl",
+            "host=${Uri.parse(url).host} first_progress_ms=$firstProgressMs total_ms=$totalMs bytes=$bytes " +
+                "transfer_kBps=${bytes / transferMs} ext=${file.extension} video=$video " +
+                "aria2=${first.aria2 != null} reused_info=${first.infoJson != null}",
+        )
     }
 
     /** Kill a running download by the id its [download] call was given. */
@@ -244,16 +687,10 @@ object Downloader {
     }
 
     private const val STALE_MS = 7L * 24 * 60 * 60 * 1000
-    private val IN_FLIGHT = setOf("part", "ytdl", "temp")
-
-    /** Retry only process failures; cancellation and local file errors must keep their original meaning. */
-    internal fun <T> retryOnceAfterYtDlpFailure(
-        afterFailure: (YoutubeDLException) -> Unit,
-        block: () -> T,
-    ): T = try {
-        block()
-    } catch (first: YoutubeDLException) {
-        afterFailure(first)
-        block()
-    }
+    // `aria2` is aria2c's resume control file, left next to its `.part` until the transfer completes.
+    private val IN_FLIGHT = setOf("part", "ytdl", "temp", "aria2")
+    private const val VISUAL_MAX_HEIGHT = 1080
+    private const val INFO_JSON = "info.json"
+    private const val INFO_MAX_AGE_MS = 60L * 60 * 1000
+    private const val RECOVERY_UPDATE_MIN_MS = 6L * 60 * 60 * 1000
 }

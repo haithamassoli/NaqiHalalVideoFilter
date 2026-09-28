@@ -1,6 +1,7 @@
 package com.haithamassoli.naqi.ui
 
 import android.content.Context
+import android.text.format.Formatter
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -298,3 +299,19 @@ fun durationText(context: Context, ms: Long): String {
 
 @Composable
 fun durationText(ms: Long): String = durationText(LocalContext.current, ms)
+
+/**
+ * "45 MB / 120 MB · 3.1 MB/s · ~30 s remaining" for a running download, shared by the queue row and the
+ * notification. Each part is dropped while yt-dlp hasn't reported it; empty when none is known.
+ * `formatShortFileSize` localizes digits and units, so Arabic gets "٤٥ م.ب" rather than "45 MB".
+ */
+fun downloadStatsText(context: Context, done: Long, total: Long, bytesPerSec: Long, etaMs: Long): String {
+    fun size(n: Long) = Formatter.formatShortFileSize(context, n)
+    // Seconds matter here: most downloads finish inside the minute that durationText rounds to "under a minute".
+    val eta = if (etaMs < 60_000) context.getString(R.string.dur_sec, etaMs / 1000) else durationText(context, etaMs)
+    return listOfNotNull(
+        done.takeIf { it > 0 }?.let { if (total > 0) context.getString(R.string.dl_done_of_total, size(it), size(total)) else size(it) },
+        bytesPerSec.takeIf { it > 0 }?.let { context.getString(R.string.dl_speed, size(it)) },
+        eta.takeIf { etaMs > 0 }?.let { context.getString(R.string.jobs_eta_remaining, it) },
+    ).joinToString(" · ")
+}

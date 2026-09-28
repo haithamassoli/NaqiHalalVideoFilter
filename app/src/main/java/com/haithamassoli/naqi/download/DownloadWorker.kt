@@ -11,6 +11,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.model.FilterOps
+import com.haithamassoli.naqi.ui.downloadStatsText
 import com.haithamassoli.naqi.work.FilterWorker
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.JobNotifications
@@ -63,13 +64,15 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
         // this a transient failure (network drop) that later succeeds leaves its message on the item,
         // and the row renders a stale "Download failed" under a green DONE tick.
         queued { it.copy(state = Queue.State.DOWNLOADING, error = null) }
-        tryForeground(foregroundInfo(title, 0))
+        tryForeground(foregroundInfo(title, 0, null))
         // yt-dlp prints a progress line per network chunk — hundreds a second on Wi-Fi. Forwarding each
         // one made the system shed our notifications (>5/s is its limit) and froze the bar mid-download.
         var lastTick = 0L
+        // Size unknown (a live-ish HLS, a host that sends no length) leaves percent at -1; hold the last one.
+        var pct = 0
         try {
             val file = Downloader.download(
-                applicationContext, url, quality, processId = id.toString(),
+                applicationContext, url, quality, Downloader.Processing.of(ops), processId = id.toString(),
                 // The PRD's "abort early once yt-dlp reports total bytes", without parsing yt-dlp's
                 // progress lines: the only thing the check actually needs is whether the volume we are
                 // filling still has room, and that is a syscall.
@@ -77,18 +80,24 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
                 // (the disk fills) at the cost of catching it later than a projection would. Project from
                 // (bytes on disk ÷ percent) if aborting at 90 % ever proves too late to be useful.
                 onSpaceCheck = { applicationContext.noBackupFilesDir.usableSpace > SPACE_FLOOR },
-            ) { pct, etaSeconds ->
+            ) { p ->
                 val now = SystemClock.elapsedRealtime()
                 if (now - lastTick < PROGRESS_INTERVAL_MS) return@download
                 lastTick = now
+                if (p.percent >= 0) pct = p.percent
+                val etaMs = p.etaSec.coerceAtLeast(0L) * 1000L
                 setProgressAsync(
                     workDataOf(
                         FilterWorker.KEY_PROGRESS to pct,
                         FilterWorker.KEY_STAGE to applicationContext.getString(R.string.stage_downloading),
-                        FilterWorker.KEY_ETA_MS to etaSeconds.coerceAtLeast(0L) * 1000L,
+                        FilterWorker.KEY_ETA_MS to etaMs,
+                        KEY_DL_DONE to p.done,
+                        KEY_DL_TOTAL to p.total,
+                        KEY_DL_BPS to p.bytesPerSec,
                     ),
                 )
-                setForegroundAsync(foregroundInfo(title, pct))
+                val stats = downloadStatsText(applicationContext, p.done, p.total, p.bytesPerSec, etaMs)
+                setForegroundAsync(foregroundInfo(title, pct, stats))
             }
             Log.i(TAG, "downloaded ${file.name} (${file.length()} bytes) for $url")
 
@@ -112,13 +121,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
                     Publish.video(applicationContext, file, name, mime) { isStopped }
                 }
                 Downloader.discard(applicationContext, fileUri)
-                queued {
-                    it.copy(
-                        title = it.title ?: downloadedTitle,
-                        state = Queue.State.DONE,
-                        outputUri = outputUri.toString(),
-                    )
-                }
+                finished()
                 JobNotifications.done(
                     applicationContext, name, outputUri.toString(), null,
                     mime,
@@ -161,25 +164,28 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
 
     /**
      * Downloads fail for reasons filtering never sees — a dead extractor, a geo-block, no network — so
-     * they get their own small taxonomy rather than [Preflight.messageFor]'s codec-shaped one.
+     * they get their own taxonomy ([Downloader.classify], shared with the retry decision) rather than
+     * [Preflight.messageFor]'s codec-shaped one.
      */
     private fun messageFor(t: Throwable): Int {
-        val text = generateSequence(t) { it.cause }.mapNotNull { it.message }.joinToString(" ").lowercase()
-        return when {
-            "enospc" in text || "no space left" in text || "space" in text -> Preflight.LOW_SPACE_DOWNLOAD
-            "unsupported url" in text || "unable to extract" in text ||
-                "no video formats" in text -> R.string.err_download_unsupported
-            "unable to download" in text || "timed out" in text ||
-                "connection" in text || "network" in text -> R.string.err_download_network
-            else -> R.string.err_download_generic
+        val text = generateSequence(t) { it.cause }.mapNotNull { it.message }.joinToString("\n")
+        return when (Downloader.classify(text)) {
+            Downloader.DlError.NO_SPACE -> Preflight.LOW_SPACE_DOWNLOAD
+            Downloader.DlError.UNAVAILABLE -> R.string.err_download_unsupported
+            Downloader.DlError.GEO -> R.string.err_download_geo
+            Downloader.DlError.RATE_LIMITED -> R.string.err_download_rate_limited
+            Downloader.DlError.FORBIDDEN -> R.string.err_download_forbidden
+            Downloader.DlError.EXTRACTOR -> R.string.err_download_extractor
+            Downloader.DlError.NETWORK -> R.string.err_download_network
+            Downloader.DlError.UNKNOWN -> R.string.err_download_generic
         }
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo =
-        foregroundInfo(applicationContext.getString(R.string.stage_downloading), 0)
+        foregroundInfo(applicationContext.getString(R.string.stage_downloading), 0, null)
 
-    private fun foregroundInfo(title: String, progress: Int) =
-        JobNotifications.downloadForegroundInfo(applicationContext, id, title, progress)
+    private fun foregroundInfo(title: String, progress: Int, stats: String?) =
+        JobNotifications.downloadForegroundInfo(applicationContext, id, title, progress, stats)
 
     companion object {
         const val KEY_URL = "url"
@@ -188,6 +194,11 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx,
 
         /** `filesize_approx` from the sheet's `getInfo`; 0 when the extractor wouldn't say. */
         const val KEY_SIZE_BYTES = "size_bytes"
+
+        /** Live download stats in the worker's progress data, Longs; -1 = not known yet. */
+        const val KEY_DL_DONE = "dl_done"
+        const val KEY_DL_TOTAL = "dl_total"
+        const val KEY_DL_BPS = "dl_bps"
 
         /** Separate name from `naqi_filter_job`, so a download and a filter run concurrently. */
         const val UNIQUE_WORK = "naqi_download"

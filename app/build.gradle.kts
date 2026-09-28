@@ -15,8 +15,8 @@ android {
         applicationId = "com.haithamassoli.naqi"
         minSdk = 29
         targetSdk = 36
-        versionCode = 26
-        versionName = "1.4.7"
+        versionCode = 27
+        versionName = "1.4.8"
 
         // Base URL for the M3 model downloader's *converted* artifacts (the NSFW gate and htdemucs —
         // NudeNet carries its own public release URL). Empty by default: no host is published yet, and
@@ -189,6 +189,7 @@ dependencies {
     // M4: yt-dlp + a bundled ffmpeg. GPL-3.0 — linking these relicenses the app (see LICENSE).
     implementation(libs.youtubedl.android)
     implementation(libs.youtubedl.ffmpeg)
+    implementation(libs.youtubedl.aria2c)
 
     testImplementation(libs.junit)
     testImplementation(libs.json) // real org.json impl so Edl JSON round-trip tests run on the JVM

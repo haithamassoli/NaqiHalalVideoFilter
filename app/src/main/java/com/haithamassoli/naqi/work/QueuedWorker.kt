@@ -71,6 +71,14 @@ abstract class QueuedWorker(ctx: Context, params: WorkerParameters) : CoroutineW
     }
 
     /**
+     * A finished item leaves the queue: its output is in the library now, and a DONE row only listed
+     * the same file twice. Failures stay — Retry is the one thing still worth doing to them.
+     */
+    internal fun finished() {
+        queueId?.let { Queue.remove(applicationContext, it) }
+    }
+
+    /**
      * Record [message] against the queue item and end the run — success for a queued run (see above),
      * a real failure otherwise. [resumable] tells the UI completed segments are still on disk.
      */
