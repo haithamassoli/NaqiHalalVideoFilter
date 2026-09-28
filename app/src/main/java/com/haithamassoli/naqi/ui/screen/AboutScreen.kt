@@ -1,5 +1,7 @@
 package com.haithamassoli.naqi.ui.screen
 
+import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -115,6 +117,15 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             SectionHeader(stringResource(R.string.settings_eyebrow))
             NaqiCard(contentPadding = 0.dp) { BatteryToggle() }
 
+            Spacer(Modifier.height(NaqiTokens.space5))
+            SectionHeader(stringResource(R.string.about_eyebrow_contact))
+            val feedbackSubject = stringResource(R.string.about_feedback_subject)
+            LinkCard(
+                title = stringResource(R.string.about_feedback_title),
+                desc = stringResource(R.string.about_feedback_desc),
+                onClick = { uriHandler.openUri(feedbackMailto(feedbackSubject)) },
+            )
+
             if (System.currentTimeMillis() >= DOWNLOADER_VISIBLE_FROM) {
                 Spacer(Modifier.height(NaqiTokens.space5))
                 SectionHeader(stringResource(R.string.about_eyebrow_downloader))
@@ -127,35 +138,11 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
             Spacer(Modifier.height(NaqiTokens.space5))
             SectionHeader(stringResource(R.string.about_eyebrow_licenses))
-            NaqiCard(contentPadding = 0.dp) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        // runCatching: a device with no browser must not take the app down on a tap.
-                        .clickable { runCatching { uriHandler.openUri(REPO_URL) } }
-                        .padding(NaqiTokens.space4),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.about_repo_title),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            stringResource(R.string.about_repo_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.width(NaqiTokens.space3))
-                    Text(
-                        stringResource(R.string.action_open),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
+            LinkCard(
+                title = stringResource(R.string.about_repo_title),
+                desc = stringResource(R.string.about_repo_desc),
+                onClick = { uriHandler.openUri(REPO_URL) },
+            )
 
             Spacer(Modifier.height(NaqiTokens.space3))
             NaqiCard(contentPadding = 0.dp) {
@@ -196,6 +183,44 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 private const val REPO_URL = "https://github.com/haithamassoli/NaqiHalalVideoFilter"
+private const val FEEDBACK_EMAIL = "haitham.b.assoli@gmail.com"
+
+/**
+ * A mailto link with the subject filled in and the app/device line under a gap for the user's text,
+ * so a report arrives with the version it is about. mailto's own query, not ACTION_SENDTO extras:
+ * every mail client reads the query; the extras are ignored by some.
+ */
+private fun feedbackMailto(subject: String): String {
+    val body = "\n\n—\nNaqi ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · " +
+        "Android ${Build.VERSION.RELEASE} · ${Build.MANUFACTURER} ${Build.MODEL}"
+    return "mailto:$FEEDBACK_EMAIL?subject=${Uri.encode(subject)}&body=${Uri.encode(body)}"
+}
+
+/** A tappable card row: title and description, with action_open trailing. */
+@Composable
+private fun LinkCard(title: String, desc: String, onClick: () -> Unit) {
+    NaqiCard(contentPadding = 0.dp) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                // runCatching: a device with no browser or mail app must not take the app down on a tap.
+                .clickable { runCatching(onClick) }
+                .padding(NaqiTokens.space4),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(NaqiTokens.space3))
+            Text(
+                stringResource(R.string.action_open),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
 
 /**
  * The downloader section is hidden until 2026-08-28 (2026-08-14 + two weeks).
