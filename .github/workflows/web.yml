@@ -1,0 +1,17 @@
+# The website resolves the APK link at build time, so each published release asks
+# Vercel to rebuild it. Set the VERCEL_DEPLOY_HOOK secret to the project's deploy hook URL.
+name: Website rebuild
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then echo "VERCEL_DEPLOY_HOOK not set, skipping"; exit 0; fi
+          curl -fsS -X POST "$HOOK"

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Naqi app icon: the Arabic letter ن (noon, first letter of نقي) whose
+       dot is a droplet. Palette is Naqi.Brand from naqi/UI/Theme/Theme.swift.
+       The droplet's flanks are true tangents to its r=72 bowl centred (520 353),
+       so the shoulders meet the curve without a kink; the 10-unit stroke only
+       blunts the tip, which reads as a needle at 16pt otherwise. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#1E6B58"/>
+      <stop offset="1" stop-color="#08110E"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <path d="M322 556 A190 190 0 0 0 702 556" fill="none" stroke="#F5F7F3"
+        stroke-width="112" stroke-linecap="round"/>
+  <path d="M520 213 L458.26 315.97 A72 72 0 1 0 581.74 315.97 Z" fill="#6FD9B6"
+        stroke="#6FD9B6" stroke-width="10" stroke-linejoin="round"/>
+</svg>

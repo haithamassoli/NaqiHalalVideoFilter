@@ -1,0 +1,452 @@
+---
+import { Font, Image } from 'astro:assets';
+import { latestRelease } from '../release';
+import androidHome from '../assets/android/01-home.png';
+import androidLink from '../assets/android/05-link.png';
+import androidJobs from '../assets/android/03-jobs.png';
+import applePickEn from '../assets/apple/1-pick-en.png';
+import applePickAr from '../assets/apple/1-pick-ar.png';
+import appleOptionsEn from '../assets/apple/2-options-en.png';
+import appleOptionsAr from '../assets/apple/2-options-ar.png';
+
+interface Props { lang: 'en' | 'ar' }
+const { lang } = Astro.props;
+const ar = lang === 'ar';
+
+const android = await latestRelease('haithamassoli/NaqiHalalVideoFilter', '.apk');
+const playUrl = 'https://play.google.com/store/apps/details?id=com.haithamassoli.naqi';
+const appStoreId = '6798173054';
+const appStoreUrl = `https://apps.apple.com/app/naqi-halal-video-filter/id${appStoreId}`;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const abs = (path: string) => new URL(`${base}/${path}`, Astro.site).href;
+const enUrl = abs('');
+const arUrl = abs('ar/');
+const pageUrl = ar ? arUrl : enUrl;
+const ogImage = abs(ar ? 'og-ar.png' : 'og-en.png');
+
+const t = {
+  en: {
+    title: 'Naqi: remove music and cover faces in videos, on your device',
+    description:
+      'Naqi removes music from videos while keeping speech, and covers faces and flagged scenes. It runs on your phone, with no upload and no account. For Android, iPhone, iPad and Mac.',
+    otherLang: 'العربية',
+    headline: 'Keep the talk. Lose the music.',
+    lead: 'Naqi removes the music from a video and keeps the voices. It can also cover faces and flagged scenes. Everything runs on your phone, and the original file stays as it was.',
+    speech: 'Speech stays',
+    music: 'Music goes',
+    getPlay: 'Get it on Google Play',
+    playMeta: 'Android 10 and newer',
+    getAppStore: 'Download on the App Store',
+    appStoreMeta: 'iPhone, iPad and Mac',
+    getApk: 'Download the APK',
+    apk: 'APK',
+    latest: 'Latest release on GitHub',
+    apkLink: 'Or get the full APK from GitHub',
+    whatTitle: 'Three filters, use one or all',
+    features: [
+      ['Remove music', 'A separation model splits the soundtrack and keeps only the voices. Pick voices only, or voices plus sound effects. Parts with no music are left untouched.'],
+      ['Cover faces', 'Faces are tracked through the whole video. Choose who gets covered: everyone, women, or men. Use a blur, a solid colour, or grayscale.'],
+      ['Cover flagged scenes', 'An optional scene check covers the whole frame while it is on. You set how strict it is, from 0 to 100.'],
+    ],
+    caveat: 'Filtering can miss a face or a scene. Watch the result before you share it.',
+    privacyTitle: 'Your videos never leave your phone.',
+    privacy:
+      'The filtering runs on the device. There is no account, no analytics and no upload. Naqi goes online only to download a video from a link you give it, and in the APK version to check for a new version.',
+    platformsTitle: 'Pick your device',
+    androidName: 'Android',
+    androidFacts: [
+      'Android 10 or newer, on 64-bit ARM phones',
+      'Reads MP4, MKV, WebM, MP3 and M4A',
+      'Long films keep their progress if the phone restarts',
+    ],
+    androidNote: 'The APK from GitHub adds link downloads, sharing videos into Naqi, and updates from GitHub. Google Play does not allow these. The filtering is the same in both.',
+    appleName: 'iPhone, iPad and Mac',
+    appleFacts: [
+      'iOS 18, iPadOS 18 or macOS 15 and newer',
+      'Import from Photos or Files, share to Naqi, or drag a file onto the Mac app',
+      'Reads MP4, MOV and M4V (not MKV or WebM)',
+      'Saves the filtered copy to Photos or a folder you pick',
+    ],
+    alt: {
+      androidHome: 'Naqi on Android: pick a video and choose what to filter',
+      androidLink: 'Naqi on Android: paste a link to download and filter',
+      androidJobs: 'Naqi on Android: progress of a filtering job',
+      applePick: 'Naqi on iPad: pick a video',
+      appleOptions: 'Naqi on iPad: filtering options',
+    },
+    footer: 'Naqi (نقي) means pure.',
+    code: 'Source code',
+  },
+  ar: {
+    title: 'نقي: احذف الموسيقى واحجب الوجوه في الفيديو، على جهازك',
+    description:
+      'يحذف نقي الموسيقى من الفيديو ويُبقي الكلام، ويحجب الوجوه والمشاهد المخلّة. يعمل على جهازك دون رفع أي ملف ودون حساب. لأندرويد وآيفون وآيباد وماك.',
+    otherLang: 'English',
+    headline: 'أبقِ الكلام، واحذف الموسيقى.',
+    lead: 'يحذف نقي الموسيقى من الفيديو ويُبقي الأصوات البشرية، ويحجب الوجوه والمشاهد المخلّة إن أردت. كل شيء يجري على جهازك، والملف الأصلي يبقى كما هو.',
+    speech: 'الكلام يبقى',
+    music: 'الموسيقى تُحذف',
+    getPlay: 'احصل عليه من Google Play',
+    playMeta: 'أندرويد 10 فأحدث',
+    getAppStore: 'حمّله من App Store',
+    appStoreMeta: 'آيفون وآيباد وماك',
+    getApk: 'حمّل ملف APK',
+    apk: 'ملف APK',
+    latest: 'أحدث إصدار على GitHub',
+    apkLink: 'أو حمّل النسخة الكاملة (APK) من GitHub',
+    whatTitle: 'ثلاثة فلاتر، استخدم واحدًا أو كلها',
+    features: [
+      ['حذف الموسيقى', 'نموذج فصل يقسم الصوت ويُبقي الأصوات البشرية وحدها. اختر الأصوات فقط، أو الأصوات مع المؤثرات الصوتية. والمقاطع الخالية من الموسيقى تبقى كما هي.'],
+      ['حجب الوجوه', 'تُتتبَّع الوجوه على امتداد الفيديو كله. اختر من يُحجب: الجميع، أو النساء، أو الرجال. بالتمويه أو بلون صلب أو بالتدرّج الرمادي.'],
+      ['حجب المشاهد المخلّة', 'فحص اختياري للمشاهد يغطي الإطار كاملًا طوال اشتغاله. وأنت تحدّد درجة صرامته من 0 إلى 100.'],
+    ],
+    caveat: 'قد تفوت الفلترة وجهًا أو مشهدًا، فشاهد النتيجة قبل أن تشاركها.',
+    privacyTitle: 'فيديوهاتك لا تغادر جهازك.',
+    privacy:
+      'الفلترة تجري على الجهاز نفسه. لا حساب ولا تحليلات ولا رفع للملفات. لا يتصل نقي بالإنترنت إلا لتنزيل فيديو من رابط تعطيه إياه، وفي نسخة APK للبحث عن إصدار جديد.',
+    platformsTitle: 'اختر جهازك',
+    androidName: 'أندرويد',
+    androidFacts: [
+      'أندرويد 10 فأحدث، على الهواتف بمعالج ARM بمعمارية 64 بت',
+      'يقرأ MP4 وMKV وWebM وMP3 وM4A',
+      'الأفلام الطويلة تحتفظ بتقدّمها حتى لو أُعيد تشغيل الهاتف',
+    ],
+    androidNote: 'نسخة APK من GitHub تضيف التنزيل من الروابط، ومشاركة الفيديو إلى نقي، والتحديث من GitHub، وهذه لا يسمح بها Google Play. أما الفلترة فواحدة في النسختين.',
+    appleName: 'آيفون وآيباد وماك',
+    appleFacts: [
+      'iOS 18 أو iPadOS 18 أو macOS 15 فأحدث',
+      'استورد من الصور أو الملفات، أو شارك إلى نقي، أو اسحب ملفًا إلى تطبيق ماك',
+      'يقرأ MP4 وMOV وM4V (لا يدعم MKV ولا WebM)',
+      'يحفظ النسخة المفلترة في الصور أو في مجلد تختاره',
+    ],
+    alt: {
+      androidHome: 'نقي على أندرويد: اختر فيديو وحدّد ما تريد فلترته',
+      androidLink: 'نقي على أندرويد: الصق رابطًا للتنزيل والفلترة',
+      androidJobs: 'نقي على أندرويد: تقدّم عملية الفلترة',
+      applePick: 'نقي على آيباد: اختيار فيديو',
+      appleOptions: 'نقي على آيباد: خيارات الفلترة',
+    },
+    footer: 'نقي: الطاهر الخالص.',
+    code: 'الشيفرة المصدرية',
+  },
+}[lang];
+
+const applePick = ar ? applePickAr : applePickEn;
+const appleOptions = ar ? appleOptionsAr : appleOptionsEn;
+
+const androidMeta = android.version
+  ? `${t.apk} ${android.version}${android.sizeMb ? `${ar ? '،' : ','} ${android.sizeMb} MB` : ''}`
+  : t.latest;
+
+// A soundtrack drawn as bars: speech keeps its bars, music bars flatten on load.
+// Deterministic so every build draws the same wave.
+const bars = Array.from({ length: 72 }, (_, i) => {
+  const music = (i >= 10 && i < 28) || (i >= 46 && i < 60);
+  const wobble = Math.abs(Math.sin(i * 1.7) * Math.cos(i * 0.45));
+  const h = music ? 0.55 + 0.45 * Math.abs(Math.sin(i * 0.9)) : 0.15 + 0.7 * wobble;
+  return { music, h: +h.toFixed(3) };
+});
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: ar ? 'نقي' : 'Naqi',
+  alternateName: ar ? 'Naqi' : 'نقي',
+  description: t.description,
+  url: pageUrl,
+  image: ogImage,
+  inLanguage: lang,
+  applicationCategory: 'MultimediaApplication',
+  operatingSystem: 'Android 10+, iOS 18+, iPadOS 18+, macOS 15+',
+  installUrl: [playUrl, appStoreUrl],
+  downloadUrl: [playUrl, appStoreUrl, android.url],
+  sameAs: [playUrl, appStoreUrl, 'https://github.com/haithamassoli/NaqiHalalVideoFilter', 'https://github.com/haithamassoli/naqi'],
+  ...(android.version && { softwareVersion: android.version.replace(/^v/, '') }),
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  author: { '@type': 'Person', name: 'Haitham Assoli' },
+};
+---
+
+<!doctype html>
+<html lang={lang} dir={ar ? 'rtl' : 'ltr'}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t.title}</title>
+    <meta name="description" content={t.description} />
+    <link rel="canonical" href={pageUrl} />
+    <link rel="alternate" hreflang="en" href={enUrl} />
+    <link rel="alternate" hreflang="ar" href={arUrl} />
+    <link rel="alternate" hreflang="x-default" href={enUrl} />
+    <link rel="sitemap" href={`${base}/sitemap.xml`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+    <link rel="apple-touch-icon" href={`${base}/apple-touch-icon.png`} />
+    <meta name="theme-color" content="#F5F7F3" />
+    <meta name="apple-itunes-app" content={`app-id=${appStoreId}`} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={ar ? 'نقي' : 'Naqi'} />
+    <meta property="og:title" content={t.title} />
+    <meta property="og:description" content={t.description} />
+    <meta property="og:url" content={pageUrl} />
+    <meta property="og:locale" content={ar ? 'ar_AR' : 'en_US'} />
+    <meta property="og:locale:alternate" content={ar ? 'en_US' : 'ar_AR'} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={t.headline} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={t.title} />
+    <meta name="twitter:description" content={t.description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={t.headline} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    <Font cssVariable="--font-readex" preload />
+  </head>
+  <body>
+    <header class="bar wrap">
+      <a class="brand" href={ar ? `${base}/ar/` : `${base}/`}>
+        <img src={`${base}/favicon.svg`} alt="" width="32" height="32" />
+        <span>{ar ? 'نقي' : 'Naqi'}</span>
+      </a>
+      <a class="lang" href={ar ? `${base}/` : `${base}/ar/`} hreflang={ar ? 'en' : 'ar'} lang={ar ? 'en' : 'ar'}>
+        {t.otherLang}
+      </a>
+    </header>
+
+    <main>
+      <section class="hero wrap">
+        <div class="hero-text">
+          <h1>{t.headline}</h1>
+          <p class="lead">{t.lead}</p>
+
+          <figure class="wave" aria-hidden="true">
+            <svg viewBox={`0 0 ${bars.length * 10} 100`} preserveAspectRatio="none">
+              {bars.map((b, i) => (
+                <rect
+                  class={b.music ? 'm' : 's'}
+                  x={i * 10 + 2}
+                  y={50 - b.h * 48}
+                  width="6"
+                  height={b.h * 96}
+                  rx="3"
+                  style={b.music ? `--d:${(i % 18) * 18}ms` : undefined}
+                />
+              ))}
+            </svg>
+            <figcaption>
+              <span class="key s">{t.speech}</span>
+              <span class="key m">{t.music}</span>
+            </figcaption>
+          </figure>
+
+          <div class="ctas">
+            <a class="btn primary" href={playUrl}>
+              <strong>{t.getPlay}</strong>
+              <small>{t.playMeta}</small>
+            </a>
+            <a class="btn primary" href={appStoreUrl}>
+              <strong>{t.getAppStore}</strong>
+              <small>{t.appStoreMeta}</small>
+            </a>
+          </div>
+          <p class="apk-link"><a href={android.url}>{t.apkLink}</a> <span>({androidMeta})</span></p>
+        </div>
+
+        <div class="hero-shots">
+          <Image class="tablet" src={appleOptions} alt={t.alt.appleOptions} widths={[480, 720, 960]} sizes="(min-width: 960px) 34vw, 70vw" loading="eager" fetchpriority="high" />
+          <Image class="phone" src={androidHome} alt={t.alt.androidHome} widths={[240, 360, 480]} sizes="(min-width: 960px) 14vw, 30vw" loading="eager" />
+        </div>
+      </section>
+
+      <section class="what wrap" aria-labelledby="what">
+        <h2 id="what">{t.whatTitle}</h2>
+        <div class="features">
+          {t.features.map(([name, body]) => (
+            <div>
+              <h3>{name}</h3>
+              <p>{body}</p>
+            </div>
+          ))}
+        </div>
+        <p class="caveat">{t.caveat}</p>
+      </section>
+
+      <section class="privacy">
+        <div class="wrap">
+          <h2>{t.privacyTitle}</h2>
+          <p>{t.privacy}</p>
+        </div>
+      </section>
+
+      <section class="platforms wrap" aria-labelledby="platforms">
+        <h2 id="platforms">{t.platformsTitle}</h2>
+        <div class="cols">
+          <article>
+            <div class="shots">
+              <Image src={androidLink} alt={t.alt.androidLink} widths={[240, 360]} sizes="(min-width: 960px) 12vw, 28vw" />
+              <Image src={androidJobs} alt={t.alt.androidJobs} widths={[240, 360]} sizes="(min-width: 960px) 12vw, 28vw" />
+            </div>
+            <h3>{t.androidName}</h3>
+            <ul>{t.androidFacts.map((f) => <li>{f}</li>)}</ul>
+            <p class="note">{t.androidNote}</p>
+            <div class="ctas">
+              <a class="btn primary" href={playUrl}>
+                <strong>{t.getPlay}</strong>
+                <small>{t.playMeta}</small>
+              </a>
+              <a class="btn" href={android.url}>
+                <strong>{t.getApk}</strong>
+                <small>{androidMeta}</small>
+              </a>
+            </div>
+          </article>
+          <article>
+            <div class="shots">
+              <Image class="wide" src={applePick} alt={t.alt.applePick} widths={[480, 720]} sizes="(min-width: 960px) 28vw, 60vw" />
+            </div>
+            <h3>{t.appleName}</h3>
+            <ul>{t.appleFacts.map((f) => <li>{f}</li>)}</ul>
+            <div class="ctas">
+              <a class="btn primary" href={appStoreUrl}>
+                <strong>{t.getAppStore}</strong>
+                <small>{t.appStoreMeta}</small>
+              </a>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      <p>{t.footer}</p>
+      <p>
+        {t.code}:{' '}
+        <a href="https://github.com/haithamassoli/NaqiHalalVideoFilter">{t.androidName}</a>{ar ? '، ' : ', '}
+        <a href="https://github.com/haithamassoli/naqi">{t.appleName}</a>
+      </p>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --paper: #f5f7f3;
+    --mist: #e3ece7;
+    --ink: #10201c;
+    --forest: #1e6b58;
+    --deep: #08110e;
+    --mint: #6fd9b6;
+    --muted: #4d5f59;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-readex), system-ui, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    font-weight: 350;
+  }
+  h1, h2, h3 { line-height: 1.15; margin: 0; font-weight: 600; text-wrap: balance; }
+  p { margin: 0; }
+  a { color: var(--forest); }
+  :focus-visible { outline: 3px solid var(--mint); outline-offset: 3px; border-radius: 6px; }
+  img { display: block; max-width: 100%; height: auto; }
+  .wrap { width: min(1160px, 100% - 2.5rem); margin-inline: auto; }
+</style>
+
+<style>
+  .bar { display: flex; justify-content: space-between; align-items: center; padding-block: 1.25rem; }
+  .brand { display: flex; gap: 0.6rem; align-items: center; color: var(--ink); text-decoration: none; font-weight: 600; font-size: 1.25rem; }
+  .brand img { border-radius: 8px; }
+  .lang { color: var(--ink); text-decoration: none; padding: 0.4rem 0.9rem; border: 1px solid #c9d6cf; border-radius: 999px; }
+  .lang:hover { background: var(--mist); }
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: center;
+    padding-block: clamp(2rem, 6vw, 5rem) clamp(3rem, 7vw, 6rem);
+  }
+  h1 { font-size: clamp(2.6rem, 6.2vw, 4.9rem); letter-spacing: -0.02em; font-weight: 650; }
+  :global([dir='rtl']) h1 { letter-spacing: 0; line-height: 1.3; }
+  .lead { margin-top: 1.4rem; max-width: 34em; font-size: 1.2rem; color: var(--muted); }
+
+  /* The one moving thing on the page: the music bars fall flat, the speech bars stay. */
+  .wave { margin: 2.2rem 0 0; }
+  .wave svg { width: 100%; height: 72px; display: block; }
+  .wave rect { transform-box: fill-box; transform-origin: center; }
+  .wave .s { fill: var(--forest); }
+  .wave .m { fill: var(--mint); animation: mute 0.7s cubic-bezier(0.6, 0, 0.2, 1) calc(0.7s + var(--d)) forwards; }
+  @keyframes mute { to { transform: scaleY(0.07); fill: #b9cbc3; } }
+  @media (prefers-reduced-motion: reduce) { .wave .m { animation: none; transform: scaleY(0.07); fill: #b9cbc3; } }
+  .wave figcaption { display: flex; gap: 1.4rem; margin-top: 0.6rem; font-size: 0.9rem; color: var(--muted); }
+  .key::before { content: ''; display: inline-block; width: 0.7em; height: 0.7em; border-radius: 50%; margin-inline-end: 0.45em; }
+  .key.s::before { background: var(--forest); }
+  .key.m::before { background: #b9cbc3; }
+
+  .ctas { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 2.2rem; }
+  .apk-link { margin-top: 1rem; font-size: 0.92rem; color: var(--muted); }
+  .btn {
+    display: inline-flex; flex-direction: column; gap: 0.1rem;
+    padding: 0.85rem 1.4rem; border-radius: 18px;
+    text-decoration: none; color: var(--ink);
+    background: var(--mist); border: 1px solid #c9d6cf;
+  }
+  .btn strong { font-weight: 600; font-size: 1.05rem; }
+  .btn small { font-size: 0.85rem; color: var(--muted); }
+  .btn:hover { background: #d6e3dc; }
+  .btn.primary { background: var(--forest); border-color: var(--forest); color: var(--paper); }
+  .btn.primary small { color: #bfe3d5; }
+  .btn.primary:hover { background: #185a4a; }
+
+  .hero-shots { position: relative; padding-block-end: 12%; }
+  .hero-shots .tablet { width: 88%; border-radius: 22px; box-shadow: 0 30px 60px -30px rgb(16 32 28 / 0.45); border: 8px solid var(--ink); }
+  .hero-shots .phone {
+    position: absolute; inset-inline-end: 0; bottom: 0; width: 34%;
+    border-radius: 20px; border: 6px solid var(--ink);
+    box-shadow: 0 24px 50px -20px rgb(16 32 28 / 0.5);
+  }
+
+  h2 { font-size: clamp(1.8rem, 3.6vw, 2.7rem); letter-spacing: -0.01em; }
+  :global([dir='rtl']) h2 { letter-spacing: 0; line-height: 1.35; }
+  h3 { font-size: 1.3rem; }
+
+  .what { padding-block: clamp(2.5rem, 6vw, 5rem); border-top: 1px solid #d3ded8; }
+  .features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem; margin-top: 2.5rem; }
+  .features p { margin-top: 0.6rem; color: var(--muted); max-width: 32em; }
+  .caveat { margin-top: 2.5rem; font-size: 0.95rem; color: var(--muted); }
+
+  .privacy { background: linear-gradient(160deg, var(--forest), var(--deep) 75%); color: var(--paper); padding-block: clamp(4rem, 9vw, 7.5rem); }
+  .privacy h2 { font-size: clamp(2.2rem, 5.2vw, 4rem); max-width: 14em; }
+  .privacy p { margin-top: 1.4rem; max-width: 36em; font-size: 1.15rem; color: #cfe2da; }
+
+  .platforms { padding-block: clamp(3rem, 7vw, 6rem); }
+  .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(2rem, 5vw, 4rem); margin-top: 2.5rem; }
+  .cols article { display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; }
+  .shots { display: flex; gap: 1rem; align-items: flex-end; height: clamp(260px, 30vw, 380px); margin-bottom: 0.5rem; }
+  .shots img { height: 100%; width: auto; border-radius: 16px; border: 5px solid var(--ink); }
+  .shots .wide { border-radius: 18px; border-width: 7px; }
+  .cols ul { margin: 0; padding-inline-start: 1.1rem; color: var(--muted); }
+  .cols li + li { margin-top: 0.35rem; }
+  .cols li::marker { color: var(--forest); }
+  .note { font-size: 0.92rem; color: var(--muted); padding-inline-start: 0.9rem; border-inline-start: 3px solid var(--mint); }
+  .cols .ctas { margin-top: auto; padding-top: 0.5rem; }
+
+  footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; padding-block: 2rem 3rem; border-top: 1px solid #d3ded8; font-size: 0.95rem; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .hero, .cols { grid-template-columns: 1fr; }
+    .features { grid-template-columns: 1fr; gap: 1.8rem; }
+    .shots { height: auto; max-width: 100%; }
+    .shots img { height: auto; width: 46%; }
+    .shots .wide { width: 100%; }
+  }
+</style>
