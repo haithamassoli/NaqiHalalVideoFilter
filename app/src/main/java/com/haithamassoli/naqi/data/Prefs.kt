@@ -150,6 +150,13 @@ object Prefs {
             .apply()
     }
 
+    /** How many times the user shared with a "prepare to post" option — what orders its chips. */
+    fun presetUses(context: Context, id: String): Int = prefs(context).getInt("preset_uses_$id", 0)
+
+    fun countPresetUse(context: Context, id: String) {
+        prefs(context).edit().putInt("preset_uses_$id", presetUses(context, id) + 1).apply()
+    }
+
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 }

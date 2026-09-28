@@ -187,6 +187,29 @@
 
     <!-- Header of the system share sheet. -->
     <string name="jobs_share_chooser_title">مشاركة الفيديو</string>
+
+    <!-- Prepare to post (PublishSheet). Platform names are labels only; limits live in PublishPreset. -->
+    <string name="action_prepare_publish">جهّز للنشر</string>
+    <string name="preset_whatsapp_status">حالة واتساب</string>
+    <string name="preset_x_free">X</string>
+    <string name="preset_instagram_story">ستوري إنستغرام</string>
+    <string name="preset_instagram_reels">ريلز إنستغرام</string>
+    <string name="preset_tiktok">تيك توك</string>
+    <string name="preset_snapchat_story">ستوري سناب شات</string>
+    <string name="preset_telegram">تيليجرام</string>
+    <string name="preset_messenger">ماسنجر</string>
+    <string name="preset_custom">مخصص</string>
+    <string name="publish_custom_max">أقصى مدة للجزء: %1$s</string>
+    <string name="publish_needs_split">الفيديو أطول من %1$s، لذلك سيُقسَّم إلى أجزاء عند أقرب إطار مفتاحي.</string>
+    <string name="publish_as_is">المدة مناسبة، سيُشارَك الفيديو كما هو.</string>
+    <string name="publish_split">جهّز الأجزاء</string>
+    <string name="publish_preparing">جارٍ تجهيز الأجزاء…</string>
+    <string name="publish_part">الجزء %1$d</string>
+    <string name="publish_part_duration">الجزء %1$d · %2$s</string>
+    <string name="publish_share_all">شارك الكل</string>
+    <string name="publish_delete_parts">احذف الأجزاء</string>
+    <string name="publish_parts_saved">الأجزاء محفوظة في Movies/Naqi/Parts.</string>
+    <string name="publish_failed">تعذّر تجهيز الأجزاء</string>
     <string name="jobs_open_failed">لا يوجد تطبيق يمكنه فتح هذا الملف.</string>
 
     <!-- File-size subtitle on a library row. %1$.1f = gigabytes, %1$.0f = megabytes. -->

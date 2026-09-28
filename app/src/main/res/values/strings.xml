@@ -192,6 +192,29 @@
 
     <!-- Header of the system share sheet. -->
     <string name="jobs_share_chooser_title">Share video</string>
+
+    <!-- Prepare to post (PublishSheet). Platform names are labels only; limits live in PublishPreset. -->
+    <string name="action_prepare_publish">Prepare to post</string>
+    <string name="preset_whatsapp_status">WhatsApp Status</string>
+    <string name="preset_x_free">X</string>
+    <string name="preset_instagram_story">Instagram Story</string>
+    <string name="preset_instagram_reels">Instagram Reels</string>
+    <string name="preset_tiktok">TikTok</string>
+    <string name="preset_snapchat_story">Snapchat Story</string>
+    <string name="preset_telegram">Telegram</string>
+    <string name="preset_messenger">Messenger</string>
+    <string name="preset_custom">Custom</string>
+    <string name="publish_custom_max">Longest part: %1$s</string>
+    <string name="publish_needs_split">Longer than %1$s, so it will be split into parts, cut at the nearest keyframe.</string>
+    <string name="publish_as_is">Fits as is. It will be shared without changes.</string>
+    <string name="publish_split">Prepare parts</string>
+    <string name="publish_preparing">Preparing parts…</string>
+    <string name="publish_part">Part %1$d</string>
+    <string name="publish_part_duration">Part %1$d · %2$s</string>
+    <string name="publish_share_all">Share all</string>
+    <string name="publish_delete_parts">Delete parts</string>
+    <string name="publish_parts_saved">Parts are saved in Movies/Naqi/Parts.</string>
+    <string name="publish_failed">Couldn’t prepare the parts</string>
     <string name="jobs_open_failed">No app can open this file.</string>
 
     <!-- File-size subtitle on a library row. %1$.1f = gigabytes, %1$.0f = megabytes. -->

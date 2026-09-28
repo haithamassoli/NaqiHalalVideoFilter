@@ -67,10 +67,13 @@ internal object Publish {
     suspend fun muxedVideo(
         context: Context,
         displayName: String,
+        /** Under `Movies/`. Publish-ready parts go to a subfolder so the library can leave them out. */
+        dir: String = "Naqi",
+        mime: String = MIME_MP4,
         write: suspend (FileDescriptor) -> Unit,
     ): Uri {
         val resolver = context.contentResolver
-        val values = pendingValues(displayName, MIME_MP4, Environment.DIRECTORY_MOVIES)
+        val values = pendingValues(displayName, mime, Environment.DIRECTORY_MOVIES, dir)
         val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val item = resolver.insert(collection, values) ?: error("MediaStore insert failed")
         try {
@@ -135,10 +138,10 @@ internal object Publish {
 
     // MediaColumns, not Video.Media/Audio.Media: these four columns are declared on the shared
     // superinterface, so one set of puts serves both collections.
-    private fun pendingValues(displayName: String, mime: String, publicDir: String) = ContentValues().apply {
+    private fun pendingValues(displayName: String, mime: String, publicDir: String, dir: String = "Naqi") = ContentValues().apply {
         put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
         put(MediaStore.MediaColumns.MIME_TYPE, mime)
-        put(MediaStore.MediaColumns.RELATIVE_PATH, "$publicDir/Naqi")
+        put(MediaStore.MediaColumns.RELATIVE_PATH, "$publicDir/$dir")
         put(MediaStore.MediaColumns.IS_PENDING, 1)
     }
 }

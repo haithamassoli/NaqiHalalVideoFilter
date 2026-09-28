@@ -21,6 +21,15 @@
     <!-- No storage permission: minSdk 29 means every install uses scoped MediaStore, and an app's own
          contributions to Movies/Naqi need no permission to write or read back. -->
 
+    <!-- Package visibility (API 30+) for apps that take a shared video, so "Prepare to post" can hide
+         platforms that are not installed (PublishPreset.isInstalled). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="video/*" />
+        </intent>
+    </queries>
+
     <!-- android:localeConfig lists the locales we ship (English default, Arabic). It is what
          surfaces Naqi in the Android 13+ per-app language picker (Settings > Apps > Naqi >
          Language), letting the user pick Arabic without changing the system language. -->

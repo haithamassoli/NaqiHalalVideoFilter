@@ -68,6 +68,7 @@ import androidx.work.WorkInfo
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.data.Battery
 import com.haithamassoli.naqi.data.Prefs
+import com.haithamassoli.naqi.publish.Splitter
 import com.haithamassoli.naqi.ui.NaqiBottomAction
 import com.haithamassoli.naqi.ui.NaqiCard
 import com.haithamassoli.naqi.ui.NaqiIcons
@@ -159,6 +160,8 @@ fun JobsScreen(
     }
 
     var pendingDelete by remember { mutableStateOf<LibraryItem?>(null) }
+    var publishing by remember { mutableStateOf<Pair<Uri, String>?>(null) }
+    publishing?.let { (uri, name) -> PublishSheet(uri, name, onDismiss = { publishing = null }) }
     val scope = rememberCoroutineScope()
     val systemDelete = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
         if (it.resultCode == Activity.RESULT_OK) libraryVersion++
@@ -220,7 +223,9 @@ fun JobsScreen(
             item(key = "status") {
                 when {
                     running -> JobProgressCard(stageText, progress, etaMs, onCancel)
-                    showSaved -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context)
+                    showSaved -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context) { uri ->
+                        publishing = uri to outputName.orEmpty()
+                    }
                     failed -> NaqiCard {
                         Text(
                             stringResource(if (outputMessageId != 0) outputMessageId else R.string.err_generic),
@@ -291,6 +296,7 @@ fun JobsScreen(
                     item,
                     onOpen = { item.uri?.let { view(context, it) } },
                     onDelete = { pendingDelete = item },
+                    onPublish = { item.uri?.let { publishing = it to item.name } },
                     modifier = Modifier
                         .padding(top = if (index == 0) 0.dp else 2.dp)
                         .clip(shape)
@@ -388,6 +394,7 @@ private fun SavedCard(
     sourceUri: String?,
     onDeleteOriginal: (Uri, String?) -> Unit,
     context: Context,
+    onPublish: (Uri) -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
     NaqiCard {
@@ -433,6 +440,15 @@ private fun SavedCard(
                     modifier = Modifier.weight(1f),
                 ) { Text(stringResource(R.string.action_share)) }
             }
+            // Audio has nothing to post to a video platform.
+            if (!isAudioOutput(name)) {
+                Spacer(Modifier.height(NaqiTokens.space2))
+                OutlinedButton(
+                    onClick = { onPublish(uri) },
+                    shape = RoundedCornerShape(NaqiTokens.radiusButton),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.action_prepare_publish)) }
+            }
         }
         // Offered here as well as on the notification, which is gone the moment it is swiped. Text, not
         // a third button in that row: it is the one destructive thing on the screen and must not read
@@ -449,7 +465,13 @@ private fun SavedCard(
 }
 
 @Composable
-private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+private fun LibraryRow(
+    item: LibraryItem,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+    onPublish: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val cs = MaterialTheme.colorScheme
     val context = LocalContext.current
     val uri = item.uri
@@ -506,6 +528,12 @@ private fun LibraryRow(item: LibraryItem, onOpen: () -> Unit, onDelete: () -> Un
                         text = { Text(stringResource(R.string.action_share)) },
                         onClick = { menu = false; share(context, uri) },
                     )
+                    if (!isAudioOutput(item.name)) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_prepare_publish)) },
+                            onClick = { menu = false; onPublish() },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.action_delete), color = cs.error) },
                         onClick = { menu = false; onDelete() },
@@ -540,8 +568,14 @@ private fun loadLibrary(context: Context): List<LibraryItem> = runCatching {
         arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE),
         "(${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? OR ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?) " +
             "AND ${MediaStore.Files.FileColumns.MEDIA_TYPE} IN " +
-            "(${MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO}, ${MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO})",
-        arrayOf("${Environment.DIRECTORY_MOVIES}/Naqi/%", "${Environment.DIRECTORY_MUSIC}/Naqi/%"),
+            "(${MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO}, ${MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO}) " +
+            // Publish-ready parts are copies of a video already listed, not new output.
+            "AND ${MediaStore.MediaColumns.RELATIVE_PATH} NOT LIKE ?",
+        arrayOf(
+            "${Environment.DIRECTORY_MOVIES}/Naqi/%",
+            "${Environment.DIRECTORY_MUSIC}/Naqi/%",
+            "${Environment.DIRECTORY_MOVIES}/${Splitter.PARTS_DIR}/%",
+        ),
         "${MediaStore.MediaColumns.DATE_ADDED} DESC",
     )?.use { c ->
         buildList {
