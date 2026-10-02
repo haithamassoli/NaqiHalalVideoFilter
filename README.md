@@ -49,6 +49,9 @@ pre-roll so nothing slips through on the first frame.
 Adjustable: who gets censored, blur amount, a solid fill instead of blur (5 colours), grayscale,
 whole-frame mode, and the NSFW gate's on/off plus strictness (0–100).
 
+Coverage can be **Face / Body / Frame**. Face is the default; Body covers person rectangles and
+warns that processing takes longer. Rectangles can also blur surrounding background.
+
 Also included:
 
 - **Download by link** — share or paste a video URL and Naqi fetches it with yt-dlp, then filters
@@ -86,13 +89,17 @@ apps outright. The filtering itself is the same either way.
 
 ## Build from source
 
-The models are gitignored (~105 MB of ONNX), so a fresh clone must fetch them first:
+The models are gitignored (~115 MB of ONNX). A fresh clone needs the pinned body-model exporter
+dependencies, then the fetch script:
 
 ```bash
+python3 -m venv .venv-bench
+.venv-bench/bin/pip install ultralytics==8.4.171 onnx==1.23.1 torch==2.14.0
 ./scripts/fetch-models.sh
 ```
 
-The script restores all four models from the v1.4.4 APK and checks their SHA-256 hashes. The build
+The script restores four models from the v1.4.4 APK, exports YOLO26n locally, and checks all five
+SHA-256 hashes. The build
 fails if any model is missing, preventing an APK whose filtering cannot work. Model regeneration
 steps are in [`docs/m0-spikes.md`](docs/m0-spikes.md).
 
@@ -145,6 +152,7 @@ More detail lives in [`docs/prd-video-filter-android.md`](docs/prd-video-filter-
 | [nsfw_model](https://github.com/GantMan/nsfw_model) MobileNetV2 1.4-224, INT8 | NSFW scene gate | 4.9 MB | NOASSERTION — see [`NOTICE`](NOTICE) |
 | [InsightFace](https://github.com/deepinsight/insightface) `genderage` (buffalo_l) | per-face-track gender vote | 1.3 MB | code MIT, weights research-use — see [`NOTICE`](NOTICE) |
 | ML Kit Face Detection | face detection and tracking | — | proprietary, Google Play services |
+| [YOLO26n](https://docs.ultralytics.com/models/yolo26) (FP32, 640×640) | optional body rectangles | 9.9 MB | AGPL-3.0 |
 
 Everything runs on [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT) on the CPU.
 

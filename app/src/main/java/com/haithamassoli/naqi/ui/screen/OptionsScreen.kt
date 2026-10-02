@@ -233,12 +233,7 @@ internal fun FilterOptions(ops: FilterOps, onOpsChange: (FilterOps) -> Unit) {
             // when their faces toggle is turned back on.
             WhoRow(ops.censorWho) { Prefs.saveWho(context, it); onOpsChange(ops.copy(censorWho = it)) }
             NaqiRowDivider()
-            ToggleTile(
-                title = stringResource(R.string.opt_whole_frame_title),
-                desc = stringResource(R.string.opt_whole_frame_desc),
-                checked = ops.wholeFrameBlur,
-                onCheckedChange = { onOpsChange(ops.copy(wholeFrameBlur = it)) },
-            )
+            CoverageRow(ops, onOpsChange)
             NaqiRowDivider()
             ToggleTile(
                 title = stringResource(R.string.opt_nsfw_title),
@@ -290,6 +285,33 @@ internal fun FilterOptions(ops: FilterOps, onOpsChange: (FilterOps) -> Unit) {
                 desc = stringResource(R.string.opt_keep_vocals_other_desc),
                 selected = ops.keepStems == "vocals_other",
             ) { onOpsChange(ops.copy(keepStems = "vocals_other")) }
+        }
+    }
+}
+
+@Composable
+private fun CoverageRow(ops: FilterOps, onChange: (FilterOps) -> Unit) {
+    val selected = when { ops.wholeFrameBlur -> 2; ops.bodyBlur -> 1; else -> 0 }
+    val labels = listOf(R.string.opt_cover_face, R.string.opt_cover_body, R.string.opt_cover_frame)
+    Column(Modifier.padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3)) {
+        Text(stringResource(R.string.opt_coverage_title), style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(NaqiTokens.space3))
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            labels.forEachIndexed { i, label ->
+                SegmentedButton(
+                    selected = selected == i,
+                    onClick = { onChange(ops.copy(bodyBlur = i == 1, wholeFrameBlur = i == 2)) },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = labels.size),
+                ) { Text(stringResource(label), maxLines = 1) }
+            }
+        }
+        if (selected != 0) {
+            Spacer(Modifier.height(NaqiTokens.space3))
+            Text(
+                stringResource(if (selected == 1) R.string.opt_body_warning else R.string.opt_whole_frame_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

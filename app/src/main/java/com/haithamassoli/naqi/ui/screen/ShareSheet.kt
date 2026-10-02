@@ -92,8 +92,8 @@ fun ShareSheet(
     onQueued: () -> Unit,
     /**
      * The two decisions the pick screen already asked for, when the sheet is opened from its link
-     * field. Only those two travel: the screen never shows strictness or blur amount, so carrying its
-     * whole [FilterOps] would silently reset saved tuning to defaults. Null from the share intent,
+     * field. Toggles and coverage travel; other saved tuning stays because carrying its
+     * whole [FilterOps] would silently reset strictness and blur amount. Null from the share intent,
      * which has no screen behind it.
      */
     initialOps: FilterOps? = null,
@@ -106,7 +106,10 @@ fun ShareSheet(
         val saved = Prefs.ops(context)
         mutableStateOf(
             if (initialOps == null) saved
-            else saved.copy(removeMusic = initialOps.removeMusic, censorWho = initialOps.censorWho),
+            else saved.copy(
+                removeMusic = initialOps.removeMusic, censorWho = initialOps.censorWho,
+                bodyBlur = initialOps.bodyBlur, wholeFrameBlur = initialOps.wholeFrameBlur,
+            ),
         )
     }
     var quality by rememberSaveable { mutableStateOf(Prefs.quality(context)) }
@@ -280,6 +283,10 @@ fun ShareSheet(
             }
 
             // ---- Warnings ----
+            if (!showAdvanced && effectiveOps.censorFaces && effectiveOps.bodyBlur && !effectiveOps.wholeFrameBlur) {
+                Text(stringResource(R.string.opt_body_warning), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (spaceError != 0) {
                 Spacer(Modifier.height(NaqiTokens.space3))
                 Text(

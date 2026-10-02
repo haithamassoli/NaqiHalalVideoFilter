@@ -61,6 +61,8 @@ object Prefs {
                 ?: if (contains(KEY_CENSOR_WOMEN)) FilterOps.whoFromLegacy(getBoolean(KEY_CENSOR_WOMEN, true))
                 else FilterOps.DEFAULT_WHO,
             censorNsfw = getBoolean(KEY_CENSOR_NSFW, true),
+            wholeFrameBlur = getBoolean("whole_frame", false),
+            bodyBlur = getBoolean("body_blur", false),
             solidColor = getInt(KEY_SOLID_COLOR, FilterOps.BLUR),
         )
     }
@@ -87,6 +89,8 @@ object Prefs {
             .putBoolean(KEY_REMOVE_MUSIC, ops.removeMusic)
             .putString(KEY_CENSOR_WHO, ops.censorWho)
             .putBoolean(KEY_CENSOR_NSFW, ops.censorNsfw)
+            .putBoolean("whole_frame", ops.wholeFrameBlur)
+            .putBoolean("body_blur", ops.bodyBlur)
             .putInt(KEY_SOLID_COLOR, ops.solidColor)
             .putString(KEY_QUALITY, quality.name)
             .apply()

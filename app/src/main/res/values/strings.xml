@@ -98,6 +98,11 @@
     <!-- The desc has to state the cost plainly: on ordinary footage this covers most of the video, and
          the output is a re-encoded file, so it cannot be undone the way a browser blur can. -->
     <string name="opt_whole_frame_title">Cover the whole frame</string>
+    <string name="opt_coverage_title">Coverage</string>
+    <string name="opt_cover_face">Face</string>
+    <string name="opt_cover_body">Body</string>
+    <string name="opt_cover_frame">Frame</string>
+    <string name="opt_body_warning">Covers rectangles around selected people, including their faces. Processing may take longer. Unclassified people are covered too.</string>
     <string name="opt_whole_frame_desc">Covers the entire picture while a censored face is on screen, not just the face. Most of the video usually ends up covered.</string>
     <string name="opt_nsfw_title">Censor flagged scenes</string>
     <string name="opt_nsfw_desc">Uses the NSFW model to cover the whole frame when a scene is flagged.</string>

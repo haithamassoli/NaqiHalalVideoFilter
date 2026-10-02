@@ -61,4 +61,6 @@ class FaceTrack(val id: Int) {
 
     /** Classifications RUN, abstentions included — the `VOTE_CAP` counter, so cost is per-track. */
     var votesTried = 0
+    /** Body mode spaces its bounded face observations in source time. */
+    var lastVoteMs = Long.MIN_VALUE
 }

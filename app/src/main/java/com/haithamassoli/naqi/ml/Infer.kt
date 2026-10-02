@@ -114,6 +114,18 @@ object Infer {
         }
     }
 
+    /** End-to-end detections: 300 rows of x1,y1,x2,y2,confidence,COCO class id. */
+    internal fun people(context: Context, input: FloatBuffer): FloatArray {
+        val session = session(context, NaqiModel.PERSON)
+        OnnxTensor.createTensor(env, input, longArrayOf(1, 3, 640, 640)).use { tensor ->
+            session.run(mapOf(session.inputNames.first() to tensor)).use { result ->
+                val out = (result[0] as OnnxTensor).floatBuffer
+                check(out.remaining() == 300 * 6) { "Unexpected person-model output shape" }
+                return FloatArray(out.remaining()).also { out.get(it) }
+            }
+        }
+    }
+
     /** Idempotent — releases the cached sessions (safe when none exist). */
     fun close() {
         sessions.values.forEach { it.close() }

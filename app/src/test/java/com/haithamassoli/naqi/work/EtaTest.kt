@@ -12,6 +12,14 @@ import org.junit.Test
  */
 class EtaTest {
 
+    @Test fun bodyModeDoesNotBorrowAnUnmeasuredFaceEstimate() {
+        val body = FilterOps(censorWho = FilterOps.WOMEN, bodyBlur = true)
+        assertEquals(0L, Eta.estimateMs(60_000L, body))
+        assertEquals(0L, Eta.estimateMs(60_000L, body.copy(removeMusic = true)))
+        assertTrue(Eta.estimateMs(60_000L, body.copy(wholeFrameBlur = true)) > 0L)
+        assertTrue(Eta.estimateMs(60_000L, body.copy(censorWho = FilterOps.NONE, removeMusic = true)) > 0L)
+    }
+
     private val censor = FilterOps(censorWho = FilterOps.EVERYONE)
     private val music = FilterOps(removeMusic = true)
     private val both = FilterOps(censorWho = FilterOps.EVERYONE, removeMusic = true)

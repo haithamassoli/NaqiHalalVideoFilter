@@ -129,6 +129,14 @@ enum class NaqiModel(
         listOf(longArrayOf(15600)),
     ),
 
+    /** YOLO26n COCO, end-to-end FP32 export: RGB /255 letterboxed to 640; [1,300,6] xyxy,score,class. */
+    PERSON(
+        "yolo26n-person.onnx",
+        "35519e399739f1d02821f6479f5a804c5da64b4f1dc20fa0db6f9822c4417265",
+        downloadUrl = null,
+        listOf(longArrayOf(1, 3, 640, 640)),
+    ),
+
     /**
      * Face gender/age classifier — InsightFace `buffalo_l`'s own `genderage.onnx`, 1.3 MB, opset 12,
      * shipped verbatim (no conversion, no quantization). Powers the per-track vote behind the

@@ -27,6 +27,15 @@ import org.junit.Test
  */
 class FilterOpsWireTest {
 
+    @Test fun bodyCoverageSurvivesQueueAndWorkData() {
+        val ops = FilterOps(censorWho = FilterOps.WOMEN, bodyBlur = true)
+        assertEquals(ops, workDataOf(*ops.pairs()).filterOps())
+        assertTrue(Queue.opsFromJson(JSONObject().put("bodyBlur", true)).bodyBlur)
+        assertFalse(Queue.opsFromJson(JSONObject()).bodyBlur)
+        assertFalse(workDataOf().filterOps().bodyBlur)
+        assertFalse(FilterOps().bodyBlur)
+    }
+
     @Test
     fun everyStateSurvivesTheWire() {
         for (who in listOf(FilterOps.NONE, FilterOps.EVERYONE, FilterOps.WOMEN, FilterOps.MEN)) {

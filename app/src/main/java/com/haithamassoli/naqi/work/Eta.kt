@@ -83,6 +83,8 @@ object Eta {
      */
     fun estimateMs(durationMs: Long, ops: FilterOps): Long {
         if (durationMs <= 0) return 0L
+        // ponytail: body timings are uncalibrated; show the cost warning until phone measurements exist.
+        if (ops.censorFaces && ops.bodyBlur && !ops.wholeFrameBlur) return 0L
         val factor = when {
             ops.censorFaces && ops.removeMusic -> COMBINED
             ops.removeMusic -> MUSIC

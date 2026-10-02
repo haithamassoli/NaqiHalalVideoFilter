@@ -15,8 +15,8 @@ android {
         applicationId = "com.haithamassoli.naqi"
         minSdk = 29
         targetSdk = 36
-        versionCode = 28
-        versionName = "1.5.0"
+        versionCode = 29
+        versionName = "1.6.0"
 
         // Base URL for the M3 model downloader's *converted* artifacts (the NSFW gate and htdemucs —
         // NudeNet carries its own public release URL). Empty by default: no host is published yet, and
@@ -159,7 +159,7 @@ abstract class VerifyModelsTask : DefaultTask() {
     @get:Internal abstract val modelsDir: DirectoryProperty
 
     @TaskAction fun verify() {
-        val missing = listOf("genderage.onnx", "htdemucs_s26_f16.onnx", "nsfw_mnv2_140_int8.onnx", "yamnet.onnx")
+        val missing = listOf("genderage.onnx", "htdemucs_s26_f16.onnx", "nsfw_mnv2_140_int8.onnx", "yamnet.onnx", "yolo26n-person.onnx")
             .filter { modelsDir.file(it).get().asFile.length() == 0L }
         check(missing.isEmpty()) { "Missing ONNX models: $missing. Run ./scripts/fetch-models.sh" }
     }

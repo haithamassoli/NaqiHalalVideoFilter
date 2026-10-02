@@ -48,7 +48,11 @@ import com.haithamassoli.naqi.model.FilterOps
 class FaceTracker(
     private val classifier: FaceGenderVoter? = null,
     private val who: String = FilterOps.EVERYONE,
+    private val coverBody: Boolean = false,
 ) {
+    private val body = if (coverBody) BodyTracker(who) else null
+    private var people: PersonDetector? = null
+    internal val bodyFallback: List<LongRange> get() = body?.fallbackIntervals ?: emptyList()
 
     /** Live tracks keyed by tracking id — only those still being seen. */
     private val tracks = LinkedHashMap<Int, FaceTrack>()
@@ -93,8 +97,7 @@ class FaceTracker(
      * Well under logcat's ~4 kB line cap: it is a fixed set of integers.
      */
     fun retention(): String =
-        "tracks=$trackCount faces=$faceCount untracked=$untrackedCount liveTracks=${tracks.size} " +
-            "spared=$sparedCount"
+        body?.retention() ?: "tracks=$trackCount faces=$faceCount untracked=$untrackedCount liveTracks=${tracks.size} spared=$sparedCount"
 
     /**
      * Start ML Kit and hand the Task back un-awaited (perf-plan 1.3a): it runs on ML Kit's own executor,
@@ -115,6 +118,15 @@ class FaceTracker(
         val w = uprightW.toFloat()
         val h = uprightH.toFloat()
         faceCount += faces.size
+        if (body != null) {
+            val frame = requireNotNull(people).detect(image, uprightW, uprightH)
+            body.onFrame(frame.boxes, faces.map { face ->
+                val b = face.boundingBox
+                NRect(b.left / w, b.top / h, b.right / w, b.bottom / h)
+            }, uprightW, uprightH, ptsMs, frame.sceneCut,
+                classifier?.let { voter -> { rect -> voter.vote(image, uprightW, uprightH, rect) } })
+            return
+        }
         for (face in faces) {
             // plan-v2 §7.1: this was `val id = face.trackingId ?: continue`, which silently DROPPED any
             // detection ML Kit found but did not assign a tracking id to — never blurred, and the failure
@@ -185,6 +197,7 @@ class FaceTracker(
 
     /** Emit whatever is still live, then return every EDL the pass produced. */
     fun finish(): List<FaceTrackEdl> {
+        body?.let { return it.finish() }
         tracks.values.forEach { emit(it) }
         tracks.clear()
         // Emission order is track-END order now that tracks leave as they finish, where M1 emitted in
@@ -198,6 +211,11 @@ class FaceTracker(
     fun closeDetector() {
         detector?.close()
         detector = null
+        people = null
+    }
+
+    internal fun enableBody(context: android.content.Context) {
+        if (coverBody && people == null) people = PersonDetector(context)
     }
 
     private fun detector(): FaceDetector = detector ?: FaceDetection.getClient(
@@ -228,7 +246,7 @@ fun interface FaceGenderVoter {
  * crops × ~1 ms ≈ 17 s on a 155-min film. Tunable in Phase B — drop to 3 first if measured cost
  * exceeds ~5 % of analyze.
  */
-private const val VOTE_CAP = 5
+internal const val VOTE_CAP = 5
 
 /**
  * Below this max side in upright pixels a crop is not classified at all — the input is 96², so a small
@@ -250,7 +268,7 @@ private const val VOTE_CAP = 5
  * excluding it costs almost no coverage and removes most of the wrong votes. Below the floor the mode
  * degrades to Everyone for that track, which is the safe direction.
  */
-private const val MIN_FACE_PX = 80
+internal const val MIN_FACE_PX = 80
 
 /**
  * Source-time gap after which an unseen track is considered over. 2 s = 20 sampled frames at 10 fps:
