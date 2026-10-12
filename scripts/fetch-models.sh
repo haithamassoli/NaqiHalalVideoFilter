@@ -5,6 +5,15 @@ cd "$(dirname "$0")/.."
 DEST=app/src/main/assets/models
 mkdir -p "$DEST"
 
+# YOLO11n-seg is exported locally; it is not present in the historical APK below.
+if [ ! -s "$DEST/yolo11n-seg.onnx" ]; then
+  if [ -x .venv-bench/bin/python ]; then
+    .venv-bench/bin/python scripts/export_person.py
+  else
+    python3 scripts/export_person.py
+  fi
+fi
+
 MODELS=(genderage.onnx htdemucs_s26_f16.onnx nsfw_mnv2_140_int8.onnx yamnet.onnx)
 for model in "${MODELS[@]}"; do
   if [ ! -s "$DEST/$model" ]; then
@@ -24,4 +33,5 @@ shasum -a 256 -c <<EOF
 df8a2c2c8dd06ca279f58646dacc007b3e1e07436f31a3189408f0336c56eba5  $DEST/htdemucs_s26_f16.onnx
 6070dd6da875025b4c8df960a3a46dff583fb2bf8a499e214f98a8984674bba9  $DEST/nsfw_mnv2_140_int8.onnx
 afe82472f2f6250570b63d4f106e7a74b5232cfd17086d39076d80a4273d01f8  $DEST/yamnet.onnx
+a119f46d1eb44acefb071c9733b2f12fc9bd89cfc581f7df4151cdb6ba758c41  $DEST/yolo11n-seg.onnx
 EOF

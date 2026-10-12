@@ -51,6 +51,46 @@ class EdlTest {
         assertRegions(listOf(r(0.3f, 0.3f, 0.4f, 0.4f)), edl.regionsAt(1000)) // midpoint
     }
 
+    @Test fun bodyTrackCoversBothNeighboursBetweenSamples() {
+        val a = r(0.1f, 0.2f, 0.3f, 0.6f)
+        val b = r(0.2f, 0.1f, 0.5f, 0.5f)
+        val track = FaceTrackEdl(0, 400, listOf(100L to a, 200L to b), union = true)
+        val edl = Edl(emptyList(), listOf(track))
+        assertRegions(listOf(r(0.1f, 0.1f, 0.5f, 0.6f)), edl.regionsAt(150))
+        assertRegions(listOf(a), edl.regionsAt(100)) // an exact sample stays exact
+        assertRegions(listOf(b), edl.regionsAt(200))
+        assertRegions(listOf(a), edl.regionsAt(20))  // lead-in holds the first box
+        assertEquals(edl, Edl.fromJson(edl.toJson()))
+        assertFalse(Edl.fromJson(Edl(emptyList(), listOf(track.copy(union = false))).toJson()).faceTracks.single().union)
+    }
+
+    @Test fun preciseTracksDrawObservedMasksAndFallBackToTheBox() {
+        val box = r(0.1f, 0.1f, 0.4f, 0.9f)
+        val m = BodyMask(r(0.15f, 0.2f, 0.35f, 0.8f), 2, 2, byteArrayOf(0b1001))
+        val n = BodyMask(r(0.16f, 0.2f, 0.36f, 0.8f), 2, 2, byteArrayOf(0b0110))
+        val track = FaceTrackEdl(
+            0, 1500,
+            listOf(100L to box, 200L to box, 300L to box, 900L to box, 1000L to box),
+            union = true, masks = listOf(m, n, null, m, m),
+        )
+        val edl = Edl(emptyList(), listOf(track))
+        assertEquals(listOf(m), edl.masksAt(100))
+        assertRegions(emptyList(), edl.regionsAt(100))
+        assertEquals(listOf(m, n), edl.masksAt(150))      // consecutive samples: both silhouettes
+        assertTrue(edl.masksAt(250).isEmpty())            // a sample without a mask: its box
+        assertRegions(listOf(box), edl.regionsAt(250))
+        assertTrue(edl.masksAt(600).isEmpty())            // missed samples in between: the box
+        assertRegions(listOf(box), edl.regionsAt(600))
+        assertEquals(listOf(m, m), edl.masksAt(950))
+        assertTrue(edl.masksAt(50).isEmpty() && edl.masksAt(1200).isEmpty()) // lead-in and hold: the box
+        assertRegions(listOf(box), edl.regionsAt(1200))
+        assertTrue(Edl(listOf(0L..2000L), listOf(track)).masksAt(100).isEmpty()) // whole frame wins
+        assertTrue(m[0, 0] && !m[1, 0] && !m[0, 1] && m[1, 1] && !m[2, 0])
+        val back = Edl.fromJson(edl.toJson())
+        assertEquals(edl.faceTracks.single().masks, back.faceTracks.single().masks)
+        assertEquals(edl.masksAt(150), back.masksAt(150))
+    }
+
     @Test fun regionsEmptyOutsideTrackSpan() {
         val track = FaceTrackEdl(1000, 2000, listOf(1000L to r(0f, 0f, 0.2f, 0.2f), 2000L to r(0f, 0f, 0.2f, 0.2f)))
         val edl = Edl(emptyList(), listOf(track))

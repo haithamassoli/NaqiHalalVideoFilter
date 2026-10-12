@@ -15,8 +15,8 @@ android {
         applicationId = "com.haithamassoli.naqi"
         minSdk = 29
         targetSdk = 36
-        versionCode = 28
-        versionName = "1.5.0"
+        versionCode = 30
+        versionName = "1.7.0"
 
         // Base URL for the M3 model downloader's *converted* artifacts (the NSFW gate and htdemucs —
         // NudeNet carries its own public release URL). Empty by default: no host is published yet, and
@@ -89,7 +89,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             // Installs alongside debug/release, so a measurement run never has to uninstall the build
             // being used for anything else.
-            applicationIdSuffix = ".benchmark"
+            // `-PnaqiBenchmarkSuffix=.bodyqa` installs a QA copy that leaves the usual benchmark alone.
+            applicationIdSuffix = project.findProperty("naqiBenchmarkSuffix") as String? ?: ".benchmark"
             // The whole instrument. Without the autorun hook there is no way to start a job on a
             // non-debuggable build from adb, and the SOAK log lines never get emitted.
             buildConfigField("boolean", "DEBUG_HOOKS", "true")
@@ -159,7 +160,7 @@ abstract class VerifyModelsTask : DefaultTask() {
     @get:Internal abstract val modelsDir: DirectoryProperty
 
     @TaskAction fun verify() {
-        val missing = listOf("genderage.onnx", "htdemucs_s26_f16.onnx", "nsfw_mnv2_140_int8.onnx", "yamnet.onnx")
+        val missing = listOf("genderage.onnx", "htdemucs_s26_f16.onnx", "nsfw_mnv2_140_int8.onnx", "yamnet.onnx", "yolo11n-seg.onnx")
             .filter { modelsDir.file(it).get().asFile.length() == 0L }
         check(missing.isEmpty()) { "Missing ONNX models: $missing. Run ./scripts/fetch-models.sh" }
     }

@@ -148,6 +148,8 @@ internal object Queue {
                 put("removeMusic", i.ops.removeMusic)
                 put("censorWho", i.ops.censorWho)
                 put("wholeFrameBlur", i.ops.wholeFrameBlur)
+                put("bodyBlur", i.ops.bodyBlur)
+                put("bodyPrecise", i.ops.bodyPrecise)
                 put("censorNsfw", i.ops.censorNsfw)
                 put("strictness", i.ops.strictness)
                 put("blurAmount", i.ops.blurAmount)
@@ -190,6 +192,8 @@ internal object Queue {
         censorWho = FilterOps.whoOrNull(ops.optString("censorWho"))
             ?: FilterOps.whoFromLegacy(ops.optBoolean("censorWomen", false)),
         wholeFrameBlur = ops.optBoolean("wholeFrameBlur", false),
+        bodyBlur = ops.optBoolean("bodyBlur", false),
+        bodyPrecise = ops.optBoolean("bodyPrecise", false),
         // Absent means a queue item written while the NSFW gate was always on.
         censorNsfw = ops.optBoolean("censorNsfw", true),
         strictness = ops.optInt("strictness", FilterOps.DEFAULT_STRICTNESS),

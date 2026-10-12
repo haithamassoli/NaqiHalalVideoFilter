@@ -12,6 +12,20 @@ import org.junit.Test
  */
 class EtaTest {
 
+    @Test fun bothBodyModesAddTheMeasuredSurcharge() {
+        val face = FilterOps(censorWho = FilterOps.WOMEN)
+        val body = face.copy(bodyBlur = true)
+        // 0.28 for faces + 1.3 for YOLO11n-seg at 10 fps (S23, 2026-10-12).
+        assertEquals(158_000L, Eta.estimateMs(100_000L, body))
+        assertEquals(158_000L, Eta.estimateMs(100_000L, body.copy(bodyPrecise = true)))
+        assertEquals(230_000L, Eta.estimateMs(100_000L, body.copy(removeMusic = true)))
+        assertEquals(2 * Eta.estimateMs(FIVE_MIN, body), Eta.estimateMs(2 * FIVE_MIN, body))
+        // Whole-frame wins over body, and music alone never pays for a body model.
+        assertEquals(Eta.estimateMs(100_000L, face), Eta.estimateMs(100_000L, body.copy(wholeFrameBlur = true)))
+        assertEquals(Eta.estimateMs(100_000L, FilterOps(removeMusic = true)),
+            Eta.estimateMs(100_000L, body.copy(censorWho = FilterOps.NONE, removeMusic = true)))
+    }
+
     private val censor = FilterOps(censorWho = FilterOps.EVERYONE)
     private val music = FilterOps(removeMusic = true)
     private val both = FilterOps(censorWho = FilterOps.EVERYONE, removeMusic = true)

@@ -37,6 +37,7 @@ import com.haithamassoli.naqi.edl.Edl
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.edl.FaceTrackEdl
 import com.haithamassoli.naqi.edl.promoteFacesToFullFrame
+import com.haithamassoli.naqi.edl.mergeRanges
 import com.haithamassoli.naqi.media.containerDurationMs
 import com.haithamassoli.naqi.media.displayName
 import com.haithamassoli.naqi.media.firstTrackIndex
@@ -133,6 +134,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
     /** [FilterOps.wholeFrameBlur] — read here, applied once per EDL build in [promoteFacesToFullFrame]. */
     private val wholeFrameBlur = ops.wholeFrameBlur
+    private val bodyBlur = ops.censorFaces && ops.bodyBlur && !wholeFrameBlur
+    private val bodyPrecise = bodyBlur && ops.bodyPrecise
+    private fun newTracker() = FaceTracker(genderVoter, censorWho, bodyBlur, bodyPrecise).also { it.enableBody(applicationContext) }
 
     /**
      * Key for this job's working directory. Derived from the source and every option that changes the
@@ -173,7 +177,14 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             inputData.getInt(KEY_SOLID_COLOR, FilterOps.BLUR),
             // Same reason as the two above: a rect-blurred segment and a whole-frame one must never
             // resume into each other. Moves every existing key once, orphaning pre-whole-frame dirs.
-            inputData.getBoolean(KEY_WHOLE_FRAME, false),
+            // body-rect-v4: body mode samples at 10 fps, so an every-frame v3 checkpoint must not resume.
+            // v5: YOLO11n-seg replaced YOLO26n and the tracker holds missed people longer. Precise body
+            // checkpoints carry masks and render differently, so they never share a key with rectangles.
+            when {
+                bodyPrecise -> "body-precise-v1"
+                bodyBlur -> "body-rect-v5"
+                else -> inputData.getBoolean(KEY_WHOLE_FRAME, false)
+            },
             inputData.getString(KEY_KEEP_STEMS),
             inputData.getString(KEY_FORCE_INTERVALS), // debug hook, but it does change the output
             // Not an input: a plan generation. Segment boundaries moved to sync samples in
@@ -673,6 +684,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         stats.stage("analyze")
         val firings = ArrayList<Long>()
         val faceTracks = ArrayList<FaceTrackEdl>()
+        val bodyFallback = ArrayList<LongRange>()
         // Outside the segment loop on purpose: report() is an AWAITED setProgress (Room write) plus a
         // setForeground binder IPC, and the sampler calls it ~93 000 times over a film for ~40 distinct
         // values. Hoisted, it also kills the duplicate write at every seam and on the resume branch.
@@ -682,6 +694,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             if (done != null) {
                 firings += done.firingsMs
                 faceTracks += done.edl.faceTracks
+                bodyFallback += done.edl.censorIntervalsMs
                 Log.i(TAG, "analyze seg-${seg.index}: resumed from checkpoint " +
                     "(${done.firingsMs.size} firings, ${done.edl.faceTracks.size} tracks)")
                 val pct = progressBase + (seg.index + 1) * progressSpan / plan.size
@@ -694,12 +707,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // crop buffer and the counters it feeds are all the worker's and outlive every segment, which
             // is safe only because the segments run in sequence (perf-plan-v4 §10 corrects this comment:
             // it used to claim the voter was fresh too, contradicting the voter's own KDoc).
-            val tracker = FaceTracker(genderVoter, censorWho)
+            val tracker = newTracker()
             val timers = PassTimers()
             try {
                 FrameSampler.sample(
-                    applicationContext, inputUri, fps = 10f, maxDim = 640,
-                    gateEnabled = censorNsfw,
+                    applicationContext, inputUri, fps = 10f, maxDim = 640, gateEnabled = censorNsfw,
                     startMs = seg.startMs, endMs = seg.endMs,
                 ) { image, gateBytes, uprightW, uprightH, ptsMs ->
                     sampledFrame(tracker, image, gateBytes, uprightW, uprightH, ptsMs, timers, segFirings)
@@ -712,7 +724,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 val segTracks = tracker.finish()
                 // The checkpoint goes in only once BOTH halves of this segment's analysis exist, and it is
                 // written atomically — so a file under its final name always means a complete segment.
-                Checkpoint.writeAnalysis(workDir, seg.index, segFirings, Edl(emptyList(), segTracks))
+                val fallback = mergeRanges(tracker.bodyFallback, bridgeMs = 0)
+                Checkpoint.writeAnalysis(workDir, seg.index, segFirings, Edl(fallback, segTracks))
+                bodyFallback += fallback
                 firings += segFirings
                 faceTracks += segTracks
                 Log.i(TAG, "analyze seg-${seg.index} [${seg.startMs}..${seg.endMs}): " +
@@ -725,11 +739,11 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         // ONE hysteresis pass over the whole timeline — the reason firings are accumulated rather than
         // turned into intervals per segment. The 7.4 overflow promotion also runs once, here, for the same
         // reason: it needs every segment's tracks to know how many faces overlap across a seam.
-        val intervals = censorSpans(firings, durationMs, faceTracks)
+        val intervals = mergeRanges(censorSpans(firings, durationMs, faceTracks) + bodyFallback, bridgeMs = 0)
         Log.i(TAG, "pass1 segmented: gateFirings=${firings.size} intervalCount=${intervals.size} " +
             "faceTracks=${faceTracks.size} wholeFrame=$wholeFrameBlur")
         logVotes("pass1 segmented")
-        return Edl(intervals, faceTracks.sortedBy { it.startMs })
+        return Edl(intervals, faceTracks.sortedBy { it.startMs }).also(::recordDebugEdl)
     }
 
     /** Pass 2, per segment. An existing `seg-NNN.mp4` is skipped; that plus [analyzeSegments] is the resume. */
@@ -776,7 +790,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         tryForeground(foregroundInfo(stage(R.string.stage_analyzing), 0))
 
         val tempFile = File(workDir, "render.mp4")
-        val faceTracker = FaceTracker(genderVoter, censorWho)
+        val faceTracker = newTracker()
         try {
             val edl = analyze(inputUri, faceTracker, meta)
             // No removeAudio: this file IS the published output, so Transformer transmuxing the source
@@ -856,7 +870,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
         val renderTemp = File(workDir, "render.mp4")
         val audioTemp = File(workDir, "audio.m4a")
-        val faceTracker = FaceTracker(genderVoter, censorWho)
+        val faceTracker = newTracker()
         try {
             branches(
                 audio = { demote ->
@@ -1182,7 +1196,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         timers.stop()
 
         val faceTracks = faceTracker.finish()
-        val intervals = censorSpans(firings, durationMs, faceTracks)
+        val intervals = mergeRanges(censorSpans(firings, durationMs, faceTracks) + faceTracker.bodyFallback, bridgeMs = 0)
         // Counts on their own line: a feature-length film produces hundreds of intervals, and logcat
         // truncates a message at ~4 kB — on the first 155-min soak that silently ate the face counts
         // off the end of the combined line, which were the whole point of logging it.
@@ -1191,7 +1205,16 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             timers)
         logVotes("pass1")
         Log.i(TAG, "pass1 intervals=$intervals")
-        return Edl(intervals, faceTracks)
+        return Edl(intervals, faceTracks).also(::recordDebugEdl)
+    }
+
+    private fun recordDebugEdl(edl: Edl) {
+        if (BuildConfig.DEBUG_HOOKS) {
+            val json = edl.toJson()
+            File(applicationContext.filesDir, "bench").apply { mkdirs() }
+                .resolve("last-edl.json").writeText(json)
+            applicationContext.getExternalFilesDir("bench")?.resolve("last-edl.json")?.writeText(json)
+        }
     }
 
     /**
@@ -1379,6 +1402,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         const val KEY_GRAYSCALE = "grayscale"
         const val KEY_SOLID_COLOR = "solid_color"
         const val KEY_WHOLE_FRAME = "whole_frame"
+        const val KEY_BODY_BLUR = "body_blur"
+        const val KEY_BODY_PRECISE = "body_precise"
 
         // KEY_BLUR_UNKNOWN ("blur_unknown_faces") was deleted with the gender vote (plan-v2 §5.4)
         // along with FilterOps.blurUnknownFaces. Unlike KEY_CENSOR_WOMEN above, the wire string did NOT

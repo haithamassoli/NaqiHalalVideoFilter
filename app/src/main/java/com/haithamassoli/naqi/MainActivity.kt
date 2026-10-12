@@ -32,6 +32,7 @@ import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.model.FilterOps
 import com.haithamassoli.naqi.ui.NaqiApp
 import com.haithamassoli.naqi.ui.theme.NaqiTheme
+import com.haithamassoli.naqi.work.BenchModel
 import com.haithamassoli.naqi.work.JobController
 import com.haithamassoli.naqi.work.JobNotifications
 import java.io.File
@@ -154,11 +155,20 @@ class MainActivity : ComponentActivity() {
      * `--ez autorun_cancel true` cancels the running one (the only way to exercise cancel-mid-job
      * from adb — the real cancel lives on the notification and in the UI).
      *
+     * `-e bench_model <onnx>` is the T1 microbench (plan §3.3); it runs on a background thread and
+     * returns before any job is started. See [BenchModel].
+     *
      * Gated on `DEBUG_HOOKS`, not `DEBUG`: the `benchmark` build type is non-debuggable and still has to
      * reach this, because it is the only way to start a job from adb and so the only way the SOAK lines
      * get emitted on an optimised build (plan-v2 §4.1).
      */
     private fun maybeAutorun() {
+        if (intent.getStringExtra("bench_model") != null) {
+            val app = applicationContext
+            val extras = intent
+            Thread({ BenchModel.run(app, extras) }, "bench_model").start()
+            return
+        }
         if (intent.getBooleanExtra("autorun_cancel", false)) {
             JobController.cancel(this)
             return
@@ -179,6 +189,9 @@ class MainActivity : ComponentActivity() {
             censorWho = censorWho,
             // `--ez whole_frame true` — covers the whole picture while a censored face is on screen.
             wholeFrameBlur = intent.getBooleanExtra("whole_frame", false),
+            // `--ez body_precise true` selects precise body (silhouettes) and implies body_blur.
+            bodyBlur = intent.getBooleanExtra("body_blur", false) || intent.getBooleanExtra("body_precise", false),
+            bodyPrecise = intent.getBooleanExtra("body_precise", false),
             // `--ez censor_nsfw false` — keeps face censoring but disables whole-scene NSFW spans.
             censorNsfw = intent.getBooleanExtra("censor_nsfw", true),
             strictness = intent.getIntExtra("strictness", FilterOps.DEFAULT_STRICTNESS),
@@ -192,7 +205,7 @@ class MainActivity : ComponentActivity() {
         // Echo what actually parsed. `everyone` and `women` censor identically until Phase C ships a
         // classifier, so without this an adb run cannot show WHICH value survived the wire — only that
         // something censored. Same reason the E2E hooks exist at all: logcat beats UI scripting here.
-        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} censorNsfw=${ops.censorNsfw} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur}")
+        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} censorNsfw=${ops.censorNsfw} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur} body=${ops.bodyBlur} precise=${ops.bodyPrecise}")
 
         // `--ez ytdlp_update true` forces the yt-dlp self-update from adb.
         if (intent.getBooleanExtra("ytdlp_update", false)) {

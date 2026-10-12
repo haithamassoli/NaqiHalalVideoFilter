@@ -114,6 +114,24 @@ object Infer {
         }
     }
 
+    /**
+     * YOLO11n-seg `output0` [1,116,8400] and, only when [protos], `output1` [1,32,160,160]. Both
+     * buffers are valid inside [read] alone; the result is closed when it returns.
+     */
+    internal fun <T> people(context: Context, input: FloatBuffer, protos: Boolean, read: (FloatBuffer, FloatBuffer?) -> T): T {
+        val session = session(context, NaqiModel.PERSON)
+        OnnxTensor.createTensor(env, input, longArrayOf(1, 3, 640, 640)).use { tensor ->
+            val names = if (protos) setOf("output0", "output1") else setOf("output0")
+            session.run(mapOf(session.inputNames.first() to tensor), names).use { result ->
+                val out = (result.get("output0").get() as OnnxTensor).floatBuffer
+                check(out.remaining() == 116 * 8400) { "Unexpected person-model output shape" }
+                val proto = if (!protos) null else (result.get("output1").get() as OnnxTensor).floatBuffer
+                check(proto == null || proto.remaining() == 32 * 160 * 160) { "Unexpected person-model prototype shape" }
+                return read(out, proto)
+            }
+        }
+    }
+
     /** Idempotent — releases the cached sessions (safe when none exist). */
     fun close() {
         sessions.values.forEach { it.close() }

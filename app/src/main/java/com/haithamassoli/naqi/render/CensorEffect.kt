@@ -14,10 +14,13 @@ import androidx.media3.effect.GlEffect
 import androidx.media3.effect.GlShaderProgram
 import com.haithamassoli.naqi.analysis.NRect
 import com.haithamassoli.naqi.analysis.VideoMeta
+import com.haithamassoli.naqi.edl.BodyMask
 import com.haithamassoli.naqi.edl.Edl
 import com.haithamassoli.naqi.model.FilterOps
+import java.nio.ByteBuffer
 import kotlin.math.ceil
 import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
@@ -128,6 +131,14 @@ private class CensorShaderProgram(
     private val scratchTex = intArrayOf(-1, -1)
     private val scratchFbo = intArrayOf(-1, -1)
 
+    // Precise body: the frame's silhouettes as one alpha texture at a quarter of the frame, rebuilt only
+    // when the set changes (every ~100 ms sample, not every frame). See [rasterizeMasks].
+    private var maskTex = -1
+    private var maskW = 1
+    private var maskH = 1
+    private var maskPixels: ByteBuffer = ByteBuffer.allocateDirect(1)
+    private var lastMasks: List<BodyMask>? = null
+
     override fun configure(inputWidth: Int, inputHeight: Int): Size {
         mapRotation = when {
             meta.rotationDegrees % 180 == 0 -> {
@@ -142,6 +153,9 @@ private class CensorShaderProgram(
             }
             else -> 0 // dims already swapped: frames arrived upright
         }
+        maskW = max(1, inputWidth / 4)
+        maskH = max(1, inputHeight / 4)
+        lastMasks = null
         if (blurEnabled) {
             // sigma in full-res pixels, scaled by blur amount and resolution (1080p reference);
             // keyed on the short side so rotated and true-portrait videos blur identically.
@@ -182,8 +196,9 @@ private class CensorShaderProgram(
         val full = edl.fullFrameAt(tMs)
         val regions =
             if (full) emptyList() else edl.regionsAt(tMs).map { it.toStoredSpace(mapRotation) }
+        val masks = if (full) emptyList() else edl.masksAt(tMs)
         try {
-            if (!full && regions.isEmpty()) {
+            if (!full && regions.isEmpty() && masks.isEmpty()) {
                 drawCopy(inputTexId) // nothing active: passthrough into the already-focused output FBO
                 return
             }
@@ -202,7 +217,8 @@ private class CensorShaderProgram(
                 GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, prevFbo[0])
                 GLES20.glViewport(prevVp[0], prevVp[1], prevVp[2], prevVp[3])
             }
-            drawComposite(inputTexId, full, kept)
+            if (masks.isNotEmpty() && masks != lastMasks) uploadMasks(masks)
+            drawComposite(inputTexId, full, kept, masks.isNotEmpty())
         } catch (e: GlUtil.GlException) {
             throw VideoFrameProcessingException(e, presentationTimeUs)
         }
@@ -220,12 +236,41 @@ private class CensorShaderProgram(
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, /* first = */ 0, /* count = */ 4)
     }
 
-    private fun drawComposite(inputTexId: Int, full: Boolean, regions: List<NRect>) {
+    private fun uploadMasks(masks: List<BodyMask>) {
+        if (maskPixels.capacity() < maskW * maskH) maskPixels = ByteBuffer.allocateDirect(maskW * maskH)
+        val bytes = ByteArray(maskW * maskH)
+        rasterizeMasks(masks, mapRotation, maskW, maskH, bytes)
+        maskPixels.clear()
+        maskPixels.put(bytes).position(0)
+        if (maskTex < 0) {
+            val ids = IntArray(1)
+            GLES20.glGenTextures(1, ids, 0)
+            maskTex = ids[0]
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, maskTex)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+        }
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, maskTex)
+        GLES20.glPixelStorei(GLES20.GL_UNPACK_ALIGNMENT, 1)
+        GLES20.glTexImage2D(
+            GLES20.GL_TEXTURE_2D, 0, GLES20.GL_LUMINANCE, maskW, maskH, 0,
+            GLES20.GL_LUMINANCE, GLES20.GL_UNSIGNED_BYTE, maskPixels,
+        )
+        GlUtil.checkGlError()
+        lastMasks = masks
+    }
+
+    private fun drawComposite(inputTexId: Int, full: Boolean, regions: List<NRect>, useMask: Boolean) {
         val p = compositeProgram
         p.use()
         p.setSamplerTexIdUniform("uInputTex", inputTexId, /* texUnitIndex = */ 0)
         // When blur is off, uBlurTex is unused at runtime (uUseBlur=0) but must still bind a complete texture.
         p.setSamplerTexIdUniform("uBlurTex", if (blurEnabled) scratchTex[1] else inputTexId, /* texUnitIndex = */ 1)
+        // Same for uMaskTex outside precise body mode.
+        p.setSamplerTexIdUniform("uMaskTex", if (useMask) maskTex else inputTexId, /* texUnitIndex = */ 2)
+        p.setIntUniform("uUseMask", if (useMask) 1 else 0)
         p.setIntUniform("uCensorAll", if (full) 1 else 0)
         p.setIntUniform("uUseBlur", if (blurEnabled) 1 else 0)
         p.setIntUniform("uUseSolid", if (solid) 1 else 0)
@@ -261,6 +306,8 @@ private class CensorShaderProgram(
             compositeProgram.delete()
             blurProgram?.delete()
             releaseScratch()
+            if (maskTex >= 0) GlUtil.deleteTexture(maskTex)
+            maskTex = -1
         } catch (e: GlUtil.GlException) {
             throw VideoFrameProcessingException(e)
         }
@@ -292,6 +339,55 @@ private class CensorShaderProgram(
     /** Array uniforms may be exposed as `name` or `name[0]`; both denote element 0 per the GLES spec. */
     private fun GlProgram.arrayUniformLocation(name: String): Int =
         getUniformLocation(name).takeIf { it >= 0 } ?: getUniformLocation("$name[0]")
+}
+
+/**
+ * The union of [masks] as a [w]x[h] alpha texture over the frame the shader sees: stored orientation
+ * for [rotation] (upright for 0), rows bottom-up like GL texture coordinates. Each mask is grown by one
+ * cell with an empty border and sampled bilinearly (iOS `CensorEffect.bodyMask`), so its edge ramps
+ * OUTWARD over one cell from the model's outline and never into it — the silhouette counterpart of
+ * the rectangles' outward feather. Masks are unioned with max, like rectangles.
+ */
+internal fun rasterizeMasks(masks: List<BodyMask>, rotation: Int, w: Int, h: Int, out: ByteArray) {
+    out.fill(0)
+    val rot = ((rotation % 360) + 360) % 360
+    for (m in masks) {
+        val gw = m.width + 2
+        val gh = m.height + 2
+        val grown = FloatArray(gw * gh)
+        for (y in 0 until m.height) for (x in 0 until m.width) {
+            if (m[x, y]) for (dy in 0..2) for (dx in 0..2) grown[(y + dy) * gw + x + dx] = 1f
+        }
+        val cw = m.rect.width / m.width
+        val ch = m.rect.height / m.height
+        if (!(cw > 0f && ch > 0f)) continue
+        val gl = m.rect.left - cw
+        val gt = m.rect.top - ch
+        val stored = NRect(gl, gt, m.rect.right + cw, m.rect.bottom + ch).toStoredSpace(rot)
+        val c0 = floor(stored.left * w).toInt().coerceAtLeast(0)
+        val c1 = ceil(stored.right * w).toInt().coerceAtMost(w)
+        val r0 = floor((1f - stored.bottom) * h).toInt().coerceAtLeast(0)
+        val r1 = ceil((1f - stored.top) * h).toInt().coerceAtMost(h)
+        for (r in r0 until r1) for (c in c0 until c1) {
+            val sx = (c + 0.5f) / w
+            val sy = 1f - (r + 0.5f) / h
+            // Stored -> upright, the inverse of NRect.toStoredSpace.
+            val u = when (rot) { 90 -> 1f - sy; 180 -> 1f - sx; 270 -> sy; else -> sx }
+            val v = when (rot) { 90 -> sx; 180 -> 1f - sy; 270 -> 1f - sx; else -> sy }
+            val gx = (u - gl) / cw - 0.5f
+            val gy = (v - gt) / ch - 0.5f
+            val ix = floor(gx).toInt()
+            val iy = floor(gy).toInt()
+            val fx = gx - ix
+            val fy = gy - iy
+            fun g(x: Int, y: Int) = if (x in 0 until gw && y in 0 until gh) grown[y * gw + x] else 0f
+            val a = g(ix, iy) * (1 - fx) * (1 - fy) + g(ix + 1, iy) * fx * (1 - fy) +
+                g(ix, iy + 1) * (1 - fx) * fy + g(ix + 1, iy + 1) * fx * fy
+            val byte = (a * 255f + 0.5f).toInt()
+            val i = r * w + c
+            if (byte > (out[i].toInt() and 255)) out[i] = byte.toByte()
+        }
+    }
 }
 
 /** Normalized 1-D Gaussian (center + [radius] symmetric sides), padded to [MAX_RADIUS]+1 with zeros. */
@@ -375,10 +471,14 @@ private val COMPOSITE_FRAGMENT = """
     uniform int uGrayscale;
     uniform int uRegionCount;
     uniform vec4 uRegions[8];
+    uniform sampler2D uMaskTex;
+    uniform int uUseMask;
     varying vec2 vTexCoord;
     void main() {
       vec4 orig = texture2D(uInputTex, vTexCoord);
       float mask = float(uCensorAll);
+      // Precise body: silhouettes, already feathered outward by rasterizeMasks.
+      if (uUseMask == 1) mask = max(mask, texture2D(uMaskTex, vTexCoord).r);
       for (int i = 0; i < 8; i++) {
         if (i >= uRegionCount) break;
         vec4 r = uRegions[i];

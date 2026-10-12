@@ -77,6 +77,10 @@ InsightFace (buffalo_l — genderage.onnx) — github.com/deepinsight/insightfac
 ML Kit Face Detection — developers.google.com/ml-kit
   Google APIs Terms of Service. Face detection only; no data leaves the device.
 
+Ultralytics YOLO11n-seg — github.com/ultralytics/ultralytics
+  AGPL-3.0. COCO person boxes and silhouettes for the optional body modes.
+  FP32 ONNX export, opset 17, static 640 x 640 input; NMS runs in the app.
+
 --- Android / Kotlin
 
 Apache License 2.0:
