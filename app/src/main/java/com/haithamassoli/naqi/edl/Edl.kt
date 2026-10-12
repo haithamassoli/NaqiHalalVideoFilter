@@ -3,6 +3,7 @@ package com.haithamassoli.naqi.edl
 import com.haithamassoli.naqi.analysis.NRect
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Base64
 import kotlin.math.max
 import kotlin.math.min
 
@@ -21,18 +22,32 @@ class BodyMask(val rect: NRect, val width: Int, val height: Int, val bits: ByteA
         height == other.height && bits.contentEquals(other.bits)
 
     override fun hashCode() = (rect.hashCode() * 31 + width) * 31 + bits.contentHashCode()
+
+    /** `[left, top, right, bottom, width, height, base64 bits]`: ~170 bytes for a 32-cell mask. */
+    internal fun toJson(): JSONArray = JSONArray().put(rect.left.toDouble()).put(rect.top.toDouble())
+        .put(rect.right.toDouble()).put(rect.bottom.toDouble()).put(width).put(height)
+        .put(Base64.getEncoder().encodeToString(bits))
+
+    internal companion object {
+        fun fromJson(a: JSONArray) = BodyMask(
+            NRect(a.getDouble(0).toFloat(), a.getDouble(1).toFloat(), a.getDouble(2).toFloat(), a.getDouble(3).toFloat()),
+            a.getInt(4), a.getInt(5), Base64.getDecoder().decode(a.getString(6)),
+        ).also { require(it.width in 1..64 && it.height in 1..64 && it.bits.size == (it.width * it.height + 7) / 8) }
+    }
 }
 
 /**
  * One tracked face's censor span with normalized keyframe rects (already 25%-padded), sorted by time.
  * [union] marks a body track: between two samples it covers both boxes instead of interpolating, because
  * a 10 fps sample pair says nothing about how a limb moved in between (iOS `PersonTrackEdl.rect(at:)`).
+ * [masks], precise body mode only, parallels [keyframes]; see [masksAt] for when they replace the box.
  */
 data class FaceTrackEdl(
     val startMs: Long,
     val endMs: Long,
     val keyframes: List<Pair<Long, NRect>>,
     val union: Boolean = false,
+    val masks: List<BodyMask?>? = null,
 )
 
 /**
@@ -52,16 +67,34 @@ data class Edl(val censorIntervalsMs: List<LongRange>, val faceTracks: List<Face
         return false
     }
 
-    /** Face rects to censor at [tMs] — empty under full-frame precedence, else one per active track. */
+    /**
+     * Face rects to censor at [tMs] — empty under full-frame precedence, else one per active track whose
+     * [masksAt] has nothing to draw instead.
+     */
     fun regionsAt(tMs: Long): List<NRect> {
         if (fullFrameAt(tMs)) return emptyList()
         var out: MutableList<NRect>? = null
         for (i in faceTracks.indices) {
             val tr = faceTracks[i]
             if (tMs < tr.startMs || tMs > tr.endMs) continue
+            if (tr.masksAt(tMs) != null) continue
             val rect = tr.rectAt(tMs) ?: continue
             if (out == null) out = ArrayList(2)
             out.add(rect)
+        }
+        return out ?: emptyList()
+    }
+
+    /** Silhouettes to censor at [tMs] (precise body mode), from the tracks [regionsAt] leaves out. */
+    fun masksAt(tMs: Long): List<BodyMask> {
+        if (fullFrameAt(tMs)) return emptyList()
+        var out: MutableList<BodyMask>? = null
+        for (i in faceTracks.indices) {
+            val tr = faceTracks[i]
+            if (tMs < tr.startMs || tMs > tr.endMs) continue
+            val masks = tr.masksAt(tMs) ?: continue
+            if (out == null) out = ArrayList(2)
+            out.addAll(masks)
         }
         return out ?: emptyList()
     }
@@ -81,6 +114,7 @@ data class Edl(val censorIntervalsMs: List<LongRange>, val faceTracks: List<Face
             }
             val track = JSONObject().put("startMs", tr.startMs).put("endMs", tr.endMs).put("keyframes", kfs)
             if (tr.union) track.put("union", true)
+            tr.masks?.let { masks -> track.put("masks", JSONArray().also { a -> masks.forEach { a.put(it?.toJson() ?: JSONObject.NULL) } }) }
             tracks.put(track)
         }
         return JSONObject().put("censorIntervalsMs", intervals).put("faceTracks", tracks).toString()
@@ -110,7 +144,11 @@ data class Edl(val censorIntervalsMs: List<LongRange>, val faceTracks: List<Face
                         ),
                     )
                 }
-                tracks.add(FaceTrackEdl(t.getLong("startMs"), t.getLong("endMs"), kfs, t.optBoolean("union")))
+                val masks = t.optJSONArray("masks")?.let { mj ->
+                    require(mj.length() == kfs.size) { "masks must parallel keyframes" }
+                    (0 until mj.length()).map { j -> mj.optJSONArray(j)?.let(BodyMask::fromJson) }
+                }
+                tracks.add(FaceTrackEdl(t.getLong("startMs"), t.getLong("endMs"), kfs, t.optBoolean("union"), masks))
             }
             return Edl(intervals, tracks)
         }
@@ -206,4 +244,29 @@ private fun FaceTrackEdl.rectAt(tMs: Long): NRect? {
         r0.right + (r1.right - r0.right) * f,
         r0.bottom + (r1.bottom - r0.bottom) * f,
     )
+}
+
+/** Two observations further apart than this have held (unseen) samples between them. */
+private const val MASK_GAP_MS = 150L
+
+/**
+ * The silhouettes to draw at [tMs], or null when the box must be drawn instead: a held or unmasked
+ * sample never narrows coverage below its rectangle (iOS `PersonTrackEdl.masks(at:)`). That covers
+ * the lead-in before the first sample, the hold after the last, and any gap with missed samples.
+ * Between two consecutive masked samples both are drawn, mirroring [FaceTrackEdl.union].
+ */
+private fun FaceTrackEdl.masksAt(tMs: Long): List<BodyMask>? {
+    val ms = masks ?: return null
+    val kf = keyframes
+    if (kf.isEmpty() || tMs < kf.first().first || tMs > kf.last().first) return null
+    var lo = 0
+    var hi = kf.size - 1
+    while (lo < hi) {
+        val mid = (lo + hi + 1) ushr 1
+        if (kf[mid].first <= tMs) lo = mid else hi = mid - 1
+    }
+    val a = ms[lo] ?: return null
+    if (kf[lo].first == tMs) return listOf(a)
+    val b = ms[lo + 1] ?: return null
+    return if (kf[lo + 1].first - kf[lo].first <= MASK_GAP_MS) listOf(a, b) else null
 }

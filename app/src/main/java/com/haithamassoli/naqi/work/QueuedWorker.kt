@@ -106,6 +106,7 @@ internal fun FilterOps.pairs(): Array<Pair<String, Any?>> = arrayOf(
     FilterWorker.KEY_CENSOR_WHO to censorWho,
     FilterWorker.KEY_WHOLE_FRAME to wholeFrameBlur,
     FilterWorker.KEY_BODY_BLUR to bodyBlur,
+    FilterWorker.KEY_BODY_PRECISE to bodyPrecise,
     FilterWorker.KEY_CENSOR_NSFW to censorNsfw,
     FilterWorker.KEY_STRICTNESS to strictness,
     FilterWorker.KEY_BLUR_AMOUNT to blurAmount,
@@ -123,6 +124,7 @@ internal fun Data.filterOps(): FilterOps = FilterOps(
         ?: FilterOps.whoFromLegacy(getBoolean(FilterWorker.KEY_CENSOR_WOMEN, false)),
     wholeFrameBlur = getBoolean(FilterWorker.KEY_WHOLE_FRAME, false),
     bodyBlur = getBoolean(FilterWorker.KEY_BODY_BLUR, false),
+    bodyPrecise = getBoolean(FilterWorker.KEY_BODY_PRECISE, false),
     // Absent means an older queued job, whose NSFW gate was always on.
     censorNsfw = getBoolean(FilterWorker.KEY_CENSOR_NSFW, true),
     strictness = getInt(FilterWorker.KEY_STRICTNESS, FilterOps.DEFAULT_STRICTNESS),

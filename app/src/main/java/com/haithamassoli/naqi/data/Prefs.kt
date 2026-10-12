@@ -63,6 +63,7 @@ object Prefs {
             censorNsfw = getBoolean(KEY_CENSOR_NSFW, true),
             wholeFrameBlur = getBoolean("whole_frame", false),
             bodyBlur = getBoolean("body_blur", false),
+            bodyPrecise = getBoolean("body_precise", false),
             solidColor = getInt(KEY_SOLID_COLOR, FilterOps.BLUR),
         )
     }
@@ -91,6 +92,7 @@ object Prefs {
             .putBoolean(KEY_CENSOR_NSFW, ops.censorNsfw)
             .putBoolean("whole_frame", ops.wholeFrameBlur)
             .putBoolean("body_blur", ops.bodyBlur)
+            .putBoolean("body_precise", ops.bodyPrecise)
             .putInt(KEY_SOLID_COLOR, ops.solidColor)
             .putString(KEY_QUALITY, quality.name)
             .apply()

@@ -108,7 +108,8 @@ fun ShareSheet(
             if (initialOps == null) saved
             else saved.copy(
                 removeMusic = initialOps.removeMusic, censorWho = initialOps.censorWho,
-                bodyBlur = initialOps.bodyBlur, wholeFrameBlur = initialOps.wholeFrameBlur,
+                bodyBlur = initialOps.bodyBlur, bodyPrecise = initialOps.bodyPrecise,
+                wholeFrameBlur = initialOps.wholeFrameBlur,
             ),
         )
     }
@@ -284,7 +285,8 @@ fun ShareSheet(
 
             // ---- Warnings ----
             if (!showAdvanced && effectiveOps.censorFaces && effectiveOps.bodyBlur && !effectiveOps.wholeFrameBlur) {
-                Text(stringResource(R.string.opt_body_warning), style = MaterialTheme.typography.bodySmall,
+                Text(stringResource(if (effectiveOps.bodyPrecise) R.string.opt_precise_warning else R.string.opt_body_warning),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (spaceError != 0) {

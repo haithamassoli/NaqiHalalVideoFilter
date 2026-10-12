@@ -87,6 +87,17 @@ class BodyTrackerTest {
         assertEquals(1100L, late.startMs) // first seen 1299 ms after it: the usual 300 ms lead-in
     }
 
+    @Test fun preciseMasksFollowTheirSamplesIntoTheEdl() {
+        val mask = com.haithamassoli.naqi.edl.BodyMask(body, 1, 1, byteArrayOf(1))
+        val tracker = BodyTracker(FilterOps.EVERYONE)
+        tracker.onFrame(listOf(body), emptyList(), 640, 640, 0, masks = listOf(mask))
+        tracker.onFrame(listOf(body), emptyList(), 640, 640, 100, masks = listOf(null))
+        assertEquals(listOf(mask, null), tracker.finish().single().masks)
+        val boxes = BodyTracker(FilterOps.EVERYONE)
+        boxes.onFrame(listOf(body), emptyList(), 640, 640, 0)
+        assertEquals(null, boxes.finish().single().masks)
+    }
+
     @Test fun ambiguousBoxesDoNotAccumulateGhostsAcrossFrames() {
         val tracker = BodyTracker(FilterOps.EVERYONE)
         for (i in 0..20) tracker.onFrame(listOf(body, body), emptyList(), 640, 640, i * 30L)

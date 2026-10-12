@@ -75,6 +75,15 @@ object Eta {
     private const val COMBINED = 1.0
 
     /**
+     * Added to either factor when body or precise body coverage runs YOLO11n-seg at 10 fps. Measured
+     * 2026-10-12 on the S23, benchmark build, 53.3 s Shorts clip (`docs/bench/body-10fps-2026-10.md`):
+     * analysis took 4.6 s for faces, 73.8 s for body and 73.3 s for precise body, i.e. ~1.30x the
+     * source length on top of face mode. ponytail: one clip, one surcharge for both body modes;
+     * re-measure on a longer film before trusting it at feature length.
+     */
+    private const val BODY = 1.3
+
+    /**
      * Wall clock this job will take **at least**, in ms, or 0 when there is nothing honest to say.
      *
      * Zero covers the two degenerate inputs: a source whose duration the provider wouldn't give us,
@@ -83,15 +92,14 @@ object Eta {
      */
     fun estimateMs(durationMs: Long, ops: FilterOps): Long {
         if (durationMs <= 0) return 0L
-        // ponytail: body timings are uncalibrated; show the cost warning until phone measurements exist.
-        if (ops.censorFaces && ops.bodyBlur && !ops.wholeFrameBlur) return 0L
-        val factor = when {
+        val body = if (ops.censorFaces && ops.bodyBlur && !ops.wholeFrameBlur) BODY else 0.0
+        val factor = body + when {
             ops.censorFaces && ops.removeMusic -> COMBINED
             ops.removeMusic -> MUSIC
             ops.censorFaces -> CENSOR
             else -> return 0L
         }
-        return (durationMs * factor).toLong()
+        return Math.round(durationMs * factor)
     }
 
     /**

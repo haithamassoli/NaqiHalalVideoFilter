@@ -135,8 +135,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     /** [FilterOps.wholeFrameBlur] — read here, applied once per EDL build in [promoteFacesToFullFrame]. */
     private val wholeFrameBlur = ops.wholeFrameBlur
     private val bodyBlur = ops.censorFaces && ops.bodyBlur && !wholeFrameBlur
-    private fun newTracker() = FaceTracker(genderVoter, censorWho, bodyBlur).also { it.enableBody(applicationContext) }
-    private fun eta(pct: Int) = if (bodyBlur) 0L else stats.etaMs(pct)
+    private val bodyPrecise = bodyBlur && ops.bodyPrecise
+    private fun newTracker() = FaceTracker(genderVoter, censorWho, bodyBlur, bodyPrecise).also { it.enableBody(applicationContext) }
 
     /**
      * Key for this job's working directory. Derived from the source and every option that changes the
@@ -178,8 +178,13 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // Same reason as the two above: a rect-blurred segment and a whole-frame one must never
             // resume into each other. Moves every existing key once, orphaning pre-whole-frame dirs.
             // body-rect-v4: body mode samples at 10 fps, so an every-frame v3 checkpoint must not resume.
-            // v5: YOLO11n-seg replaced YOLO26n and the tracker holds missed people longer.
-            if (bodyBlur) "body-rect-v5" else inputData.getBoolean(KEY_WHOLE_FRAME, false),
+            // v5: YOLO11n-seg replaced YOLO26n and the tracker holds missed people longer. Precise body
+            // checkpoints carry masks and render differently, so they never share a key with rectangles.
+            when {
+                bodyPrecise -> "body-precise-v1"
+                bodyBlur -> "body-rect-v5"
+                else -> inputData.getBoolean(KEY_WHOLE_FRAME, false)
+            },
             inputData.getString(KEY_KEEP_STEMS),
             inputData.getString(KEY_FORCE_INTERVALS), // debug hook, but it does change the output
             // Not an input: a plan generation. Segment boundaries moved to sync samples in
@@ -973,7 +978,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         val now = SystemClock.elapsedRealtime()
         if (now - lastReportMs < REPORT_INTERVAL_MS) return
         lastReportMs = now
-        setProgressAsync(workDataOf(KEY_PROGRESS to overall, KEY_STAGE to stage, KEY_ETA_MS to eta(overall)))
+        setProgressAsync(workDataOf(KEY_PROGRESS to overall, KEY_STAGE to stage, KEY_ETA_MS to stats.etaMs(overall)))
         setForegroundAsync(foregroundInfo(stage, overall))
     }
 
@@ -1359,7 +1364,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
     private suspend fun report(stage: String, pct: Int) {
         stats.tick()
-        setProgress(workDataOf(KEY_PROGRESS to pct, KEY_STAGE to stage, KEY_ETA_MS to eta(pct)))
+        setProgress(workDataOf(KEY_PROGRESS to pct, KEY_STAGE to stage, KEY_ETA_MS to stats.etaMs(pct)))
         tryForeground(foregroundInfo(stage, pct))
     }
 
@@ -1370,7 +1375,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
 
     // The ETA is derived here rather than passed in, so every existing call site posts it for free.
     private fun foregroundInfo(stage: String, progress: Int) =
-        JobNotifications.foregroundInfo(applicationContext, id, stage, progress, eta(progress))
+        JobNotifications.foregroundInfo(applicationContext, id, stage, progress, stats.etaMs(progress))
 
     companion object {
         const val KEY_REMOVE_MUSIC = "remove_music"
@@ -1398,6 +1403,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         const val KEY_SOLID_COLOR = "solid_color"
         const val KEY_WHOLE_FRAME = "whole_frame"
         const val KEY_BODY_BLUR = "body_blur"
+        const val KEY_BODY_PRECISE = "body_precise"
 
         // KEY_BLUR_UNKNOWN ("blur_unknown_faces") was deleted with the gender vote (plan-v2 §5.4)
         // along with FilterOps.blurUnknownFaces. Unlike KEY_CENSOR_WOMEN above, the wire string did NOT

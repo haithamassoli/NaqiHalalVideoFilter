@@ -49,6 +49,8 @@ class FaceTracker(
     private val classifier: FaceGenderVoter? = null,
     private val who: String = FilterOps.EVERYONE,
     private val coverBody: Boolean = false,
+    /** With [coverBody]: silhouettes instead of rectangles (precise body mode). */
+    private val precise: Boolean = false,
 ) {
     private val body = if (coverBody) BodyTracker(who) else null
     private var people: PersonDetector? = null
@@ -124,7 +126,8 @@ class FaceTracker(
                 val b = face.boundingBox
                 NRect(b.left / w, b.top / h, b.right / w, b.bottom / h)
             }, uprightW, uprightH, ptsMs, frame.sceneCut,
-                classifier?.let { voter -> { rect -> voter.vote(image, uprightW, uprightH, rect) } })
+                classifier?.let { voter -> { rect -> voter.vote(image, uprightW, uprightH, rect) } },
+                frame.people.map { it.mask })
             return
         }
         for (face in faces) {
@@ -215,7 +218,7 @@ class FaceTracker(
     }
 
     internal fun enableBody(context: android.content.Context) {
-        if (coverBody && people == null) people = PersonDetector(context)
+        if (coverBody && people == null) people = PersonDetector(context, masks = precise)
     }
 
     private fun detector(): FaceDetector = detector ?: FaceDetection.getClient(

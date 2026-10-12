@@ -291,8 +291,8 @@ internal fun FilterOptions(ops: FilterOps, onOpsChange: (FilterOps) -> Unit) {
 
 @Composable
 private fun CoverageRow(ops: FilterOps, onChange: (FilterOps) -> Unit) {
-    val selected = when { ops.wholeFrameBlur -> 2; ops.bodyBlur -> 1; else -> 0 }
-    val labels = listOf(R.string.opt_cover_face, R.string.opt_cover_body, R.string.opt_cover_frame)
+    val selected = when { ops.wholeFrameBlur -> 3; ops.bodyBlur && ops.bodyPrecise -> 2; ops.bodyBlur -> 1; else -> 0 }
+    val labels = listOf(R.string.opt_cover_face, R.string.opt_cover_body, R.string.opt_cover_precise, R.string.opt_cover_frame)
     Column(Modifier.padding(horizontal = NaqiTokens.space4, vertical = NaqiTokens.space3)) {
         Text(stringResource(R.string.opt_coverage_title), style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.height(NaqiTokens.space3))
@@ -300,7 +300,7 @@ private fun CoverageRow(ops: FilterOps, onChange: (FilterOps) -> Unit) {
             labels.forEachIndexed { i, label ->
                 SegmentedButton(
                     selected = selected == i,
-                    onClick = { onChange(ops.copy(bodyBlur = i == 1, wholeFrameBlur = i == 2)) },
+                    onClick = { onChange(ops.copy(bodyBlur = i == 1 || i == 2, bodyPrecise = i == 2, wholeFrameBlur = i == 3)) },
                     shape = SegmentedButtonDefaults.itemShape(index = i, count = labels.size),
                 ) { Text(stringResource(label), maxLines = 1) }
             }
@@ -308,7 +308,13 @@ private fun CoverageRow(ops: FilterOps, onChange: (FilterOps) -> Unit) {
         if (selected != 0) {
             Spacer(Modifier.height(NaqiTokens.space3))
             Text(
-                stringResource(if (selected == 1) R.string.opt_body_warning else R.string.opt_whole_frame_desc),
+                stringResource(
+                    when (selected) {
+                        1 -> R.string.opt_body_warning
+                        2 -> R.string.opt_precise_warning
+                        else -> R.string.opt_whole_frame_desc
+                    },
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

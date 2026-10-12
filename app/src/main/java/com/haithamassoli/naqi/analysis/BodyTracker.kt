@@ -1,5 +1,6 @@
 package com.haithamassoli.naqi.analysis
 
+import com.haithamassoli.naqi.edl.BodyMask
 import com.haithamassoli.naqi.edl.FaceTrackEdl
 import com.haithamassoli.naqi.model.FilterOps
 import kotlin.math.max
@@ -22,9 +23,10 @@ internal class BodyTracker(private val who: String) {
     var cutCount = 0
         private set
 
+    /** [masks], when given, parallels [people] (precise body mode). */
     fun onFrame(
         people: List<NRect>, faces: List<NRect>, width: Int, height: Int, ptsMs: Long,
-        sceneCut: Boolean = false, vote: ((NRect) -> Int)? = null,
+        sceneCut: Boolean = false, vote: ((NRect) -> Int)? = null, masks: List<BodyMask?> = emptyList(),
     ) {
         frameCount++
         detectionCount += people.size
@@ -60,7 +62,7 @@ internal class BodyTracker(private val who: String) {
                 live += it
             }
             used += track
-            track.samples += FaceSample(ptsMs, box)
+            track.samples += FaceSample(ptsMs, box, masks.getOrNull(index))
             if (vote == null || track.votesTried >= VOTE_CAP) continue
             val associated = faces.filter { face ->
                 faceInside(face, box) && people.count { faceInside(face, it) } == 1
@@ -119,6 +121,7 @@ internal class BodyTracker(private val who: String) {
             max(endMs, track.samples.last().ptsMs),
             track.samples.map { it.ptsMs to padRect(it.rect) },
             union = true,
+            masks = if (track.samples.any { it.mask != null }) track.samples.map { it.mask } else null,
         )
     }
 

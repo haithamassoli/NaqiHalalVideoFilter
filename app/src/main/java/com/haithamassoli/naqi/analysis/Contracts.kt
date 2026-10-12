@@ -1,5 +1,7 @@
 package com.haithamassoli.naqi.analysis
 
+import com.haithamassoli.naqi.edl.BodyMask
+
 /**
  * Shared M1 analysis types. Pure Kotlin — no Android imports, so gate/EDL logic stays
  * JVM-unit-testable. All rectangles are normalized to [0,1] in UPRIGHT (display-oriented)
@@ -35,8 +37,8 @@ data class VideoMeta(
     val fps: Float,
 )
 
-/** One face observation on one sampled frame. */
-data class FaceSample(val ptsMs: Long, val rect: NRect)
+/** One face observation on one sampled frame; body mode adds the person's silhouette in precise mode. */
+data class FaceSample(val ptsMs: Long, val rect: NRect, val mask: BodyMask? = null)
 
 /**
  * A face tracked across sampled frames. [id] is the ML Kit tracking id, or a negative synthetic one

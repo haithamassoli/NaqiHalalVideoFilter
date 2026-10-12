@@ -45,6 +45,8 @@ data class FilterOps(
     val wholeFrameBlur: Boolean = false,
     /** Opt-in person rectangles, including the face. Whole-frame coverage takes precedence. */
     val bodyBlur: Boolean = false,
+    /** With [bodyBlur]: cover each person's silhouette instead of their rectangle. */
+    val bodyPrecise: Boolean = false,
     /** Whether the NSFW gate may add whole-frame censor spans. Face censoring is independent. */
     val censorNsfw: Boolean = true,
     val strictness: Int = DEFAULT_STRICTNESS,

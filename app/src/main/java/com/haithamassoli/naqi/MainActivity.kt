@@ -189,7 +189,9 @@ class MainActivity : ComponentActivity() {
             censorWho = censorWho,
             // `--ez whole_frame true` — covers the whole picture while a censored face is on screen.
             wholeFrameBlur = intent.getBooleanExtra("whole_frame", false),
-            bodyBlur = intent.getBooleanExtra("body_blur", false),
+            // `--ez body_precise true` selects precise body (silhouettes) and implies body_blur.
+            bodyBlur = intent.getBooleanExtra("body_blur", false) || intent.getBooleanExtra("body_precise", false),
+            bodyPrecise = intent.getBooleanExtra("body_precise", false),
             // `--ez censor_nsfw false` — keeps face censoring but disables whole-scene NSFW spans.
             censorNsfw = intent.getBooleanExtra("censor_nsfw", true),
             strictness = intent.getIntExtra("strictness", FilterOps.DEFAULT_STRICTNESS),
@@ -203,7 +205,7 @@ class MainActivity : ComponentActivity() {
         // Echo what actually parsed. `everyone` and `women` censor identically until Phase C ships a
         // classifier, so without this an adb run cannot show WHICH value survived the wire — only that
         // something censored. Same reason the E2E hooks exist at all: logcat beats UI scripting here.
-        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} censorNsfw=${ops.censorNsfw} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur}")
+        android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} censorNsfw=${ops.censorNsfw} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur} body=${ops.bodyBlur} precise=${ops.bodyPrecise}")
 
         // `--ez ytdlp_update true` forces the yt-dlp self-update from adb.
         if (intent.getBooleanExtra("ytdlp_update", false)) {

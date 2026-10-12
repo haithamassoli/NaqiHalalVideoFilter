@@ -49,8 +49,10 @@ pre-roll so nothing slips through on the first frame.
 Adjustable: who gets censored, blur amount, a solid fill instead of blur (5 colours), grayscale,
 whole-frame mode, and the NSFW gate's on/off plus strictness (0–100).
 
-Coverage can be **Face / Body / Frame**. Face is the default; Body covers person rectangles and
-warns that processing takes longer. Rectangles can also blur surrounding background.
+Coverage can be **Face / Body / Precise body / Frame**. Face is the default. Both body options add
+YOLO11n-seg at 10 fps and say that filtering is slower: Body covers person rectangles, which can
+also blur surrounding background; Precise body covers each person's outline and keeps the
+background clear.
 
 Also included:
 
