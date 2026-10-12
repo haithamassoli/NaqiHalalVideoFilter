@@ -98,7 +98,7 @@ python3 -m venv .venv-bench
 ./scripts/fetch-models.sh
 ```
 
-The script restores four models from the v1.4.4 APK, exports YOLO26n locally, and checks all five
+The script restores four models from the v1.4.4 APK, exports YOLO11n-seg locally, and checks all five
 SHA-256 hashes. The build
 fails if any model is missing, preventing an APK whose filtering cannot work. Model regeneration
 steps are in [`docs/m0-spikes.md`](docs/m0-spikes.md).
@@ -152,7 +152,7 @@ More detail lives in [`docs/prd-video-filter-android.md`](docs/prd-video-filter-
 | [nsfw_model](https://github.com/GantMan/nsfw_model) MobileNetV2 1.4-224, INT8 | NSFW scene gate | 4.9 MB | NOASSERTION — see [`NOTICE`](NOTICE) |
 | [InsightFace](https://github.com/deepinsight/insightface) `genderage` (buffalo_l) | per-face-track gender vote | 1.3 MB | code MIT, weights research-use — see [`NOTICE`](NOTICE) |
 | ML Kit Face Detection | face detection and tracking | — | proprietary, Google Play services |
-| [YOLO26n](https://docs.ultralytics.com/models/yolo26) (FP32, 640×640) | optional body rectangles | 9.9 MB | AGPL-3.0 |
+| [YOLO11n-seg](https://docs.ultralytics.com/models/yolo11) (FP32, 640×640) | optional body boxes and silhouettes | 12 MB | AGPL-3.0 |
 
 Everything runs on [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT) on the CPU.
 

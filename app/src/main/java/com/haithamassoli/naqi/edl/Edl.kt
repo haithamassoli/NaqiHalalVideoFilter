@@ -7,6 +7,23 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
+ * A person's silhouette over their unpadded body [rect] (upright, normalized): [width]x[height] cells,
+ * row-major from the top, one bit per cell, LSB first (iOS `BodyMask`).
+ */
+class BodyMask(val rect: NRect, val width: Int, val height: Int, val bits: ByteArray) {
+    operator fun get(x: Int, y: Int): Boolean {
+        if (x !in 0 until width || y !in 0 until height) return false
+        val i = y * width + x
+        return bits[i / 8].toInt() shr (i % 8) and 1 == 1
+    }
+
+    override fun equals(other: Any?) = other is BodyMask && rect == other.rect && width == other.width &&
+        height == other.height && bits.contentEquals(other.bits)
+
+    override fun hashCode() = (rect.hashCode() * 31 + width) * 31 + bits.contentHashCode()
+}
+
+/**
  * One tracked face's censor span with normalized keyframe rects (already 25%-padded), sorted by time.
  * [union] marks a body track: between two samples it covers both boxes instead of interpolating, because
  * a 10 fps sample pair says nothing about how a limb moved in between (iOS `PersonTrackEdl.rect(at:)`).

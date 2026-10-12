@@ -41,7 +41,7 @@ class BodyTrackerTest {
     @Test fun missingBodyFallsBackAndUnknownPeopleAreCovered() {
         val tracker = BodyTracker(FilterOps.WOMEN)
         tracker.onFrame(emptyList(), listOf(face), 640, 640, 100)
-        assertEquals(listOf(100L..400L), tracker.fallbackIntervals)
+        assertEquals(listOf(100L..1000L), tracker.fallbackIntervals)
         tracker.onFrame(listOf(body), emptyList(), 640, 640, 200)
         assertEquals(1, tracker.finish().size)
     }
@@ -50,11 +50,12 @@ class BodyTrackerTest {
         val tracker = BodyTracker(FilterOps.WOMEN)
         tracker.onFrame(emptyList(), emptyList(), 640, 640, 0)
         for (pts in listOf(100L, 200L, 301L)) tracker.onFrame(emptyList(), listOf(face), 640, 640, pts)
-        for (pts in listOf(401L, 501L, 601L, 701L)) tracker.onFrame(emptyList(), emptyList(), 640, 640, pts)
-        tracker.onFrame(emptyList(), listOf(face), 640, 640, 801)
+        for (pts in 401L..2301L step 100) tracker.onFrame(emptyList(), emptyList(), 640, 640, pts)
+        tracker.onFrame(emptyList(), listOf(face), 640, 640, 2401)
         val merged = com.haithamassoli.naqi.edl.mergeRanges(tracker.fallbackIntervals, bridgeMs = 0)
-        // From just after the previous sample to HOLD_MS past the last one; a 400 ms miss reopens it.
-        assertEquals(listOf(1L..601L, 702L..1101L), merged)
+        // 900 ms past the last sighting, from the shot start this early in a shot, else from just after
+        // the previous sample.
+        assertEquals(listOf(0L..1201L, 2302L..3301L), merged)
     }
 
     @Test fun tracksAfterACutReachBackToThePreviousSample() {
@@ -72,6 +73,18 @@ class BodyTrackerTest {
         assertEquals(101L, new.startMs)
         assertEquals(other.right, new.keyframes.single().second.right, 1f)
         assertTrue(old.union && new.union)
+    }
+
+    @Test fun peopleFoundEarlyInAShotAreCoveredFromTheCut() {
+        val tracker = BodyTracker(FilterOps.EVERYONE)
+        val small = NRect(.45f, .58f, .58f, .7f)
+        for (pts in 0L..1500L step 100) {
+            val people = when (pts) { 900L, 1000L -> listOf(small); 1400L, 1500L -> listOf(body); else -> emptyList() }
+            tracker.onFrame(people, emptyList(), 640, 640, pts, sceneCut = pts == 200L)
+        }
+        val (early, late) = tracker.finish()
+        assertEquals(101L, early.startMs) // first seen 799 ms after the cut
+        assertEquals(1100L, late.startMs) // first seen 1299 ms after it: the usual 300 ms lead-in
     }
 
     @Test fun ambiguousBoxesDoNotAccumulateGhostsAcrossFrames() {

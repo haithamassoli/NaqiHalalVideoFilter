@@ -160,7 +160,7 @@ abstract class VerifyModelsTask : DefaultTask() {
     @get:Internal abstract val modelsDir: DirectoryProperty
 
     @TaskAction fun verify() {
-        val missing = listOf("genderage.onnx", "htdemucs_s26_f16.onnx", "nsfw_mnv2_140_int8.onnx", "yamnet.onnx", "yolo26n-person.onnx")
+        val missing = listOf("genderage.onnx", "htdemucs_s26_f16.onnx", "nsfw_mnv2_140_int8.onnx", "yamnet.onnx", "yolo11n-seg.onnx")
             .filter { modelsDir.file(it).get().asFile.length() == 0L }
         check(missing.isEmpty()) { "Missing ONNX models: $missing. Run ./scripts/fetch-models.sh" }
     }

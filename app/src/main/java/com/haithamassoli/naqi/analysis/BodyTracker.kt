@@ -31,7 +31,7 @@ internal class BodyTracker(private val who: String) {
         // A cut happened somewhere after the previous sample, so the new shot starts just after it (iOS
         // `PersonTracker` shotStart = lastPtsMs + 1) and the old shot's tracks keep their last box up to
         // this sample. Both shots' boxes overlap for those frames rather than leaving either uncovered.
-        val since = lastPtsMs?.let { it + 1 } ?: ptsMs
+        val since = lastPtsMs?.let { it + 1 } ?: ptsMs.also { shotStartMs = it }
         lastPtsMs = ptsMs
         if (sceneCut) { live.forEach { emit(it, endMs = ptsMs - 1) }; live.clear(); cutCount++; shotStartMs = since }
         live.removeAll { tr ->
@@ -50,12 +50,13 @@ internal class BodyTracker(private val who: String) {
             val matched = best?.takeIf { score >= 0.25f && score - runnerUp >= 0.10f && score - competing >= 0.10f }
                 ?.let { old[it] }?.takeIf { it !in used }
             // Detection can settle a few samples after a person appears, especially small people on a
-            // screen, so a new span reaches back HOLD_MS within its shot (iOS PersonTracker lead-in). A
-            // box replacing a nearby track only needs the frames since the previous sample: that track
-            // covered the place until then, and reaching further back stacks ghosts (finding 1).
+            // screen, so a new span reaches back LEAD_MS within its shot (iOS PersonTracker lead-in), or
+            // to the cut itself early in a shot. A box replacing a nearby track only needs the frames
+            // since the previous sample: that track covered the place until then, and reaching further
+            // back stacks ghosts (finding 1).
             val fresh = old.none { overlap(box, it.samples.last().rect) > 0.1f }
             val track = matched ?: FaceTrack(nextId++).also {
-                it.startMs = if (fresh) max(shotStartMs, ptsMs - HOLD_MS) else since
+                it.startMs = if (fresh) leadIn(ptsMs, max(shotStartMs, ptsMs - LEAD_MS)) else since
                 live += it
             }
             used += track
@@ -85,9 +86,17 @@ internal class BodyTracker(private val who: String) {
         // previous sample and held like a body box: at 10 fps small faces (a comment avatar, a person on
         // a camera screen) are found on fewer samples than every-frame detection found them on.
         if (faces.any { face -> people.none { faceInside(face, it) } }) {
-            fallbackIntervals += since.coerceAtLeast(0)..(ptsMs + HOLD_MS)
+            fallbackIntervals += leadIn(ptsMs, since).coerceAtLeast(0)..(ptsMs + HOLD_MS)
         }
     }
+
+    /**
+     * Someone first found within [SETTLE_MS] of a cut was most likely there from the cut: the
+     * regression clip's camera display shows a person from 7.33 s, and neither model finds them before
+     * ~8.1 s at 10 fps. ponytail: a fixed window; a person who really walks in during it is covered early.
+     */
+    private fun leadIn(ptsMs: Long, otherwise: Long) =
+        if (ptsMs - shotStartMs <= SETTLE_MS) min(shotStartMs, otherwise) else otherwise
 
     fun finish(): List<FaceTrackEdl> {
         live.forEach { emit(it) }
@@ -114,7 +123,14 @@ internal class BodyTracker(private val who: String) {
     }
 
     companion object {
-        private const val HOLD_MS = 300L
+        /**
+         * A missed person keeps their last box this long. Every-frame detection held 300 ms, i.e. nine
+         * missed frames; at 10 fps the same nine misses are 900 ms. The regression clip's small people
+         * on a camera display drop out of detection for that long and stayed visible with 300.
+         */
+        private const val HOLD_MS = 900L
+        private const val LEAD_MS = 300L
+        private const val SETTLE_MS = 1_000L
         private fun area(r: NRect) = max(0f, r.width) * max(0f, r.height)
         private fun intersection(a: NRect, b: NRect) = max(0f, min(a.right, b.right) - max(a.left, b.left)) *
             max(0f, min(a.bottom, b.bottom) - max(a.top, b.top))

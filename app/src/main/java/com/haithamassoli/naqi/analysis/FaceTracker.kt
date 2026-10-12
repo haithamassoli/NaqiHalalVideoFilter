@@ -120,7 +120,7 @@ class FaceTracker(
         faceCount += faces.size
         if (body != null) {
             val frame = requireNotNull(people).detect(image, uprightW, uprightH)
-            body.onFrame(frame.boxes, faces.map { face ->
+            body.onFrame(frame.people.map { it.box }, faces.map { face ->
                 val b = face.boundingBox
                 NRect(b.left / w, b.top / h, b.right / w, b.bottom / h)
             }, uprightW, uprightH, ptsMs, frame.sceneCut,

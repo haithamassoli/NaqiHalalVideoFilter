@@ -114,14 +114,20 @@ object Infer {
         }
     }
 
-    /** End-to-end detections: 300 rows of x1,y1,x2,y2,confidence,COCO class id. */
-    internal fun people(context: Context, input: FloatBuffer): FloatArray {
+    /**
+     * YOLO11n-seg `output0` [1,116,8400] and, only when [protos], `output1` [1,32,160,160]. Both
+     * buffers are valid inside [read] alone; the result is closed when it returns.
+     */
+    internal fun <T> people(context: Context, input: FloatBuffer, protos: Boolean, read: (FloatBuffer, FloatBuffer?) -> T): T {
         val session = session(context, NaqiModel.PERSON)
         OnnxTensor.createTensor(env, input, longArrayOf(1, 3, 640, 640)).use { tensor ->
-            session.run(mapOf(session.inputNames.first() to tensor)).use { result ->
-                val out = (result[0] as OnnxTensor).floatBuffer
-                check(out.remaining() == 300 * 6) { "Unexpected person-model output shape" }
-                return FloatArray(out.remaining()).also { out.get(it) }
+            val names = if (protos) setOf("output0", "output1") else setOf("output0")
+            session.run(mapOf(session.inputNames.first() to tensor), names).use { result ->
+                val out = (result.get("output0").get() as OnnxTensor).floatBuffer
+                check(out.remaining() == 116 * 8400) { "Unexpected person-model output shape" }
+                val proto = if (!protos) null else (result.get("output1").get() as OnnxTensor).floatBuffer
+                check(proto == null || proto.remaining() == 32 * 160 * 160) { "Unexpected person-model prototype shape" }
+                return read(out, proto)
             }
         }
     }

@@ -178,7 +178,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // Same reason as the two above: a rect-blurred segment and a whole-frame one must never
             // resume into each other. Moves every existing key once, orphaning pre-whole-frame dirs.
             // body-rect-v4: body mode samples at 10 fps, so an every-frame v3 checkpoint must not resume.
-            if (bodyBlur) "body-rect-v4" else inputData.getBoolean(KEY_WHOLE_FRAME, false),
+            // v5: YOLO11n-seg replaced YOLO26n and the tracker holds missed people longer.
+            if (bodyBlur) "body-rect-v5" else inputData.getBoolean(KEY_WHOLE_FRAME, false),
             inputData.getString(KEY_KEEP_STEMS),
             inputData.getString(KEY_FORCE_INTERVALS), // debug hook, but it does change the output
             // Not an input: a plan generation. Segment boundaries moved to sync samples in

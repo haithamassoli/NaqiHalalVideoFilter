@@ -129,10 +129,14 @@ enum class NaqiModel(
         listOf(longArrayOf(15600)),
     ),
 
-    /** YOLO26n COCO, end-to-end FP32 export: RGB /255 letterboxed to 640; [1,300,6] xyxy,score,class. */
+    /**
+     * YOLO11n-seg COCO, FP32 static export (`scripts/export_person.py`): RGB /255 letterboxed to 640;
+     * `output0` [1,116,8400] cx,cy,w,h + 80 class scores + 32 mask coefficients, `output1` [1,32,160,160]
+     * prototypes. Not end-to-end: `PersonDetector` runs the class filter and NMS.
+     */
     PERSON(
-        "yolo26n-person.onnx",
-        "35519e399739f1d02821f6479f5a804c5da64b4f1dc20fa0db6f9822c4417265",
+        "yolo11n-seg.onnx",
+        "a119f46d1eb44acefb071c9733b2f12fc9bd89cfc581f7df4151cdb6ba758c41",
         downloadUrl = null,
         listOf(longArrayOf(1, 3, 640, 640)),
     ),
