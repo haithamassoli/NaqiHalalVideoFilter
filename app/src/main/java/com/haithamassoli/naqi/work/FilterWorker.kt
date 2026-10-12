@@ -55,7 +55,6 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import kotlin.math.exp
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 internal fun shouldResumeAudio(durationMs: Long, forcedSegments: Boolean): Boolean =
     durationMs >= Eta.CONFIRM_THRESHOLD_MS || forcedSegments
@@ -178,7 +177,8 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             inputData.getInt(KEY_SOLID_COLOR, FilterOps.BLUR),
             // Same reason as the two above: a rect-blurred segment and a whole-frame one must never
             // resume into each other. Moves every existing key once, orphaning pre-whole-frame dirs.
-            if (bodyBlur) "body-rect-v3" else inputData.getBoolean(KEY_WHOLE_FRAME, false),
+            // body-rect-v4: body mode samples at 10 fps, so an every-frame v3 checkpoint must not resume.
+            if (bodyBlur) "body-rect-v4" else inputData.getBoolean(KEY_WHOLE_FRAME, false),
             inputData.getString(KEY_KEEP_STEMS),
             inputData.getString(KEY_FORCE_INTERVALS), // debug hook, but it does change the output
             // Not an input: a plan generation. Segment boundaries moved to sync samples in
@@ -440,7 +440,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                     )
                 },
             ) {
-                val edl = analyzeSegments(inputUri, plan, durationMs, 0, analyzeSpan, meta)
+                val edl = analyzeSegments(inputUri, plan, durationMs, 0, analyzeSpan)
                 renderSegments(inputUri, plan, edl, meta, renderBase, renderSpan)
             }
 
@@ -673,7 +673,6 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         durationMs: Long,
         progressBase: Int,
         progressSpan: Int,
-        meta: VideoMeta,
     ): Edl {
         val stage = stage(R.string.stage_analyzing)
         stats.stage("analyze")
@@ -706,9 +705,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             val timers = PassTimers()
             try {
                 FrameSampler.sample(
-                    applicationContext, inputUri, fps = if (bodyBlur) 1_000_000f else 10f, maxDim = 640,
-                    gateEvery = if (bodyBlur) (meta.fps / 5f).roundToInt().coerceAtLeast(1) else 2,
-                    gateEnabled = censorNsfw,
+                    applicationContext, inputUri, fps = 10f, maxDim = 640, gateEnabled = censorNsfw,
                     startMs = seg.startMs, endMs = seg.endMs,
                 ) { image, gateBytes, uprightW, uprightH, ptsMs ->
                     sampledFrame(tracker, image, gateBytes, uprightW, uprightH, ptsMs, timers, segFirings)
@@ -1176,8 +1173,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         var lastPct = -1
         val timers = PassTimers()
         FrameSampler.sample(
-            applicationContext, uri, fps = if (bodyBlur) 1_000_000f else 10f, maxDim = 640, gateEnabled = censorNsfw,
-            gateEvery = if (bodyBlur) (meta.fps / 5f).roundToInt().coerceAtLeast(1) else 2,
+            applicationContext, uri, fps = 10f, maxDim = 640, gateEnabled = censorNsfw,
         ) { image, gateBytes, uprightW, uprightH, ptsMs ->
             sampledFrame(faceTracker, image, gateBytes, uprightW, uprightH, ptsMs, timers, firings)
             index++

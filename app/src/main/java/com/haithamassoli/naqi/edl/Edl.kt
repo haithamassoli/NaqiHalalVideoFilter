@@ -3,9 +3,20 @@ package com.haithamassoli.naqi.edl
 import com.haithamassoli.naqi.analysis.NRect
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.max
+import kotlin.math.min
 
-/** One tracked face's censor span with normalized keyframe rects (already 25%-padded), sorted by time. */
-data class FaceTrackEdl(val startMs: Long, val endMs: Long, val keyframes: List<Pair<Long, NRect>>)
+/**
+ * One tracked face's censor span with normalized keyframe rects (already 25%-padded), sorted by time.
+ * [union] marks a body track: between two samples it covers both boxes instead of interpolating, because
+ * a 10 fps sample pair says nothing about how a limb moved in between (iOS `PersonTrackEdl.rect(at:)`).
+ */
+data class FaceTrackEdl(
+    val startMs: Long,
+    val endMs: Long,
+    val keyframes: List<Pair<Long, NRect>>,
+    val union: Boolean = false,
+)
 
 /**
  * M1 edit-decision list: the per-frame censor plan emitted by pass 1 and consumed by the pass-2
@@ -51,7 +62,9 @@ data class Edl(val censorIntervalsMs: List<LongRange>, val faceTracks: List<Face
                         .put(rect.right.toDouble()).put(rect.bottom.toDouble()),
                 )
             }
-            tracks.put(JSONObject().put("startMs", tr.startMs).put("endMs", tr.endMs).put("keyframes", kfs))
+            val track = JSONObject().put("startMs", tr.startMs).put("endMs", tr.endMs).put("keyframes", kfs)
+            if (tr.union) track.put("union", true)
+            tracks.put(track)
         }
         return JSONObject().put("censorIntervalsMs", intervals).put("faceTracks", tracks).toString()
     }
@@ -80,7 +93,7 @@ data class Edl(val censorIntervalsMs: List<LongRange>, val faceTracks: List<Face
                         ),
                     )
                 }
-                tracks.add(FaceTrackEdl(t.getLong("startMs"), t.getLong("endMs"), kfs))
+                tracks.add(FaceTrackEdl(t.getLong("startMs"), t.getLong("endMs"), kfs, t.optBoolean("union")))
             }
             return Edl(intervals, tracks)
         }
@@ -147,7 +160,10 @@ internal fun promoteFacesToFullFrame(intervals: List<LongRange>, tracks: List<Fa
     mergeRanges(intervals + tracks.map { it.startMs..it.endMs })
         .filter { it.last - it.first >= MIN_FULL_MS }
 
-/** Linear-interpolate the track's rect at [tMs], clamped to the first/last keyframe at the span edges. */
+/**
+ * Linear-interpolate the track's rect at [tMs] (a [FaceTrackEdl.union] track covers both neighbours
+ * instead), clamped to the first/last keyframe at the span edges.
+ */
 private fun FaceTrackEdl.rectAt(tMs: Long): NRect? {
     val kf = keyframes
     if (kf.isEmpty()) return null
@@ -164,7 +180,8 @@ private fun FaceTrackEdl.rectAt(tMs: Long): NRect? {
     }
     val (t0, r0) = kf[lo]
     val (t1, r1) = kf[lo + 1]
-    if (t1 <= t0) return r0
+    if (t1 <= t0 || tMs == t0) return r0
+    if (union) return NRect(min(r0.left, r1.left), min(r0.top, r1.top), max(r0.right, r1.right), max(r0.bottom, r1.bottom))
     val f = (tMs - t0).toFloat() / (t1 - t0).toFloat()
     return NRect(
         r0.left + (r1.left - r0.left) * f,

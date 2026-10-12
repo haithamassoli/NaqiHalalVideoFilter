@@ -11,6 +11,9 @@ internal class BodyTracker(private val who: String) {
     private val emitted = mutableListOf<FaceTrackEdl>()
     private var nextId = 0
     private var sparedCount = 0
+    /** The previous sample. At 10 fps anything that first shows up now may have been on screen since then. */
+    private var lastPtsMs: Long? = null
+    private var shotStartMs = 0L
     val fallbackIntervals = mutableListOf<LongRange>()
     var frameCount = 0
         private set
@@ -25,7 +28,12 @@ internal class BodyTracker(private val who: String) {
     ) {
         frameCount++
         detectionCount += people.size
-        if (sceneCut) { live.forEach { emit(it, tailMs = 0) }; live.clear(); cutCount++ }
+        // A cut happened somewhere after the previous sample, so the new shot starts just after it (iOS
+        // `PersonTracker` shotStart = lastPtsMs + 1) and the old shot's tracks keep their last box up to
+        // this sample. Both shots' boxes overlap for those frames rather than leaving either uncovered.
+        val since = lastPtsMs?.let { it + 1 } ?: ptsMs
+        lastPtsMs = ptsMs
+        if (sceneCut) { live.forEach { emit(it, endMs = ptsMs - 1) }; live.clear(); cutCount++; shotStartMs = since }
         live.removeAll { tr ->
             if (ptsMs - tr.samples.last().ptsMs > HOLD_MS) { emit(tr); true } else false
         }
@@ -41,7 +49,15 @@ internal class BodyTracker(private val who: String) {
             // ponytail: IoU with reciprocal ambiguity guards, no re-identification. Crossings restart evidence and cover unknown people.
             val matched = best?.takeIf { score >= 0.25f && score - runnerUp >= 0.10f && score - competing >= 0.10f }
                 ?.let { old[it] }?.takeIf { it !in used }
-            val track = matched ?: FaceTrack(nextId++).also { live += it }
+            // Detection can settle a few samples after a person appears, especially small people on a
+            // screen, so a new span reaches back HOLD_MS within its shot (iOS PersonTracker lead-in). A
+            // box replacing a nearby track only needs the frames since the previous sample: that track
+            // covered the place until then, and reaching further back stacks ghosts (finding 1).
+            val fresh = old.none { overlap(box, it.samples.last().rect) > 0.1f }
+            val track = matched ?: FaceTrack(nextId++).also {
+                it.startMs = if (fresh) max(shotStartMs, ptsMs - HOLD_MS) else since
+                live += it
+            }
             used += track
             track.samples += FaceSample(ptsMs, box)
             if (vote == null || track.votesTried >= VOTE_CAP) continue
@@ -61,13 +77,15 @@ internal class BodyTracker(private val who: String) {
         // manufacture competing candidates on the next frame and eventually overflow the renderer.
         for (track in old) {
             if (track !in used && people.any { overlap(it, track.samples.last().rect) > 0.1f }) {
-                emit(track, tailMs = 0)
+                emit(track, endMs = ptsMs - 1)
                 live.remove(track)
             }
         }
-        // A detected face with no reliable body must never disappear from a body-mode result.
+        // A detected face with no reliable body must never disappear from a body-mode result. From the
+        // previous sample and held like a body box: at 10 fps small faces (a comment avatar, a person on
+        // a camera screen) are found on fewer samples than every-frame detection found them on.
         if (faces.any { face -> people.none { faceInside(face, it) } }) {
-            fallbackIntervals += (ptsMs - 50).coerceAtLeast(0)..(ptsMs + 50)
+            fallbackIntervals += since.coerceAtLeast(0)..(ptsMs + HOLD_MS)
         }
     }
 
@@ -79,7 +97,7 @@ internal class BodyTracker(private val who: String) {
 
     fun retention() = "bodyFrames=$frameCount people=$detectionCount tracks=$nextId live=${live.size} cuts=$cutCount fallback=${fallbackIntervals.size} spared=$sparedCount"
 
-    private fun emit(track: FaceTrack, tailMs: Long = HOLD_MS) {
+    private fun emit(track: FaceTrack, endMs: Long = track.samples.last().ptsMs + HOLD_MS) {
         val spareVotes = when (who) {
             FilterOps.WOMEN -> track.maleVotes
             FilterOps.MEN -> track.femaleVotes
@@ -88,9 +106,10 @@ internal class BodyTracker(private val who: String) {
         // A single misread face must not expose an entire body for the rest of its track.
         if (!shouldCensor(track.femaleVotes, track.maleVotes, who) && spareVotes >= 2) { sparedCount++; return }
         emitted += FaceTrackEdl(
-            track.samples.first().ptsMs.coerceAtLeast(0),
-            track.samples.last().ptsMs + tailMs,
+            track.startMs.coerceAtLeast(0),
+            max(endMs, track.samples.last().ptsMs),
             track.samples.map { it.ptsMs to padRect(it.rect) },
+            union = true,
         )
     }
 

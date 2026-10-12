@@ -89,7 +89,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             // Installs alongside debug/release, so a measurement run never has to uninstall the build
             // being used for anything else.
-            applicationIdSuffix = ".benchmark"
+            // `-PnaqiBenchmarkSuffix=.bodyqa` installs a QA copy that leaves the usual benchmark alone.
+            applicationIdSuffix = project.findProperty("naqiBenchmarkSuffix") as String? ?: ".benchmark"
             // The whole instrument. Without the autorun hook there is no way to start a job on a
             // non-debuggable build from adb, and the SOAK log lines never get emitted.
             buildConfigField("boolean", "DEBUG_HOOKS", "true")

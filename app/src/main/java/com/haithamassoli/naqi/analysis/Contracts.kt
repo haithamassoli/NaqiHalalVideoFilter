@@ -63,4 +63,6 @@ class FaceTrack(val id: Int) {
     var votesTried = 0
     /** Body mode spaces its bounded face observations in source time. */
     var lastVoteMs = Long.MIN_VALUE
+    /** Body mode: first covered ms, which reaches back before the first sample (see `BodyTracker`). */
+    var startMs = 0L
 }

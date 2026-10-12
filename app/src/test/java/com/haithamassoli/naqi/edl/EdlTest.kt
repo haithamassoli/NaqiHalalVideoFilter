@@ -51,6 +51,19 @@ class EdlTest {
         assertRegions(listOf(r(0.3f, 0.3f, 0.4f, 0.4f)), edl.regionsAt(1000)) // midpoint
     }
 
+    @Test fun bodyTrackCoversBothNeighboursBetweenSamples() {
+        val a = r(0.1f, 0.2f, 0.3f, 0.6f)
+        val b = r(0.2f, 0.1f, 0.5f, 0.5f)
+        val track = FaceTrackEdl(0, 400, listOf(100L to a, 200L to b), union = true)
+        val edl = Edl(emptyList(), listOf(track))
+        assertRegions(listOf(r(0.1f, 0.1f, 0.5f, 0.6f)), edl.regionsAt(150))
+        assertRegions(listOf(a), edl.regionsAt(100)) // an exact sample stays exact
+        assertRegions(listOf(b), edl.regionsAt(200))
+        assertRegions(listOf(a), edl.regionsAt(20))  // lead-in holds the first box
+        assertEquals(edl, Edl.fromJson(edl.toJson()))
+        assertFalse(Edl.fromJson(Edl(emptyList(), listOf(track.copy(union = false))).toJson()).faceTracks.single().union)
+    }
+
     @Test fun regionsEmptyOutsideTrackSpan() {
         val track = FaceTrackEdl(1000, 2000, listOf(1000L to r(0f, 0f, 0.2f, 0.2f), 2000L to r(0f, 0f, 0.2f, 0.2f)))
         val edl = Edl(emptyList(), listOf(track))

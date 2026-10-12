@@ -41,9 +41,37 @@ class BodyTrackerTest {
     @Test fun missingBodyFallsBackAndUnknownPeopleAreCovered() {
         val tracker = BodyTracker(FilterOps.WOMEN)
         tracker.onFrame(emptyList(), listOf(face), 640, 640, 100)
-        assertEquals(listOf(50L..150L), tracker.fallbackIntervals)
+        assertEquals(listOf(100L..400L), tracker.fallbackIntervals)
         tracker.onFrame(listOf(body), emptyList(), 640, 640, 200)
         assertEquals(1, tracker.finish().size)
+    }
+
+    @Test fun orphanFacesStayContiguousAt10Fps() {
+        val tracker = BodyTracker(FilterOps.WOMEN)
+        tracker.onFrame(emptyList(), emptyList(), 640, 640, 0)
+        for (pts in listOf(100L, 200L, 301L)) tracker.onFrame(emptyList(), listOf(face), 640, 640, pts)
+        for (pts in listOf(401L, 501L, 601L, 701L)) tracker.onFrame(emptyList(), emptyList(), 640, 640, pts)
+        tracker.onFrame(emptyList(), listOf(face), 640, 640, 801)
+        val merged = com.haithamassoli.naqi.edl.mergeRanges(tracker.fallbackIntervals, bridgeMs = 0)
+        // From just after the previous sample to HOLD_MS past the last one; a 400 ms miss reopens it.
+        assertEquals(listOf(1L..601L, 702L..1101L), merged)
+    }
+
+    @Test fun tracksAfterACutReachBackToThePreviousSample() {
+        val tracker = BodyTracker(FilterOps.EVERYONE)
+        val other = NRect(.5f, .2f, .9f, .9f)
+        tracker.onFrame(listOf(body), emptyList(), 640, 640, 0)
+        tracker.onFrame(listOf(body), emptyList(), 640, 640, 100)
+        tracker.onFrame(listOf(other), emptyList(), 640, 640, 200, sceneCut = true)
+        val (old, new) = tracker.finish()
+        // The cut happened somewhere in 101..199: the old shot keeps its box up to this sample and the
+        // new one starts right after the previous sample, so no frame of either is left uncovered.
+        // The usual 300 ms lead-in stops at the cut.
+        assertEquals(0L, old.startMs)
+        assertEquals(199L, old.endMs)
+        assertEquals(101L, new.startMs)
+        assertEquals(other.right, new.keyframes.single().second.right, 1f)
+        assertTrue(old.union && new.union)
     }
 
     @Test fun ambiguousBoxesDoNotAccumulateGhostsAcrossFrames() {

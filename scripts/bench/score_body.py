@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mac CPU person-detection cost, every frame. Does not time Android tracking/rendering or claim mask accuracy."""
+"""Mac CPU person-detection cost, every frame or at --fps like the app's sampler. Does not time Android tracking/rendering or claim mask accuracy."""
 import argparse
 import hashlib
 import json
@@ -18,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("video", type=Path)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--fps", type=float, default=0, help="sample slots per second; 0 = every frame")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     cv2.setNumThreads(1)
@@ -29,12 +30,19 @@ def main():
     fps = capture.get(cv2.CAP_PROP_FPS)
     assert fps > 0
     rows, inference, preprocess = [], [], []
+    decoded, next_slot = 0, 0.0
     started = time.perf_counter()
     try:
         while True:
             ok, frame = capture.read()
             if not ok:
                 break
+            pts = decoded * 1000 / fps
+            decoded += 1
+            # FrameSampler: decode every frame, keep the first one at or past each slot.
+            if args.fps and pts < next_slot:
+                continue
+            next_slot += 1000 / args.fps if args.fps else 0
             t0 = time.perf_counter()
             h, w = frame.shape[:2]
             scale = 640 / max(w, h)
@@ -54,7 +62,7 @@ def main():
                                (x2 - left) / (scale * w), (y2 - top) / (scale * h)], 0, 1)
                 if box[2] > box[0] and box[3] > box[1]:
                     boxes.append([*box.tolist(), float(score)])
-            rows.append({"ptsMs": len(rows) * 1000 / fps, "boxes": boxes})
+            rows.append({"ptsMs": pts, "boxes": boxes})
             inference.append(t2 - t1)
             preprocess.append(t1 - t0)
     finally:
@@ -62,7 +70,8 @@ def main():
     wall = time.perf_counter() - started
     assert rows, "No video frames decoded"
     report = {
-        "video": str(args.video), "fps": fps, "frames": len(rows), "durationS": len(rows) / fps,
+        "video": str(args.video), "fps": fps, "sampleFps": args.fps or fps, "frames": decoded,
+        "inferences": len(rows), "durationS": decoded / fps,
         "modelSha256": hashlib.sha256(model.read_bytes()).hexdigest(), "runtime": ort.__version__,
         "platform": platform.platform(), "provider": "CPUExecutionProvider", "threads": 4,
         "wallS": wall, "inferenceS": sum(inference), "preprocessS": sum(preprocess),
@@ -71,8 +80,9 @@ def main():
         "peakRssMiB": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 ** 2),
         "scope": "Native Mac decode, letterbox and person inference; excludes faces, tracking and rendering",
     }
-    (args.out / "mac-cost.json").write_text(json.dumps(report, indent=2) + "\n")
-    (args.out / "mac-detections.json").write_text(json.dumps(rows) + "\n")
+    suffix = f"-{args.fps:g}fps" if args.fps else ""
+    (args.out / f"mac-cost{suffix}.json").write_text(json.dumps(report, indent=2) + "\n")
+    (args.out / f"mac-detections{suffix}.json").write_text(json.dumps(rows) + "\n")
     print(json.dumps(report, indent=2))
 
 
