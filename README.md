@@ -21,6 +21,10 @@
   <b>English</b> · <a href="README.ar.md">العربية</a>
 </p>
 
+<p align="center">
+  📱 Also on iPhone, iPad and Mac: <a href="https://github.com/haithamassoli/naqi"><b>Naqi for iOS</b></a>
+</p>
+
 *Naqi (نقي) means "pure" in Arabic.*
 
 <p align="center">

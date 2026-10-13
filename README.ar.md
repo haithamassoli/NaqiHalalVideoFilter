@@ -21,6 +21,10 @@
 </p>
 
 <p align="center">
+  📱 متوفر أيضًا على آيفون وآيباد وماك: <a href="https://github.com/haithamassoli/naqi"><b>نقي لنظام iOS</b></a>
+</p>
+
+<p align="center">
   <img src="docs/screenshots/01-home.png" width="19%" alt="اختر فيديو وحدّد ما تريد فلترته">
   <img src="docs/screenshots/02-options.png" width="19%" alt="خيارات الحجب: من، الصرامة، التمويه">
   <img src="docs/screenshots/03-jobs.png" width="19%" alt="تقدّم المرحلتين مع تقدير حي للوقت">
