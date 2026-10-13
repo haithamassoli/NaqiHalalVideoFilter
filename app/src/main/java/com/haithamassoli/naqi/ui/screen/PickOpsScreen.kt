@@ -323,8 +323,23 @@ private fun OverflowMenu(onAbout: () -> Unit) {
             text = { Text(stringResource(R.string.about_open)) },
             onClick = { open = false; onAbout() },
         )
+        // Both store links: the person it is sent to may be on either platform.
+        val shareMessage = stringResource(R.string.share_app_message)
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.share_app)) },
+            onClick = {
+                open = false
+                val send = Intent(Intent.ACTION_SEND)
+                    .setType("text/plain")
+                    .putExtra(Intent.EXTRA_TEXT, "$shareMessage\n\nAndroid: $PLAY_STORE_URL\niOS: $APP_STORE_URL")
+                runCatching { context.startActivity(Intent.createChooser(send, null)) }
+            },
+        )
     }
 }
+
+private const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.haithamassoli.naqi"
+private const val APP_STORE_URL = "https://apps.apple.com/app/id6798173054"
 
 @Composable
 internal fun TrustSeal() {

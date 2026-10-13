@@ -359,6 +359,8 @@
     <string name="about_license">Licensed under GPL-3.0-or-later.</string>
     <!-- Entry point on the pick screen. -->
     <string name="about_open">Settings &amp; about</string>
+    <string name="share_app">Share Naqi</string>
+    <string name="share_app_message">Try Naqi, the halal video filter:</string>
 
     <string name="about_eyebrow_downloader">Downloader</string>
     <string name="about_eyebrow_licenses">Open source</string>
