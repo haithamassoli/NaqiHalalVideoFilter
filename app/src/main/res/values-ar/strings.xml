@@ -394,4 +394,7 @@
     <string name="settings_eyebrow">الإعدادات</string>
     <string name="battery_setting_title">معالجة أسرع في الخلفية</string>
     <string name="battery_setting_desc">تُبقي الفيديوهات في قائمة الانتظار تُعالَج بسرعتها الكاملة ونقي في الخلفية. لإيقافها اختر «مُحسَّن» من إعدادات البطارية.</string>
+    <string name="end_card_setting_title">خاتمة نقي</string>
+    <string name="end_card_setting_desc">أضف شعار نقي لثانيتين في نهاية الفيديو.</string>
+    <string name="end_card_hint">ينتهي الفيديو بخاتمة نقي، ويمكنك إيقافها من «الإعدادات وعن التطبيق».</string>
 </resources>

@@ -24,6 +24,8 @@ object Prefs {
     private const val KEY_SOLID_COLOR = "solid_color"
     private const val KEY_ONBOARDED = "onboarded"
     private const val KEY_BATTERY_CARD_DISMISSED = "battery_card_dismissed"
+    private const val KEY_END_CARD = "end_card"
+    private const val KEY_END_CARD_HINT_SEEN = "end_card_hint_seen"
 
     /** Read-only legacy: what [KEY_CENSOR_WHO] replaced. Still read so an upgrade keeps the last pick. */
     private const val KEY_CENSOR_WOMEN = "censor_women"
@@ -111,6 +113,20 @@ object Prefs {
 
     fun dismissBatteryCard(context: Context) {
         prefs(context).edit().putBoolean(KEY_BATTERY_CARD_DISMISSED, true).apply()
+    }
+
+    /** The 2 s Naqi card at the end of a re-encoded video. On unless the user turned it off. */
+    fun endCard(context: Context): Boolean = prefs(context).getBoolean(KEY_END_CARD, true)
+
+    fun setEndCard(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_END_CARD, on).apply()
+    }
+
+    /** The Saved card's "you can turn the card off" line is shown on the first video that has the card. */
+    fun endCardHintSeen(context: Context): Boolean = prefs(context).getBoolean(KEY_END_CARD_HINT_SEEN, false)
+
+    fun markEndCardHintSeen(context: Context) {
+        prefs(context).edit().putBoolean(KEY_END_CARD_HINT_SEEN, true).apply()
     }
 
     /** Has it been a week since the last yt-dlp update check? */

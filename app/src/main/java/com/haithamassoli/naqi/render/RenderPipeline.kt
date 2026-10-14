@@ -9,6 +9,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -57,6 +58,7 @@ data class RenderSegment(val index: Int, val startMs: Long, val endMs: Long)
  */
 object RenderPipeline {
 
+    private const val TAG = "RenderPipeline"
     private const val PROGRESS_POLL_MS = 500L
 
     /**
@@ -80,6 +82,12 @@ object RenderPipeline {
      * @param bitrate the job's already-resolved encode bitrate; null resolves it here. One bitrate per
      *   job is an invariant, not a tuning knob — see [resolveBitrate]. Segmented callers resolve it once
      *   before their loop instead of re-probing the container 35–70 times per film (5.9 S3).
+     * @param endCard append the 2 s [EndCard] after this clip. Ignored on the passthrough path: the card
+     *   would force the very re-encode that path exists to avoid. With audio kept, a two-item sequence
+     *   makes Transformer re-encode the audio (AAC) and pad the card with silence; it can no longer
+     *   transmux it. If the export with the card fails, it is retried once without it — the card is
+     *   never worth the user's video.
+     * @return whether the card made it into [outputFile].
      */
     suspend fun renderCensor(
         context: Context,
@@ -93,8 +101,9 @@ object RenderPipeline {
         segment: RenderSegment? = null,
         removeAudio: Boolean = false,
         bitrate: Int? = null,
+        endCard: Boolean = false,
         onProgress: (Int) -> Unit,
-    ) {
+    ): Boolean {
         outputFile.parentFile?.mkdirs()
 
         // S4 (`video-performance-plan-v2.md` 5.9). Nothing to censor => hand Transformer an EMPTY effects
@@ -116,6 +125,17 @@ object RenderPipeline {
         val passthrough = segment == null && edl.censorIntervalsMs.isEmpty() && edl.faceTracks.isEmpty() &&
             canMuxVideo(context, inputUri)
 
+        val card = if (endCard && !passthrough) {
+            val upright = meta.rotationDegrees % 180 == 0
+            val clipMs = segment?.let { it.endMs - it.startMs } ?: meta.durationMs
+            EndCardHandoff(
+                width = if (upright) meta.width else meta.height,
+                height = if (upright) meta.height else meta.width,
+                // A generous window: the probed duration can overshoot the last video frame.
+                tailFromUs = (clipMs - 3_000L).coerceAtLeast(0L) * 1000L,
+            )
+        } else null
+
         val mediaItem = MediaItem.Builder().setUri(inputUri).apply {
             if (segment != null) {
                 // Frame-accurate on the transcoding path: the decoder starts at the preceding sync
@@ -135,12 +155,13 @@ object RenderPipeline {
                 if (passthrough) Effects.EMPTY else Effects(
                     /* audioProcessors = */ emptyList(),
                     listOf<Effect>(
-                        CensorGlEffect(edl, blurAmount, grayscale, meta, segment?.startMs ?: 0L, solidColor),
+                        CensorGlEffect(edl, blurAmount, grayscale, meta, segment?.startMs ?: 0L, solidColor, card),
                     ),
                 ),
             )
             .build()
-        val composition = Composition.Builder(EditedMediaItemSequence.Builder(editedItem).build())
+        val items = listOfNotNull(editedItem, card?.let { EndCard.item(it, meta.fps) })
+        val composition = Composition.Builder(EditedMediaItemSequence.Builder(items).build())
             // Left at the default HDR_MODE_KEEP_HDR on the passthrough path: it is the only mode that
             // does not force a transcode, so an untouched HDR source now stays HDR instead of being
             // tone-mapped into a copy of itself.
@@ -170,48 +191,60 @@ object RenderPipeline {
             .build()
 
         // Transformer is single-threaded: build/start/poll/cancel all run on the Looper thread (Main).
-        withContext(Dispatchers.Main) {
-            val transformer = Transformer.Builder(context).apply {
-                // Both force a transcode by themselves, so they are only requested when transcoding is
-                // happening anyway. H.264 keeps every segment of a job in the one format Remux.concat can
-                // write; requesting it on a passthrough job is exactly what would convert an HEVC source.
-                if (encoderFactory != null) {
-                    setVideoMimeType(MimeTypes.VIDEO_H264)
-                    setEncoderFactory(encoderFactory)
-                }
-            }.build()
-            coroutineScope {
-                val poller = launch {
-                    val holder = ProgressHolder()
-                    while (true) {
-                        if (transformer.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) {
-                            onProgress(holder.progress.coerceIn(0, 100))
-                        }
-                        delay(PROGRESS_POLL_MS)
+        try {
+            withContext(Dispatchers.Main) {
+                val transformer = Transformer.Builder(context).apply {
+                    // Both force a transcode by themselves, so they are only requested when transcoding is
+                    // happening anyway. H.264 keeps every segment of a job in the one format Remux.concat can
+                    // write; requesting it on a passthrough job is exactly what would convert an HEVC source.
+                    if (encoderFactory != null) {
+                        setVideoMimeType(MimeTypes.VIDEO_H264)
+                        setEncoderFactory(encoderFactory)
                     }
-                }
-                try {
-                    suspendCancellableCoroutine<Unit> { cont ->
-                        transformer.addListener(object : Transformer.Listener {
-                            override fun onCompleted(exportedComposition: Composition, result: ExportResult) {
-                                if (cont.isActive) cont.resume(Unit)
+                }.build()
+                coroutineScope {
+                    val poller = launch {
+                        val holder = ProgressHolder()
+                        while (true) {
+                            if (transformer.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) {
+                                // A two-item sequence reports the video as 0..50 and the 2 s card as 50..100.
+                                val p = if (card != null) holder.progress * 2 else holder.progress
+                                onProgress(p.coerceIn(0, 100))
                             }
+                            delay(PROGRESS_POLL_MS)
+                        }
+                    }
+                    try {
+                        suspendCancellableCoroutine<Unit> { cont ->
+                            transformer.addListener(object : Transformer.Listener {
+                                override fun onCompleted(exportedComposition: Composition, result: ExportResult) {
+                                    if (cont.isActive) cont.resume(Unit)
+                                }
 
-                            override fun onError(exportedComposition: Composition, result: ExportResult, exception: ExportException) {
-                                if (cont.isActive) cont.resumeWithException(exception)
+                                override fun onError(exportedComposition: Composition, result: ExportResult, exception: ExportException) {
+                                    if (cont.isActive) cont.resumeWithException(exception)
+                                }
+                            })
+                            // Cancellation may arrive off-thread; Transformer.cancel() must run on its Looper (Main).
+                            cont.invokeOnCancellation {
+                                Handler(Looper.getMainLooper()).post { runCatching { transformer.cancel() } }
                             }
-                        })
-                        // Cancellation may arrive off-thread; Transformer.cancel() must run on its Looper (Main).
-                        cont.invokeOnCancellation {
-                            Handler(Looper.getMainLooper()).post { runCatching { transformer.cancel() } }
+                            transformer.start(composition, outputFile.absolutePath)
                         }
-                        transformer.start(composition, outputFile.absolutePath)
+                    } finally {
+                        poller.cancel() // stop polling on completion, error, or cancellation
                     }
-                } finally {
-                    poller.cancel() // stop polling on completion, error, or cancellation
                 }
             }
+        } catch (e: ExportException) {
+            if (card == null) throw e
+            Log.w(TAG, "export with the end card failed; retrying without it", e)
+            return renderCensor(
+                context, inputUri, outputFile, edl, blurAmount, grayscale, meta, solidColor,
+                segment, removeAudio, bitrate, endCard = false, onProgress = onProgress,
+            )
         }
+        return card != null
     }
 
     /**

@@ -36,10 +36,12 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.haithamassoli.naqi.BuildConfig
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.data.Battery
+import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.ml.ModelSmoke
 import com.haithamassoli.naqi.ml.SmokeReport
 import com.haithamassoli.naqi.ui.NaqiCard
+import com.haithamassoli.naqi.ui.NaqiRowDivider
 import com.haithamassoli.naqi.ui.NaqiTopBar
 import com.haithamassoli.naqi.ui.SectionHeader
 import com.haithamassoli.naqi.ui.ToggleTile
@@ -115,7 +117,11 @@ fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 
             Spacer(Modifier.height(NaqiTokens.space6))
             SectionHeader(stringResource(R.string.settings_eyebrow))
-            NaqiCard(contentPadding = 0.dp) { BatteryToggle() }
+            NaqiCard(contentPadding = 0.dp) {
+                BatteryToggle()
+                NaqiRowDivider()
+                EndCardToggle()
+            }
 
             Spacer(Modifier.height(NaqiTokens.space5))
             SectionHeader(stringResource(R.string.about_eyebrow_contact))
@@ -307,6 +313,18 @@ private fun BatteryToggle() {
         desc = stringResource(R.string.battery_setting_desc),
         checked = unrestricted,
         onCheckedChange = { on -> if (on) Battery.request(context) else Battery.openSettings(context) },
+    )
+}
+
+@Composable
+private fun EndCardToggle() {
+    val context = LocalContext.current
+    var on by remember { mutableStateOf(Prefs.endCard(context)) }
+    ToggleTile(
+        title = stringResource(R.string.end_card_setting_title),
+        desc = stringResource(R.string.end_card_setting_desc),
+        checked = on,
+        onCheckedChange = { on = it; Prefs.setEndCard(context, it) },
     )
 }
 

@@ -413,4 +413,7 @@
     <string name="settings_eyebrow">Settings</string>
     <string name="battery_setting_title">Faster background processing</string>
     <string name="battery_setting_desc">Keeps queued videos processing at full speed while Naqi is in the background. To turn it off, set Battery to Optimized.</string>
+    <string name="end_card_setting_title">Naqi end card</string>
+    <string name="end_card_setting_desc">Add a 2-second Naqi card at the end of the video.</string>
+    <string name="end_card_hint">This video ends with the Naqi card. You can turn it off in Settings &amp; about.</string>
 </resources>

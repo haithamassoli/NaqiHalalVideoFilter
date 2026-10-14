@@ -32,6 +32,7 @@ import com.haithamassoli.naqi.audio.Remux
 import com.haithamassoli.naqi.audio.TrackSource
 import com.haithamassoli.naqi.audio.canMuxVideo
 import com.haithamassoli.naqi.audio.concatAudio
+import com.haithamassoli.naqi.data.Prefs
 import com.haithamassoli.naqi.download.Downloader
 import com.haithamassoli.naqi.edl.Edl
 import com.haithamassoli.naqi.model.FilterOps
@@ -124,6 +125,17 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         if (it > 0 || grayscale || solidColor != FilterOps.BLUR) it else MIN_EFFECTIVE_BLUR
     }
     private val keepStems = ops.keepStems
+
+    /**
+     * The 2 s Naqi outro, a setting rather than a per-job op. Only the shapes that re-encode the video
+     * ask for it — censor-only, combined, and the LAST segment of a segmented job. Never music-only: it
+     * copies the video track, and a card on just the sources it has to re-render (WebM) would be
+     * arbitrary. RenderPipeline drops it again on its own passthrough path.
+     */
+    private val endCard by lazy { Prefs.endCard(applicationContext) }
+
+    /** Did a render actually append the card? Echoed as [KEY_END_CARD] so the Saved card can say so once. */
+    private var cardAdded = false
 
     /**
      * WHICH faces get censored — one of [FilterOps]' four states (plan-censor-who §1.1). Every branch
@@ -772,12 +784,13 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
             // Export to `.part` and rename, so a killed export never leaves a file that looks complete.
             val part = File(workDir, "seg-%03d.mp4.part".format(seg.index))
             runCatching { part.delete() }
-            RenderPipeline.renderCensor(
+            val withCard = RenderPipeline.renderCensor(
                 applicationContext, inputUri, part, edl, blurAmount, grayscale, meta, solidColor,
-                segment = seg, bitrate = bitrate,
+                segment = seg, bitrate = bitrate, endCard = endCard && seg == plan.last(),
             ) { p ->
                 reportVideoAsync(stage, progressBase + ((seg.index * 100 + p) * progressSpan / (plan.size * 100)))
             }
+            if (withCard) cardAdded = true
             check(part.renameTo(Checkpoint.segmentFile(workDir, seg.index))) {
                 "could not commit segment ${seg.index}"
             }
@@ -794,8 +807,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         try {
             val edl = analyze(inputUri, faceTracker, meta)
             // No removeAudio: this file IS the published output, so Transformer transmuxing the source
-            // audio alongside is exactly what is wanted (the M1 no-audio-re-encode fast path).
-            render(inputUri, tempFile, edl, meta)
+            // audio alongside is exactly what is wanted (the M1 no-audio-re-encode fast path). With the
+            // end card on, the audio is re-encoded instead and padded with silence under the card.
+            render(inputUri, tempFile, edl, meta, endCard = endCard)
             val displayName = outputName(inputUri)
             stats.stage("publish")
             val outputUri = publish(tempFile, displayName)
@@ -888,7 +902,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 // transmux for an AAC source, and for Opus/AC-3 (which media3 cannot transmux) a full
                 // decode + AAC encode that is thrown away, measured 12.9 s per 193 s track.
                 render(
-                    inputUri, renderTemp, edl, meta, removeAudio = true,
+                    inputUri, renderTemp, edl, meta, removeAudio = true, endCard = endCard,
                     progressBase = Eta.Bands.ANALYZE, progressSpan = Eta.Bands.RENDER,
                 )
             }
@@ -1224,14 +1238,15 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     private suspend fun render(
         uri: Uri, tempFile: File, edl: Edl, meta: VideoMeta,
         removeAudio: Boolean = false,
+        endCard: Boolean = false,
         progressBase: Int = 50, progressSpan: Int = 50,
     ) {
         val stage = stage(R.string.stage_rendering)
         stats.stage("render")
         reportVideo(stage, progressBase)
-        RenderPipeline.renderCensor(
+        cardAdded = RenderPipeline.renderCensor(
             applicationContext, uri, tempFile, edl, blurAmount, grayscale, meta, solidColor,
-            removeAudio = removeAudio,
+            removeAudio = removeAudio, endCard = endCard,
         ) { p ->
             reportVideoAsync(stage, progressBase + p * progressSpan / 100)
         }
@@ -1339,6 +1354,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
                 // The Saved card offers the same delete the notification does, so it needs the same
                 // target — null for a quarantine, which is not the user's file to be asked about.
                 KEY_SOURCE_URI to inputUri.toString().takeUnless { quarantined },
+                KEY_END_CARD to cardAdded,
             ),
         )
     }
@@ -1434,6 +1450,9 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
          * same (source, options) lands on the same [JobStore] key and skips everything already finished.
          */
         const val KEY_RESUMABLE = "resumable"
+
+        /** True when the output ends with the Naqi card; drives the one-time "you can turn it off" line. */
+        const val KEY_END_CARD = "end_card"
         const val UNIQUE_WORK = "naqi_filter_job"
 
         /** Ties this run to its [Queue] item. Absent = the picker/debug path, which keeps real failures. */
