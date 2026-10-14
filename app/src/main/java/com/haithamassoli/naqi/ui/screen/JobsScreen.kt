@@ -129,6 +129,11 @@ fun JobsScreen(
     val outputUri = info?.outputData?.getString(FilterWorker.KEY_OUTPUT_URI)
     // Absent for a download: the quarantine is Naqi's own temp, already gone, and never the user's file.
     val sourceUri = info?.outputData?.getString(FilterWorker.KEY_SOURCE_URI)?.takeIf { it.isNotEmpty() }
+    // Once ever, on the first video that ends with the card: read before marking, so it stays up for this visit.
+    val endCardHint = remember(outputUri) {
+        info?.outputData?.getBoolean(FilterWorker.KEY_END_CARD, false) == true && !Prefs.endCardHintSeen(context)
+    }
+    LaunchedEffect(endCardHint) { if (endCardHint) Prefs.markEndCardHintSeen(context) }
     // A @StringRes id, so a failure re-localizes if the language changes after the job failed; 0 = absent.
     val outputMessageId = info?.outputData?.getInt(FilterWorker.KEY_OUTPUT_MESSAGE, 0) ?: 0
     val resumable = info?.outputData?.getBoolean(FilterWorker.KEY_RESUMABLE, false) ?: false
@@ -239,7 +244,7 @@ fun JobsScreen(
             item(key = "status") {
                 when {
                     running -> JobProgressCard(stageText, progress, etaMs, onCancel)
-                    showSaved -> SavedCard(outputName, savedUri, sourceUri, onDeleteOriginal, context) { uri, preset ->
+                    showSaved -> SavedCard(outputName, savedUri, sourceUri, endCardHint, onDeleteOriginal, context) { uri, preset ->
                         publishing = Triple(uri, outputName.orEmpty(), preset)
                     }
                     failed -> NaqiCard {
@@ -408,6 +413,7 @@ private fun SavedCard(
     name: String?,
     uri: Uri?,
     sourceUri: String?,
+    endCardHint: Boolean,
     onDeleteOriginal: (Uri, String?) -> Unit,
     context: Context,
     onPublish: (Uri, String?) -> Unit,
@@ -526,6 +532,14 @@ private fun SavedCard(
                     },
                 ) { share(context, uri) }
             }
+        }
+        if (endCardHint) {
+            Spacer(Modifier.height(NaqiTokens.space3))
+            Text(
+                stringResource(R.string.end_card_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.onSurfaceVariant,
+            )
         }
         // Offered here as well as on the notification, which is gone the moment it is swiped. A hint with
         // its action rather than a lone button: the sentence says why you would delete. It only ASKS —

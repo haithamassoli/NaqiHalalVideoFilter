@@ -63,9 +63,10 @@ class CensorGlEffect(
     private val meta: VideoMeta,
     private val timeOffsetMs: Long = 0L,
     private val solidColor: Int = FilterOps.BLUR,
+    private val endCard: EndCardHandoff? = null,
 ) : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram =
-        CensorShaderProgram(edl, blurAmount, grayscale, meta, useHdr, timeOffsetMs, solidColor)
+        CensorShaderProgram(edl, blurAmount, grayscale, meta, useHdr, timeOffsetMs, solidColor, endCard)
 }
 
 /**
@@ -103,6 +104,8 @@ private class CensorShaderProgram(
     private val useHdr: Boolean,
     private val timeOffsetMs: Long,
     private val solidColor: Int,
+    /** Non-null when an end card follows this clip: told the frame geometry, handed the last frame. */
+    private val endCard: EndCardHandoff?,
 ) : BaseGlShaderProgram(useHdr, /* texturePoolCapacity = */ 3) {
 
     private val solid = solidColor != FilterOps.BLUR
@@ -153,6 +156,11 @@ private class CensorShaderProgram(
             }
             else -> 0 // dims already swapped: frames arrived upright
         }
+        endCard?.let {
+            it.width = inputWidth
+            it.height = inputHeight
+            it.rotation = mapRotation
+        }
         maskW = max(1, inputWidth / 4)
         maskH = max(1, inputHeight / 4)
         lastMasks = null
@@ -200,6 +208,7 @@ private class CensorShaderProgram(
         try {
             if (!full && regions.isEmpty() && masks.isEmpty()) {
                 drawCopy(inputTexId) // nothing active: passthrough into the already-focused output FBO
+                endCard?.capture(presentationTimeUs, useHdr)
                 return
             }
             val kept = if (regions.size <= MAX_REGIONS) {
@@ -219,6 +228,7 @@ private class CensorShaderProgram(
             }
             if (masks.isNotEmpty() && masks != lastMasks) uploadMasks(masks)
             drawComposite(inputTexId, full, kept, masks.isNotEmpty())
+            endCard?.capture(presentationTimeUs, useHdr)
         } catch (e: GlUtil.GlException) {
             throw VideoFrameProcessingException(e, presentationTimeUs)
         }
