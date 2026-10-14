@@ -115,6 +115,9 @@
     <string name="opt_keep_vocals_desc">يُبقي الحوار والغناء؛ ويحذف الموسيقى والمؤثرات الصوتية.</string>
     <string name="opt_keep_vocals_other_title">الأصوات البشرية + المؤثرات</string>
     <string name="opt_keep_vocals_other_desc">يُبقي أيضًا المؤثرات الصوتية وأصوات المحيط؛ وقد يتسرّب شيء من الموسيقى.</string>
+    <string name="opt_section_cloud">السيرفر</string>
+    <string name="opt_cloud_title">استخدام السيرفر للفيديوهات الطويلة</string>
+    <string name="opt_cloud_desc">الفيديوهات التي مدتها 10 دقائق فأكثر تُرسل إلى سيرفر نقي ليزيل الموسيقى ويحدد الأشخاص لتغبيش الجسم بسرعة أكبر بكثير، ثم تُحذف فورًا. إذا تعذّر السيرفر يقوم هاتفك بذلك.</string>
 
     <!-- action_hide/action_show are the two states of one affordance (the about screen's licence block). -->
     <string name="action_hide">إخفاء</string>

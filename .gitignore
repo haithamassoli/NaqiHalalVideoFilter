@@ -11,7 +11,7 @@
 /build
 /captures
 # Bundled ONNX models (large binaries) — fetch/regenerate with scripts/fetch-models.sh
-/app/src/main/assets/models/
+/app/src/main/assets/models
 # Local QA video clips (synthesized from public-domain portraits; manifest in docs/m0-spikes.md)
 /qa-assets/
 .externalNativeBuild
@@ -19,7 +19,7 @@
 local.properties
 
 # Python bytecode from scripts/
-scripts/**/__pycache__/
+__pycache__/
 
 # Release build outputs — a 134 MB .aab was staged for commit once; git is not an artifact store.
 /app/release/

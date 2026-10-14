@@ -694,6 +694,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
     ): Edl {
         val stage = stage(R.string.stage_analyzing)
         stats.stage("analyze")
+        cloudEdl(inputUri, durationMs, progressBase, progressSpan)?.let { return it }
         val firings = ArrayList<Long>()
         val faceTracks = ArrayList<FaceTrackEdl>()
         val bodyFallback = ArrayList<LongRange>()
@@ -1188,6 +1189,7 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         val progressDen = durationMs.coerceAtLeast(1L)
         val stage = stage(R.string.stage_analyzing)
         stats.stage("analyze")
+        cloudEdl(uri, durationMs, progressBase, progressSpan)?.let { return it }
         val firings = ArrayList<Long>()
         var index = 0
         var lastPct = -1
@@ -1220,6 +1222,26 @@ class FilterWorker(ctx: Context, params: WorkerParameters) : QueuedWorker(ctx, p
         logVotes("pass1")
         Log.i(TAG, "pass1 intervals=$intervals")
         return Edl(intervals, faceTracks).also(::recordDebugEdl)
+    }
+
+    /**
+     * Body mode on a long source: the server's pass 1 (`work/Cloud.kt`), folded in exactly like one
+     * segment checkpoint, or null to run pass 1 here. Face-only stays on the phone — it is ~0.17x of
+     * the source there, which the upload alone would not beat.
+     */
+    private suspend fun cloudEdl(uri: Uri, durationMs: Long, progressBase: Int, progressSpan: Int): Edl? {
+        if (!bodyBlur) return null
+        val stage = stage(R.string.stage_analyzing)
+        val a = Cloud.analyze(
+            applicationContext, uri, durationMs, censorWho, bodyPrecise, censorNsfw, strictness,
+            cache = File(workDir, "cloud-analysis.json"),
+            onProgress = { p -> reportVideoAsync(stage, progressBase + p * progressSpan / 100) },
+            isCancelled = { isStopped },
+        ) ?: return null
+        val tracks = a.edl.faceTracks.sortedBy { it.startMs }
+        val intervals = mergeRanges(censorSpans(a.firingsMs, durationMs, tracks) + a.edl.censorIntervalsMs, bridgeMs = 0)
+        Log.i(TAG, "pass1 cloud: gateFirings=${a.firingsMs.size} intervalCount=${intervals.size} faceTracks=${tracks.size}")
+        return Edl(intervals, tracks).also(::recordDebugEdl)
     }
 
     private fun recordDebugEdl(edl: Edl) {

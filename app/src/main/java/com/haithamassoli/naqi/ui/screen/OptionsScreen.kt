@@ -51,6 +51,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.haithamassoli.naqi.BuildConfig
 import com.haithamassoli.naqi.R
 import com.haithamassoli.naqi.analysis.FrameSampler
 import com.haithamassoli.naqi.data.Prefs
@@ -285,6 +286,21 @@ internal fun FilterOptions(ops: FilterOps, onOpsChange: (FilterOps) -> Unit) {
                 desc = stringResource(R.string.opt_keep_vocals_other_desc),
                 selected = ops.keepStems == "vocals_other",
             ) { onOpsChange(ops.copy(keepStems = "vocals_other")) }
+        }
+    }
+
+    // The two jobs the server can take (`work/Cloud.kt`); face-only stays on the phone, where it is fast.
+    if (BuildConfig.NAQI_CLOUD_URL.isNotEmpty() && (ops.removeMusic || (ops.censorFaces && ops.bodyBlur && !ops.wholeFrameBlur))) {
+        if (ops.removeMusic) Spacer(Modifier.height(NaqiTokens.space5)) // the censor section ends with its own
+        SectionHeader(stringResource(R.string.opt_section_cloud))
+        NaqiCard(contentPadding = 0.dp) {
+            var cloud by remember { mutableStateOf(Prefs.cloud(context)) }
+            ToggleTile(
+                title = stringResource(R.string.opt_cloud_title),
+                desc = stringResource(R.string.opt_cloud_desc),
+                checked = cloud,
+                onCheckedChange = { cloud = it; Prefs.setCloud(context, it) },
+            )
         }
     }
 }
