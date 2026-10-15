@@ -87,14 +87,17 @@ internal object Checkpoint {
     fun analysisFile(dir: File, index: Int): File = File(dir, "an-%03d.json".format(index))
 
     /** Null when this segment has not been analyzed yet (or its write never completed). */
-    fun readAnalysis(dir: File, index: Int): Analysis? = runCatching {
-        val root = JSONObject(analysisFile(dir, index).readText())
+    fun readAnalysis(dir: File, index: Int): Analysis? = runCatching { parseAnalysis(analysisFile(dir, index).readText()) }.getOrNull()
+
+    /** One checkpoint's JSON; also the shape the cloud's body analysis answers in (`work/Cloud.kt`). */
+    fun parseAnalysis(json: String): Analysis {
+        val root = JSONObject(json)
         val fj = root.getJSONArray("firingsMs")
-        Analysis(
+        return Analysis(
             firingsMs = (0 until fj.length()).map { fj.getLong(it) },
             edl = Edl.fromJson(root.getJSONObject("edl").toString()),
         )
-    }.getOrNull()
+    }
 
     fun writeAnalysis(dir: File, index: Int, firingsMs: List<Long>, edl: Edl) {
         val root = JSONObject()
@@ -160,7 +163,7 @@ internal object Checkpoint {
      * Write via a temp + rename, so the final name only ever exists over complete content. Rename within
      * one directory is atomic on every filesystem Android uses.
      */
-    private fun atomicWrite(target: File, text: String) {
+    internal fun atomicWrite(target: File, text: String) {
         val tmp = File(target.parentFile, "${target.name}.tmp")
         tmp.writeText(text)
         if (!tmp.renameTo(target)) {

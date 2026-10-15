@@ -9,6 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import com.haithamassoli.naqi.media.requireTrackIndex
 import com.haithamassoli.naqi.work.Checkpoint
+import com.haithamassoli.naqi.work.Cloud
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.coroutineScope
@@ -281,6 +282,8 @@ object AudioPipeline {
         jobDir: File? = null,
         demoteWhile: () -> Boolean = { false },
     ) = withContext(Dispatchers.Default) {
+        // Long sources try the server first; any failure there lands back here, on the phone.
+        if (Cloud.removeMusic(context, uri, keepStems, tempM4a, onProgress, isCancelled)) return@withContext
         if (jobDir != null) {
             removeMusicResumable(context, uri, keepStems, tempM4a, onProgress, isCancelled, jobDir, demoteWhile)
             return@withContext

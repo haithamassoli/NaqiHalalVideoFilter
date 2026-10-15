@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -15,8 +17,8 @@ android {
         applicationId = "com.haithamassoli.naqi"
         minSdk = 29
         targetSdk = 36
-        versionCode = 31
-        versionName = "1.8.0"
+        versionCode = 32
+        versionName = "1.9.0"
 
         // Base URL for the M3 model downloader's *converted* artifacts (the NSFW gate and htdemucs —
         // NudeNet carries its own public release URL). Empty by default: no host is published yet, and
@@ -30,6 +32,15 @@ android {
         // own field. Off here so the default for any build type is "no hooks"; the two types that want
         // them opt in explicitly.
         buildConfigField("boolean", "DEBUG_HOOKS", "false")
+
+        // Cloud music removal and body analysis (server/naqi_modal.py). From local.properties or -P, never committed: the
+        // key is the server's only gate against drive-by traffic. Empty URL = phone-only build.
+        val local = Properties().apply {
+            rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+        }
+        fun prop(key: String) = (project.findProperty(key) ?: local.getProperty(key) ?: "").toString()
+        buildConfigField("String", "NAQI_CLOUD_URL", "\"${prop("naqiCloudUrl")}\"")
+        buildConfigField("String", "NAQI_CLOUD_KEY", "\"${prop("naqiCloudKey")}\"")
 
         // arm64-v8a only: ONNX Runtime ships a universal AAR (~108 MB of .so across 4 ABIs);
         // restrict to the one ABI we support.

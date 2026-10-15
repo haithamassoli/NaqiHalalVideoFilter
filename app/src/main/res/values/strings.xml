@@ -132,6 +132,9 @@
     <string name="opt_keep_vocals_desc">Keeps dialogue and singing; drops music and sound effects.</string>
     <string name="opt_keep_vocals_other_title">Voices + sounds</string>
     <string name="opt_keep_vocals_other_desc">Also keeps sound effects and ambience; some music may leak.</string>
+    <string name="opt_section_cloud">Server</string>
+    <string name="opt_cloud_title">Use the server for long videos</string>
+    <string name="opt_cloud_desc">Videos of 10 minutes or more are sent to Naqi\'s server, which removes music and finds people for body blur far faster, then deletes them. If the server is unavailable, your phone does it.</string>
 
     <!-- action_hide/action_show are the two states of one affordance (the about screen's licence block). -->
     <string name="action_hide">Hide</string>

@@ -129,6 +129,18 @@ object Prefs {
         prefs(context).edit().putBoolean(KEY_END_CARD_HINT_SEEN, true).apply()
     }
 
+    /** Long videos' music removal on the server (`audio/CloudSeparator`). On unless turned off. */
+    fun cloud(context: Context): Boolean = prefs(context).getBoolean("cloud_music", true)
+
+    fun setCloud(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean("cloud_music", on).apply()
+    }
+
+    /** Random per-install id the server's per-device daily cap counts against. Not tied to the user. */
+    fun deviceId(context: Context): String = with(prefs(context)) {
+        getString("device_id", null) ?: java.util.UUID.randomUUID().toString().also { edit().putString("device_id", it).apply() }
+    }
+
     /** Has it been a week since the last yt-dlp update check? */
     fun updateDue(context: Context): Boolean =
         System.currentTimeMillis() - prefs(context).getLong(KEY_LAST_UPDATE_CHECK, 0L) > UPDATE_INTERVAL_MS
