@@ -292,9 +292,8 @@ object AudioPipeline {
         onProgress(lastPct)
 
         val keepOther = keepStems == "vocals_other"
-        // ponytail: YAMNet missed audible tonal music, so separate every chunk until a gate passes recall QA.
         val tOpen = System.nanoTime()
-        val gate: MusicGate? = null
+        val gate = MusicGate.openIfLong(context, estFrames) // null => separate everything
         val tGate = System.nanoTime()
         try {
             // A4: the session copies only the kept stems out of ORT, so it is built from the same set the
@@ -527,7 +526,7 @@ object AudioPipeline {
             // "whether removeMusicResumable behaves like removeMusic" as still unknown after a year, and
             // this path being un-instrumented is how it stayed that way.
             val tOpen = System.nanoTime()
-            val gate: MusicGate? = null // Same fail-closed policy as removeMusic.
+            val gate = MusicGate.openIfLong(context, estFrames) // null => separate everything
             val tGate = System.nanoTime()
             try {
                 HtdemucsSession(context, DemucsSeparator.keptStems(keepOther)).use { session ->

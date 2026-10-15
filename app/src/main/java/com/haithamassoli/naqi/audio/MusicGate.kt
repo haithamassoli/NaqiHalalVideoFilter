@@ -192,6 +192,17 @@ class MusicGate private constructor(private val session: OrtSession) : AutoClose
                 .getOrNull()
         }
 
+        /** Audio this long or longer gets the gate; shorter clips separate every chunk. */
+        private const val LONG_FRAMES = 10L * 60 * 44_100
+
+        /**
+         * [open] only for audio of 10 minutes or more ([estFrames] at 44.1 kHz). YAMNet misses some quiet
+         * background music under speech (~4 s of a 4:29 vlog), which a short clip doesn't need to risk;
+         * on a long one the skips save minutes. Null = separate everything.
+         */
+        fun openIfLong(context: Context, estFrames: Long): MusicGate? =
+            if (estFrames >= LONG_FRAMES) open(context) else null
+
         /** 16 kHz samples a [frames]-sample 44.1 kHz window produces; the last one interpolates in range. */
         private fun out16kLength(frames: Int): Int = ((frames - 1) / RATIO).toInt() + 1
     }
