@@ -205,6 +205,8 @@ class MainActivity : ComponentActivity() {
         // Echo what actually parsed. `everyone` and `women` censor identically until Phase C ships a
         // classifier, so without this an adb run cannot show WHICH value survived the wire — only that
         // something censored. Same reason the E2E hooks exist at all: logcat beats UI scripting here.
+        // `--ez cloud false` forces the phone path, to compare it with the server on the same source.
+        if (intent.hasExtra("cloud")) com.haithamassoli.naqi.data.Prefs.setCloud(this, intent.getBooleanExtra("cloud", true))
         android.util.Log.i("NaqiOps", "autorun censorWho=${ops.censorWho} censorFaces=${ops.censorFaces} censorNsfw=${ops.censorNsfw} removeMusic=${ops.removeMusic} wholeFrame=${ops.wholeFrameBlur} body=${ops.bodyBlur} precise=${ops.bodyPrecise}")
 
         // `--ez ytdlp_update true` forces the yt-dlp self-update from adb.
