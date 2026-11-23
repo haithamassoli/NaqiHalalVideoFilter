@@ -67,8 +67,9 @@ jobs:
       - name: Verify ONNX models
         run: ./scripts/fetch-models.sh
 
+      # :core:test named too, not left to app/build.gradle.kts's dependsOn: the shared logic's tests live there.
       - name: Unit tests
-        run: ./gradlew :app:testDebugUnitTest
+        run: ./gradlew :core:test :app:testDebugUnitTest
 
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug

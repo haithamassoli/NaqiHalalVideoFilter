@@ -37,7 +37,17 @@ The website (`web/src/release.ts`) builds its "Download the APK" link from the n
 
 ## Page depth
 
-Only the first page of releases is read. That page holds 30 releases in builds after the monorepo move, and **10** in older builds. If more than 9 desktop releases are published after the newest Android one, older builds can't see it and stop offering updates until the next Android release. Keep desktop releases below that limit, or publish an Android release in between.
+Installed Android builds read only the first page of releases: 30 in builds after the monorepo move, and **10** in older builds. `--latest=false` does not change that order, so desktop releases still push the Android one down the page.
+
+**Rule: the newest Android release must stay within the 10 newest releases. Publish no more than 9 non-Android releases after it; otherwise cut an Android release first.** Older builds that can't see it stop offering updates until the next Android release.
+
+Before publishing a desktop release, check it:
+
+```sh
+.github/scripts/release-depth.sh 9   # fails if one more release would push the Android one out of the 10 newest
+```
+
+Without an argument it checks the current list against 10. The Release depth workflow (`.github/workflows/release-depth.yml`) runs that after every published release and goes red if the rule has been broken. The website reads 100 releases, so it is not affected.
 
 Each published release, desktop ones included, also triggers a website rebuild (`.github/workflows/web.yml`). That is harmless.
 

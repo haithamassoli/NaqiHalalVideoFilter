@@ -3,7 +3,7 @@
 
 Numpy-only, no torch / no demucs. Mirrors the demucs `_spec` / `_ispec` math
 (dsp-spec.md §1-§2, cross-checked against plan.md's locked constants) so that
-apps/android/app/src/test/java/.../audio/DspTest.kt can validate the Kotlin `Fft`/`Stft`
+core/src/test/kotlin/.../audio/DspTest.kt can validate the Kotlin `Fft`/`Stft`
 port against an independent reference.
 
 The SAME code path runs at full size; here it runs a small, odd-tail config
@@ -14,7 +14,7 @@ Reference is float64 (numpy `rfft`/`irfft`, which already fold in 1/N on the
 inverse); the Kotlin port is float32 data with float64 window/envelope/OLA, so
 DspTest compares at atol 1e-4 (measured f32-vs-f64 gap here is ~2e-7).
 
-Fields written to apps/android/app/src/test/resources/dsp/stft_small.json:
+Fields written to core/src/test/resources/dsp/stft_small.json:
   nfft, hop, T, bins (= nfft/2), le (= ceil(T/hop))         ints
   cac_shape = [4, bins, le]                                 the shape `cac` flattens (C-order)
   input     = [ch0[T], ch1[T]]                              f32 stereo test signal (planar)
@@ -115,7 +115,7 @@ def main():
         "roundtrip": [roundtrip[0].tolist(), roundtrip[1].tolist()],
     }
     out_path = os.path.abspath(os.path.join(
-        os.path.dirname(__file__), "..", "apps", "android", "app", "src", "test", "resources", "dsp", "stft_small.json"))
+        os.path.dirname(__file__), "..", "core", "src", "test", "resources", "dsp", "stft_small.json"))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as fh:
         json.dump(payload, fh)

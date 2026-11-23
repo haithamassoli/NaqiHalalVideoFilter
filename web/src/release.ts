@@ -12,8 +12,8 @@ const ANDROID_TAG = /^v\d/;
 export async function latestRelease(repo: string, ext: string): Promise<Release> {
   const fallback = { url: `https://github.com/${repo}/releases/latest` };
   try {
-    // 30 per page so a run of desktop releases can't push the newest Android one off the page.
-    const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=30`, {
+    // 100 per page (GitHub's maximum) so a run of desktop releases can't push the newest Android one off it.
+    const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100`, {
       headers: {
         Accept: 'application/vnd.github+json',
         // Optional: build machines share IPs, so the anonymous 60 requests/hour limit can run out.
