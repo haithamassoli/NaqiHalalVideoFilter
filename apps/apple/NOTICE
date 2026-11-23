@@ -7,9 +7,12 @@ or grant rights to the components and model artifacts below.
 ONNX Runtime Swift Package Manager 1.24.2
   Bundled component: ONNX Runtime Objective-C/C runtime and Swift package.
   Terms: MIT License. The runtime also carries upstream third-party notices.
-  Source: https://github.com/microsoft/onnxruntime-swift-package-manager/tree/1.24.2
-  License: https://github.com/microsoft/onnxruntime-swift-package-manager/blob/1.24.2/LICENSE
-  Runtime notices: https://github.com/microsoft/onnxruntime/blob/v1.24.2/ThirdPartyNotices.txt
+  Source: Packages/OnnxRuntime (the Objective-C wrapper from that package's
+  1.24.2 commit b7fb7f7dea8a2469e6335d95a61b8f36d0dc83b2, plus Microsoft's
+  onnxruntime-c 1.24.2 pod archive; the upstream GitHub repositories are gone)
+  License: Packages/OnnxRuntime/LICENSE
+  Runtime notices: ThirdPartyNotices.txt in the Microsoft.ML.OnnxRuntime 1.24.2
+  NuGet package, https://www.nuget.org/packages/Microsoft.ML.OnnxRuntime/1.24.2
 
 Demucs / htdemucs
   Bundled artifact: naqi/Resources/Models/htdemucs_s26_f32.onnx

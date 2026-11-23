@@ -92,7 +92,9 @@ Free on the App Store for iPhone and iPad. The Mac app is built from source (bel
 ## Build from source
 
 You need a Mac with Xcode and the iOS 18 / macOS 15 SDKs. The project uses Swift 6 and resolves
-ONNX Runtime and the FFmpegKit min build through Swift Package Manager.
+ONNX Runtime and the FFmpegKit min build through Swift Package Manager. ONNX Runtime comes from
+the local package in [`Packages/OnnxRuntime`](Packages/OnnxRuntime/Package.swift), because
+Microsoft's Swift package repository is gone; Xcode downloads its binary on first resolve.
 
 The models and fonts are gitignored. Run the commands below from `apps/apple`. A fresh clone needs
 three things first:
