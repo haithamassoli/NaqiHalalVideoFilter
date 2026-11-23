@@ -33,9 +33,11 @@ class FaceAnalyzer(who: String, modelsDir: File = Models.dir()) : AutoCloseable 
         ?.let { GenderVoter(it) }
 
     private val tracker = FaceTracks(who)
+    private val cuts = SceneCuts()
 
     /** One UPRIGHT analysis frame from `VideoDecoder.sample`. Must not keep [frame] past the call. */
     fun onFrame(frame: RgbFrame) {
+        if (cuts.isCut(frame)) tracker.cut()
         val faces = detector.detect(frame)
         tracker.onFrame(faces, frame.width, frame.height, frame.ptsMs, voter?.let { v -> { rect -> v.vote(frame, rect) } })
     }
