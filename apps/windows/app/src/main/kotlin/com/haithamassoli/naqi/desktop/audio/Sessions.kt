@@ -2,6 +2,7 @@ package com.haithamassoli.naqi.desktop.audio
 
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
+import ai.onnxruntime.OrtLoggingLevel
 import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import com.haithamassoli.naqi.audio.DemucsSeparator
@@ -40,6 +41,9 @@ internal class HtdemucsSession(file: File, private val keep: IntArray) : AutoClo
             opts.addConfigEntry("session.intra_op.allow_spinning", "0")
             opts.setCPUArenaAllocator(false)
             opts.setMemoryPatternOptimization(false)
+            // The f16 graph's Sin/Cos/Mul nodes print a "can't constant fold" warning each, every session: noise
+            // in the CLI's output for something that only means those nodes stay in the graph.
+            opts.setSessionLogLevel(OrtLoggingLevel.ORT_LOGGING_LEVEL_ERROR)
             env.createSession(file.absolutePath, opts)
         }
     }
