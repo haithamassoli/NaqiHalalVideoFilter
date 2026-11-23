@@ -218,10 +218,20 @@ object Renderer {
             out.pb(io)
             ffCheck(avformat_write_header(out, null as AVDictionary?), "mp4 header")
 
+            // The last dts written per output stream. Where a splice leaves one stream's new segment starting a
+            // few ms before its old one ended (the shared clock moves by whichever stream saw the jump first), the
+            // packet goes at last + 1, as the ffmpeg CLI's muxer does, instead of the MP4 muxer refusing the job.
+            val lastDts = HashMap<Int, Long>()
             fun write(p: AVPacket, from: AVStream, to: AVStream, shift: Long) {
                 if (p.pts() != AV_NOPTS_VALUE) p.pts(p.pts() - shift)
                 if (p.dts() != AV_NOPTS_VALUE) p.dts(p.dts() - shift)
                 av_packet_rescale_ts(p, from.time_base(), to.time_base())
+                val prev = lastDts[to.index()]
+                if (prev != null && p.dts() != AV_NOPTS_VALUE && p.dts() <= prev) {
+                    p.dts(prev + 1)
+                    if (p.pts() != AV_NOPTS_VALUE && p.pts() < p.dts()) p.pts(p.dts())
+                }
+                if (p.dts() != AV_NOPTS_VALUE) lastDts[to.index()] = p.dts()
                 p.stream_index(to.index())
                 p.pos(-1)
                 ffCheck(av_interleaved_write_frame(out, p), "mp4 write") // takes the packet's data
@@ -296,12 +306,14 @@ object Renderer {
 
             val durationUs = inFmt.duration().takeIf { it != AV_NOPTS_VALUE && it > 0 } ?: 0L
             var lastPct = -1
+            val clock = TsDiscontinuity(inFmt) // the same continuous clock the sampler and the audio decoder read
             while (true) {
                 coroutineContext.ensureActive()
                 val r = av_read_frame(inFmt, pkt)
                 if (r == AVERROR_EOF) break
                 ffCheck(r, "read $input")
                 try {
+                    clock.fix(pkt)
                     when (pkt.stream_index()) {
                         vIn.index() -> {
                             val ts = if (pkt.dts() != AV_NOPTS_VALUE) pkt.dts() else pkt.pts()

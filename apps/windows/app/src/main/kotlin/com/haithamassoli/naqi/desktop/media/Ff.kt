@@ -17,6 +17,7 @@ import org.bytedeco.javacpp.Loader
 import org.bytedeco.javacpp.PointerPointer
 import java.io.File
 import java.io.IOException
+import kotlin.math.abs
 
 // The few libav* idioms every file in this package repeats. Everything here is a thin wrapper: the
 // FFmpeg C API is the API, this only turns its negative return codes into exceptions.
@@ -101,6 +102,50 @@ internal inline fun decodePacket(dec: AVCodecContext, pkt: AVPacket?, frame: AVF
 
 /** The stream's start in its own time base, 0 when the container does not say. */
 internal fun startPts(st: AVStream): Long = st.start_time().let { if (it == AV_NOPTS_VALUE) 0L else it }
+
+/**
+ * The ffmpeg CLI's timestamp-discontinuity rule, for formats whose clock may jump ([AVFMT_TS_DISCONT]: MPEG-TS
+ * and the like; a no-op for any other). A packet whose dts is more than [THRESHOLD_US] (the CLI's 10 s
+ * `-dts_delta_threshold`) from where its stream was due next, or that goes back more than 0.1 s, moves one
+ * offset shared by every stream of the file, so the clock goes on from where it was and audio and video stay
+ * together. Every reader of a file runs its packets through one of these before decoding or copying them: the
+ * sampler, the audio decoder and the renderer then all see the same continuous clock, and the EDL's times
+ * match the frames the renderer edits.
+ */
+internal class TsDiscontinuity(private val fmt: AVFormatContext) {
+    private val enabled = fmt.iformat().flags() and AVFMT_TS_DISCONT != 0
+    private var offsetUs = 0L
+    private val nextUs = HashMap<Int, Long>() // per stream: where the next dts is due, on the corrected clock
+    private val lastUs = HashMap<Int, Long>() // per stream: the latest pts/dts seen, on the corrected clock
+
+    fun fix(pkt: AVPacket) {
+        if (!enabled) return
+        val i = pkt.stream_index()
+        val tb = fmt.streams(i).time_base()
+        var shift = av_rescale_q(offsetUs, MICROS, tb)
+        val raw = if (pkt.dts() != AV_NOPTS_VALUE) pkt.dts() else pkt.pts()
+        if (raw != AV_NOPTS_VALUE) {
+            val due = nextUs[i]
+            val at = toUs(raw + shift, tb)
+            if (due != null && (abs(at - due) > THRESHOLD_US || at + BACKWARD_US < lastUs.getValue(i))) {
+                offsetUs -= at - due
+                shift = av_rescale_q(offsetUs, MICROS, tb)
+            }
+        }
+        if (pkt.pts() != AV_NOPTS_VALUE) pkt.pts(pkt.pts() + shift)
+        if (pkt.dts() != AV_NOPTS_VALUE) pkt.dts(pkt.dts() + shift)
+        val dts = if (pkt.dts() != AV_NOPTS_VALUE) pkt.dts() else pkt.pts()
+        if (dts == AV_NOPTS_VALUE) return
+        val pts = if (pkt.pts() != AV_NOPTS_VALUE) pkt.pts() else dts
+        lastUs[i] = maxOf(lastUs[i] ?: Long.MIN_VALUE, toUs(maxOf(pts, dts), tb))
+        nextUs[i] = toUs(dts + maxOf(pkt.duration(), 0L), tb)
+    }
+
+    private companion object {
+        const val THRESHOLD_US = 10_000_000L
+        const val BACKWARD_US = 100_000L
+    }
+}
 
 /** [ts] in [tb] as whole milliseconds, floored (SEAMS: ptsMs is floored, never rounded up past a frame). */
 internal fun toMs(ts: Long, tb: AVRational): Long = av_rescale_q_rnd(ts, tb, MILLIS, AV_ROUND_DOWN)

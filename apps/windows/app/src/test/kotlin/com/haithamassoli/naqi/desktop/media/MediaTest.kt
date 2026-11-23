@@ -245,9 +245,22 @@ class MediaTest {
         var count = 0L
         var sumSq = 0.0
         AudioDecoder.decode(m4a) { b, k -> count += k; for (i in 0 until k * 2) sumSq += b[i] * b[i] }
-        // The priming is trimmed (edit list); the last frame's padding is not, as with any FFmpeg MP4 read.
-        assertTrue("decoded $count of $n", count in n.toLong() until n + 1024L)
+        // The priming and the last frame's padding are both trimmed (the edit list): exactly what was written.
+        assertEquals(n.toLong(), count)
         assertEquals(0.5 / sqrt(2.0), sqrt(sumSq / (count * 2)), 0.02)
+    }
+
+    @Test
+    fun anAacMp4DecodesToItsOwnLengthWithoutTheEncodersPadding() = runBlocking {
+        // 8 s at 44.1 kHz is 352 800 samples, not a whole number of 1024-sample AAC frames: the encoder pads
+        // the last frame and the MP4 edit list says where the audio really ends. FFmpeg 8.1's demuxer only
+        // shortens that last packet's duration, so a plain decode hands back 480 samples of padding too, and
+        // music removal then wrote a track 11 ms longer than the video.
+        val src = tmp.root.resolve("aac.mp4")
+        ff("-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100:duration=8", "-c:a", "aac", src.path)
+        var count = 0L
+        assertTrue(AudioDecoder.decode(src) { _, k -> count += k })
+        assertEquals(352_800L, count)
     }
 
     @Test
@@ -446,6 +459,50 @@ class MediaTest {
             val crossings = (from + 1 until to).count { (left[it - 1] < 0f) != (left[it] < 0f) }
             assertEquals("tone at ${at + s / 2} s", hz.toDouble(), crossings / 2.0 / ((to - from) / 44_100.0), hz * 0.05)
             at += s
+        }
+    }
+
+    /** [framePtsMs] for every stream of [type], from packets (one per frame for these fixtures). */
+    private fun packetPtsMs(f: File, type: String): List<Long> =
+        run(ffprobe, "-v", "error", "-select_streams", "$type:0", "-show_entries", "packet=pts_time", "-of", "csv=p=0", f.path)
+            .lines().filter { it.isNotBlank() }.map { Math.round(it.trim().trimEnd(',').toDouble() * 1000) }
+
+    @Test
+    fun aSplicedMpegTsRendersOnOneContinuousClock() = runBlocking {
+        // The same splice with video: 1 s, then 1.5 s whose clock is 60 s ahead, then 2 s reset to the start.
+        // Copied packets used to go backward at the reset and the MP4 muxer refused them ("mp4 write: Invalid
+        // argument"), whatever the job; re-encoding would have dropped the third segment's frames. The ffmpeg
+        // CLI moves the whole file's clock at such a jump, and every reader here now does the same.
+        val secs = listOf(1.0, 1.5, 2.0)
+        val parts = secs.mapIndexed { i, s ->
+            tmp.root.resolve("v$i.ts").also {
+                ff("-f", "lavfi", "-i", "testsrc=size=160x120:rate=30:duration=$s",
+                    "-f", "lavfi", "-i", "sine=frequency=${440 * (i + 1)}:sample_rate=44100:duration=$s",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                    *(if (i == 1) arrayOf("-output_ts_offset", "60") else emptyArray()), "-f", "mpegts", it.path)
+            }
+        }
+        val ts = tmp.root.resolve("splice-av.ts")
+        ts.writeBytes(parts.fold(ByteArray(0)) { acc, f -> acc + f.readBytes() })
+        val frames = (secs.sum() * 30).toInt()
+
+        val sampled = sampled(ts, fps = 30f).map { it.ptsMs }
+        assertEquals(frames, sampled.size)
+        assertTrue("sampled clock $sampled", sampled.zipWithNext().all { (a, b) -> b - a in 1L..100L })
+
+        for (reencode in listOf(false, true)) {
+            val out = tmp.root.resolve("splice-$reencode.mp4")
+            val seen = ArrayList<Long>()
+            Renderer.render(ts, out, AudioOut.Keep, if (reencode) { f -> seen += f.ptsMs } else null) {}
+            val v = packetPtsMs(out, "v").sorted()
+            assertEquals("video frames (reencode=$reencode)", frames, v.size)
+            assertTrue("video clock $v", v.zipWithNext().all { (a, b) -> b - a in 1L..100L })
+            val a = packetPtsMs(out, "a").sorted()
+            // In order and without a hole. At a splice a packet may sit one tick after the last: each segment's
+            // AAC padding overlaps the next, which MPEG-TS cannot trim, and the muxer step closes it up as ffmpeg's.
+            assertTrue("audio clock (reencode=$reencode) $a", a.zipWithNext().all { (x, y) -> y - x in 0L..100L })
+            assertEquals("audio ends with the video", v.last().toDouble(), a.last().toDouble(), 150.0)
+            if (reencode) assertEquals("the editor sees the sampler's clock", sampled, seen)
         }
     }
 }

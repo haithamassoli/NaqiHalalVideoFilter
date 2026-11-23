@@ -142,7 +142,16 @@ object AudioDecoder {
      * frame), or, in an [AVFMT_TS_DISCONT] format, a forward one over [MAX_GAP_FILL_SECONDS]. There the clock
      * is rebased onto where the audio so far ends and the frame is appended whole, so no decoded sample is
      * ever dropped except a genuine overlap. Other formats' timestamps are trusted (MP4, MKV: their gaps are
-     * real, and the video sits on the same clock), so a forward gap of any size is filled there.
+     * real, and the video sits on the same clock), so a forward gap of any size is filled there. In practice
+     * [readStream]'s [TsDiscontinuity] has already moved a jumping file's packets onto one continuous clock, the
+     * one the video is sampled and rendered on; this rule is what is left if the frames still disagree.
+     *
+     * In an MP4/MOV, an AAC encoder's padding of the last frame is marked only by that last packet's shorter
+     * duration: FFmpeg 8.1's demuxer exports no end padding for the decoder to drop, so a frame longer than
+     * its own duration is cut to it here. Only where the stream's time base is 1/rate, so the duration counts
+     * samples exactly (the MP4 muxers' default for audio); the edit list's end is no substitute, since the
+     * movie timescale it is written in is often 1/1000. Without this a 44.1 kHz source came back up to 1023
+     * samples long, and so did the music-removed track put back over its video.
      *
      * Mono is duplicated at full level into both channels, as Android's decoder does (swresample's own
      * mono upmix would put it 3 dB down). More than two channels go through swresample's downmix, which,
@@ -189,8 +198,12 @@ object AudioDecoder {
             var fed = 0L // input samples handed to the resampler since the first frame
             var origin = AV_NOPTS_VALUE // the first frame's timestamp, in input samples (rebased at a discontinuity)
             var discont = false
+            var mov = false
             try {
-                val opened = { fmt: AVFormatContext -> discont = fmt.iformat().flags() and AVFMT_TS_DISCONT != 0 }
+                val opened = { fmt: AVFormatContext ->
+                    discont = fmt.iformat().flags() and AVFMT_TS_DISCONT != 0
+                    mov = fmt.iformat().name().string.split(',').contains("mov")
+                }
                 readStream(input, AVMEDIA_TYPE_AUDIO, opened) { st, frame ->
                     if (swr == null) {
                         inRate = frame.sample_rate()
@@ -244,7 +257,14 @@ object AudioDecoder {
                             skip = (-drift).toInt() // under nb_samples: the rest of the frame is new
                         }
                     }
-                    val n = frame.nb_samples() - skip
+                    // The encoder's end padding (see above): the frame's duration is its packet's, in samples here.
+                    val tb = st.time_base()
+                    val padding = if (mov && tb.num() == 1 && tb.den() == inRate && frame.duration() in 1 until frame.nb_samples()) {
+                        frame.nb_samples() - frame.duration().toInt()
+                    } else {
+                        0
+                    }
+                    val n = frame.nb_samples() - skip - padding
                     if (n > 0) {
                         if (skip == 0) {
                             push(frame.extended_data(), n, inRate)
@@ -362,7 +382,8 @@ internal class ToRgb(private val flags: Int) : AutoCloseable {
 /**
  * Decodes every frame of [input]'s best stream of [type] in presentation order and hands it to
  * [onFrame] (valid only inside the call), after [onOpen] has seen the opened file. Returns null, having
- * decoded nothing, when there is no such stream. Checks for cancellation once per packet.
+ * decoded nothing, when there is no such stream. Checks for cancellation once per packet. Timestamps are on
+ * the file's continuous clock ([TsDiscontinuity]), the one [Renderer] writes.
  */
 internal suspend inline fun readStream(
     input: File,
@@ -378,12 +399,14 @@ internal suspend inline fun readStream(
         val st = bestStream(fmt, type) ?: return null
         onOpen(fmt)
         val d = openDecoder(st).also { dec = it }
+        val clock = TsDiscontinuity(fmt)
         while (true) {
             kotlin.coroutines.coroutineContext.ensureActive()
             val r = av_read_frame(fmt, pkt)
             if (r == AVERROR_EOF) break
             ffCheck(r, "read $input")
             try {
+                clock.fix(pkt) // every stream's packets, so a jump seen first in another stream moves this one too
                 if (pkt.stream_index() == st.index()) decodePacket(d, pkt, frame) { onFrame(st, it) }
             } finally {
                 av_packet_unref(pkt)
