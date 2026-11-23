@@ -1,5 +1,5 @@
-// Mirrors core/src/main/kotlin/com/haithamassoli/naqi/model/FilterOps.kt (fields, defaults, wire
-// literals). The full port with its rules and tests lands with the rest of core/ (plan milestone 2).
+// Port of core/src/main/kotlin/com/haithamassoli/naqi/model/FilterOps.kt (fields, defaults, wire
+// literals, who parsing).
 
 export const NONE = 'none';
 export const EVERYONE = 'everyone';
@@ -31,6 +31,24 @@ export interface FilterOps {
   solidColor: number;
   /** Spleeter keeps vocals only; "vocals_other" is not offered on the web (plan §4). */
   keepStems: 'vocals';
+}
+
+/** The pipeline branches on *whether* faces are censored, never on *which*. */
+export const censorFaces = (ops: Pick<FilterOps, 'censorWho'>): boolean => ops.censorWho !== NONE;
+
+export const anyOp = (ops: Pick<FilterOps, 'removeMusic' | 'censorWho'>): boolean => ops.removeMusic || censorFaces(ops);
+
+/** Legacy `censorWomen` boolean -> the new field; `true` censored every detected face. */
+export const whoFromLegacy = (censorWomen: boolean): CensorWho => (censorWomen ? EVERYONE : NONE);
+
+/**
+ * Wire value -> field. Absent or blank ⇒ null; anything unrecognised resolves to EVERYONE, because
+ * censoring is the safe direction and a typo that quietly stopped censoring is the failure nobody sees.
+ */
+export function whoOrNull(raw: string | null | undefined): CensorWho | null {
+  const who = (raw ?? '').trim().toLowerCase();
+  if (who === '') return null;
+  return who === NONE || who === EVERYONE || who === WOMEN || who === MEN ? who : EVERYONE;
 }
 
 export const DEFAULT_OPS: Readonly<FilterOps> = Object.freeze({
