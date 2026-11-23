@@ -300,6 +300,52 @@ class MediaTest {
     }
 
     @Test
+    fun anOutputThatAppearsDuringTheRenderIsNotReplaced() = runBlocking {
+        val input = clip()
+        val out = tmp.root.resolve("out.mp4")
+        // Created after render's up-front check and before it publishes.
+        try {
+            Renderer.render(input, out, AudioOut.Keep, null) { if (it < 100 && !out.exists()) out.writeText("someone else's") }
+            fail("replaced a file that appeared during the render")
+        } catch (_: FileAlreadyExistsException) {
+        }
+        assertEquals("someone else's", out.readText())
+        assertArrayEquals(arrayOf("in.mp4", "out.mp4"), tmp.root.list()!!.sortedArray())
+    }
+
+    @Test
+    fun publishingNeverClobbersAFileCreatedAtTheSameMoment() {
+        // Codex re-review, finding 1: Java's move without REPLACE_EXISTING is check-then-rename on macOS and
+        // Linux, so a file created between the two is silently replaced. Race a CREATE_NEW against publish
+        // many times: at most one of them may succeed, and the file holds the winner's bytes.
+        val out = tmp.root.resolve("raced.mp4").toPath()
+        val barrier = java.util.concurrent.CyclicBarrier(2)
+        var theirs = false
+        var clobbered = 0
+        val rounds = 500 // the check-then-rename lost about 98% of them
+        val rival = Thread {
+            repeat(rounds) {
+                barrier.await()
+                theirs = runCatching { java.nio.file.Files.write(out, byteArrayOf(2), java.nio.file.StandardOpenOption.CREATE_NEW) }.isSuccess
+                barrier.await()
+            }
+        }.apply { start() }
+        repeat(rounds) {
+            val part = File.createTempFile(".raced.", ".part", tmp.root).apply { writeBytes(byteArrayOf(1)) }
+            barrier.await()
+            val ours = try { Renderer.publish(part, out.toFile(), overwrite = false); true } catch (_: FileAlreadyExistsException) { false }
+            barrier.await()
+            val bytes = out.toFile().readBytes()
+            if ((ours && theirs) || bytes.single() != (if (ours) 1 else 2).toByte()) clobbered++
+            if (!ours) assertTrue("the temp file is left behind", part.delete())
+            assertFalse(part.exists())
+            out.toFile().delete()
+        }
+        rival.join()
+        assertEquals("rounds where both wrote, or the file is not the winner's", 0, clobbered)
+    }
+
+    @Test
     fun aCancelBeforeTheRenameLeavesNothingAndOneAfterItIsDone() = runBlocking {
         val input = clip()
         val frames = framePtsMs(input).size
