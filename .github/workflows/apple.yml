@@ -1,0 +1,76 @@
+# Unsigned builds of the naqi scheme (app, share extension, widgets) for macOS and the iOS Simulator.
+#
+# The build does not need the gitignored models, fonts or NaqiCloud.plist: every target uses
+# file-system-synchronized folders, so missing files are just left out of the bundle.
+# The tests are compiled (build-for-testing) but not run. ModelContractTests and the audio and
+# analysis suites need the staged models, and scripts/fetch-models.sh needs
+# nsfw_mnv2_140_f32.onnx, which no published artifact provides.
+name: Apple
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/apple/**
+      - .github/workflows/apple.yml
+  pull_request:
+    paths:
+      - apps/apple/**
+      - .github/workflows/apple.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: macos-26
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            destination: generic/platform=macOS
+            action: build-for-testing # the app plus the naqiTests bundle
+          - name: iOS Simulator
+            destination: generic/platform=iOS Simulator
+            action: build
+    defaults:
+      run:
+        working-directory: apps/apple
+    env:
+      # LastUpgradeCheck = 2660, and SWIFT_APPROACHABLE_CONCURRENCY needs the Swift 6.2 toolchain.
+      # The macos-26 image ships Xcode 26.6 with the macOS 26.5 and iOS 26.5 SDKs.
+      XCODE: /Applications/Xcode_26.6.app
+      SPM_DIR: ${{ github.workspace }}/.spm
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      # ffmpeg-kit-spm's binary frameworks are large; key on the pins so a repin refetches.
+      - name: Cache Swift packages
+        uses: actions/cache@v6
+        with:
+          path: .spm
+          key: spm-${{ runner.os }}-${{ hashFiles('apps/apple/naqi.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+
+      - name: xcodebuild ${{ matrix.action }}
+        run: |
+          xcodebuild "${{ matrix.action }}" \
+            -project naqi.xcodeproj \
+            -scheme naqi \
+            -configuration Debug \
+            -destination "${{ matrix.destination }}" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -clonedSourcePackagesDirPath "$SPM_DIR" \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO

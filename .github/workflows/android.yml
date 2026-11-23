@@ -1,0 +1,81 @@
+# Unit tests and a debug APK for apps/android.
+name: Android
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/android/**
+      - models/**
+      - NOTICE # copied into the APK by :app:copyNotice
+      - .github/workflows/android.yml
+  pull_request:
+    paths:
+      - apps/android/**
+      - models/**
+      - NOTICE
+      - .github/workflows/android.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/android
+    env:
+      # preBuild depends on :app:verifyModels, so both tasks below fail without the five gitignored
+      # ONNX models. fetch-models.sh exports yolo11n-seg with torch + ultralytics, which CI cannot
+      # reproduce cheaply, but this release ships all five byte-identical to its checksums.
+      MODELS_APK: https://github.com/haithamassoli/NaqiHalalVideoFilter/releases/download/v1.9.0/naqi-1.9.0.apk
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21 # gradle/gradle-daemon-jvm.properties: toolchainVersion=21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Restore ONNX models
+        id: models
+        uses: actions/cache@v6
+        with:
+          path: apps/android/app/src/main/assets/models
+          key: android-models-${{ hashFiles('apps/android/scripts/fetch-models.sh') }}
+
+      - name: Download ONNX models
+        if: steps.models.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p app/src/main/assets/models
+          curl -fL --retry 3 -o "$RUNNER_TEMP/models.apk" "$MODELS_APK"
+          unzip -j -o "$RUNNER_TEMP/models.apk" 'assets/models/*.onnx' -d app/src/main/assets/models
+          rm "$RUNNER_TEMP/models.apk"
+
+      # With every model present the script skips its export and download and only checks the
+      # SHA-256 of each file, so a changed model fails here rather than in the build.
+      - name: Verify ONNX models
+        run: ./scripts/fetch-models.sh
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-test-reports
+          path: apps/android/app/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7
