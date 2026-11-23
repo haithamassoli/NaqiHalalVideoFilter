@@ -9,3 +9,4 @@ package com.haithamassoli.naqi.desktop.ui
  * unreviewed version of it.
  */
 internal val NOTICE: String = object {}.javaClass.getResource("NOTICE")!!.readText()
+    .replace("\r\n", "\n") // a Windows checkout (core.autocrlf) bakes CRLF into the jar
