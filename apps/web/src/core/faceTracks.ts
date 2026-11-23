@@ -47,10 +47,18 @@ export class FaceTracks {
   /**
    * `faces` are raw boxes normalized to the `uprightW` x `uprightH` analysis frame. `vote` classifies one
    * of them (+1 male, -1 female, 0 abstain), or is null when no vote is wanted.
+   * Async only because the web's ONNX Runtime is: callers await each frame before the next, and a vote that
+   * throws rejects the whole frame (the caller stops the export).
    */
-  onFrame(faces: NRect[], uprightW: number, uprightH: number, ptsMs: number, vote: ((face: NRect) => number) | null): void {
+  async onFrame(
+    faces: NRect[],
+    uprightW: number,
+    uprightH: number,
+    ptsMs: number,
+    vote: ((face: NRect) => number | Promise<number>) | null,
+  ): Promise<void> {
     const assigned = this.associate(faces, ptsMs);
-    faces.forEach((rect, i) => {
+    for (const [i, rect] of faces.entries()) {
       let track = assigned[i];
       if (!track) {
         track = new FaceTrack(this.nextId++);
@@ -58,19 +66,19 @@ export class FaceTracks {
         if (ptsMs - this.lastCutMs <= MATCH_GAP_MS) this.afterCut.set(track, this.lastCutMs);
       }
       track.samples.push({ ptsMs, rect, mask: null });
-      if (!vote || this.contested.has(track)) return; // contested is already censored: nothing to learn
+      if (!vote || this.contested.has(track)) continue; // contested is already censored: nothing to learn
       // CHECK: a spared track keeps its spare only for faces whose own readable vote agrees with it.
       const spared = this.spared(track);
       const px = Math.trunc(Math.max(rectWidth(rect) * uprightW, rectHeight(rect) * uprightH)); // unpadded, upright px
       if (px < MIN_FACE_PX) {
         // too small to read: no vote, which already means censor
         if (spared) this.contested.add(track);
-        return;
+        continue;
       }
       // Android's guards: at most VOTE_CAP votes, spent on the biggest crops.
       const counted = track.votesTried < VOTE_CAP && px > track.classifiedPx;
-      if (!counted && !spared) return;
-      const v = vote(rect);
+      if (!counted && !spared) continue;
+      const v = await vote(rect);
       if (counted) {
         track.votesTried++;
         track.classifiedPx = px;
@@ -78,7 +86,7 @@ export class FaceTracks {
         else if (v === -1) track.femaleVotes++;
       }
       if (spared && v !== -this.against) this.contested.add(track);
-    });
+    }
     this.live = this.live.filter((track) => {
       if (isStale(last(track.samples).ptsMs, ptsMs)) {
         this.emit(track);

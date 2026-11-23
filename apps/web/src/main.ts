@@ -56,6 +56,7 @@ function readOps(): FilterOps {
 
 const PHASES: Record<Phase, string> = {
   open: 'Opening the video…',
+  analyze: 'Analyzing the picture…',
   remux: 'Writing the MP4…',
   model: 'Loading the music model…',
   music: 'Removing music…',

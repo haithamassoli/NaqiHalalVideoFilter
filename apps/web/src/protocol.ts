@@ -8,7 +8,7 @@ export type ToWorker =
   | { type: 'start'; file: File; ops: FilterOps; target: SaveTarget }
   | { type: 'cancel' };
 
-export type Phase = 'open' | 'remux' | 'model' | 'music' | 'finalize';
+export type Phase = 'open' | 'analyze' | 'remux' | 'model' | 'music' | 'finalize';
 
 export type FromWorker =
   | { type: 'progress'; phase: Phase; pct: number }

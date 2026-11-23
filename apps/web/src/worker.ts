@@ -25,6 +25,7 @@ import {
 } from 'mediabunny';
 import { RATE } from './audio/grid';
 import { loadSpleeter, separate } from './audio/separate';
+import { censorFaces, type FilterOps } from './core/filterOps';
 import type { FromWorker, Phase, ToWorker } from './protocol';
 
 let canceled = false;
@@ -54,6 +55,7 @@ async function run({ file, ops, target }: Extract<ToWorker, { type: 'start' }>):
   let disk: FileSystemWritableFileStream | null = null;
   try {
     progress('open', 0);
+    await analyzePicture(input, ops);
     const mp4 = new Mp4OutputFormat({ fastStart: target.kind === 'buffer' ? 'in-memory' : false });
     const music = ops.removeMusic ? await planMusicRemoval(input) : null;
     // AAC in MP4 where the browser can encode it. Otherwise Opus, in WebM when the video fits WebM.
@@ -85,6 +87,32 @@ async function run({ file, ops, target }: Extract<ToWorker, { type: 'start' }>):
   } finally {
     cancelCurrent = null;
     input.dispose();
+  }
+}
+
+/**
+ * Pass 1 when anything in the picture is censored. Until the render pass exists, an EDL with anything in
+ * it stops the export: the video is never written with what should have been covered left bare. An empty
+ * EDL (analyzed, nothing to cover) goes on to the copy paths below (plan §3, render case 2).
+ */
+async function analyzePicture(input: Input, ops: FilterOps): Promise<void> {
+  if (!censorFaces(ops) && !ops.censorNsfw) return;
+  const video = await input.getPrimaryVideoTrack();
+  if (!video) return; // no picture, nothing to censor in it
+  progress('analyze', 0);
+  const { analyze } = await import('./vision/analyze');
+  const edl = await analyze(
+    video,
+    ops,
+    (pct) => progress('analyze', pct),
+    () => {
+      if (canceled) throw new Error('Canceled.');
+    },
+  );
+  if (edl.censorIntervalsMs.length > 0 || edl.faceTracks.length > 0) {
+    throw new Error(
+      `The analysis found ${edl.faceTracks.length} face span(s) and ${edl.censorIntervalsMs.length} whole-frame span(s) to cover, and this build cannot render censored video yet.`,
+    );
   }
 }
 
