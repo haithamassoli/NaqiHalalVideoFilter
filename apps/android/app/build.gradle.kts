@@ -160,7 +160,8 @@ abstract class CopyNoticeTask : DefaultTask() {
 }
 
 val copyNotice = tasks.register<CopyNoticeTask>("copyNotice") {
-    notice.set(rootProject.layout.projectDirectory.file("NOTICE"))
+    // NOTICE sits at the monorepo root, two levels above this Gradle project (apps/android).
+    notice.set(rootProject.layout.projectDirectory.file("../../NOTICE"))
 }
 androidComponents.onVariants { variant ->
     variant.sources.assets?.addGeneratedSourceDirectory(copyNotice, CopyNoticeTask::outputDir)

@@ -4,7 +4,7 @@ Thanks for looking. Issues and pull requests are both welcome.
 
 ## Before you write code
 
-Read `docs/` first. `docs/plan-*.md` and `docs/perf-plan-*.md` are committed specs: they pick the
+Read `docs/` and `apps/android/docs/` first. `apps/android/docs/plan-*.md` and `apps/android/docs/perf-plan-*.md` are committed specs: they pick the
 seam a change should land on and list the alternatives already rejected, with the measurements that
 rejected them. A change that reopens a settled decision needs to say why the old measurement no
 longer holds. This is the single biggest time-saver in this repo.
@@ -12,17 +12,19 @@ longer holds. This is the single biggest time-saver in this repo.
 ## Setting up
 
 ```bash
+cd apps/android
 ./scripts/fetch-models.sh          # models are gitignored; see the README
 ./gradlew assembleDebug
 ```
 
 Two of the five ONNX artifacts have no public host and the script will tell you so — regenerate them
-per [`docs/m0-spikes.md`](docs/m0-spikes.md), or point the app at your own host with
+per [`apps/android/docs/m0-spikes.md`](apps/android/docs/m0-spikes.md), or point the app at your own host with
 `-PnaqiModelBaseUrl=...`.
 
 ## The build gate
 
 ```bash
+cd apps/android
 ./gradlew compileDebugKotlin testDebugUnitTest
 ```
 
@@ -43,13 +45,13 @@ read its output for your own change, but it is not a gate and fixing all of it i
 
 ## Model changes
 
-Any new or re-exported model needs: the regeneration pipeline written into `docs/m0-spikes.md`, a
+Any new or re-exported model needs: the regeneration pipeline written into `apps/android/docs/m0-spikes.md`, a
 fresh `shasum -a 256` in `NaqiModel`, a licence entry in `NOTICE`, and a parity check against the
 artifact it replaces. fp16 conversions have corrupted this app three separate times — verify on
 hardware, not on the emulator.
 
 ## Translations
 
-Strings live in `app/src/main/res/values/strings.xml` (English) and `values-ar/` (Arabic). Both
+Strings live in `apps/android/app/src/main/res/values/strings.xml` (English) and `values-ar/` (Arabic). Both
 READMEs are hand-written, not generated: a change to `README.md` should carry the same change into
 `README.ar.md`.

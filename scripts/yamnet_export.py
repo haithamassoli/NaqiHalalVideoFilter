@@ -32,7 +32,7 @@ graphs (verified bit-exact on several waveforms) with different serialized bytes
 prints a DIFFERENT sha256. The shipped file is the authority — if you re-export, update
 `NaqiModel.MUSIC_GATE.sha256` from the sha this prints, or `ModelDownloader` rejects the download.
 
-    python3 scripts/yamnet_export.py            # writes app/src/main/assets/models/yamnet.onnx
+    python3 scripts/yamnet_export.py            # writes apps/android/app/src/main/assets/models/yamnet.onnx
     python3 scripts/yamnet_export.py --keep     # also leave the intermediates in build/yamnet/
 """
 
@@ -67,7 +67,7 @@ CLASS_MAP_ANCHORS = {24: "Singing", 32: "Humming", 132: "Music", 276: "Scary mus
 
 ROOT = Path(__file__).resolve().parent.parent
 WORK = ROOT / "build" / "yamnet"
-OUT = ROOT / "app/src/main/assets/models/yamnet.onnx"
+OUT = ROOT / "apps/android/app/src/main/assets/models/yamnet.onnx"
 
 
 def fetch_saved_model() -> Path:

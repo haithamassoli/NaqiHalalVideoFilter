@@ -25,7 +25,7 @@ VLOG_HOST_NAME="vlog-naqi"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$ROOT/qa-assets/bench-out/device"
-ASSETS="$ROOT/app/src/main/assets/models"
+ASSETS="$ROOT/apps/android/app/src/main/assets/models"
 PY="$ROOT/.venv-bench/bin/python"
 REPORT="$ROOT/docs/bench/baseline-2026-10.md"
 
@@ -121,8 +121,8 @@ ensure_pkg() {
   if ! A shell pm path "$PKG" >/dev/null 2>&1; then
     log "benchmark APK missing — assembling"
     JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
-      "$ROOT/gradlew" -p "$ROOT" :app:assembleBenchmark
-    A install -r "$ROOT/app/build/outputs/apk/benchmark/app-benchmark.apk"
+      "$ROOT/apps/android/gradlew" -p "$ROOT/apps/android" :app:assembleBenchmark
+    A install -r "$ROOT/apps/android/app/build/outputs/apk/benchmark/app-benchmark.apk"
   fi
   grant_perms
 }

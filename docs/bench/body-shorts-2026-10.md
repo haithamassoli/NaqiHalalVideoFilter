@@ -103,8 +103,8 @@ content, and no reference stems are available for this song.
 
 ```sh
 .venv-bench/bin/python scripts/export_person.py
-./scripts/fetch-models.sh
-./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleBenchmark
+apps/android/scripts/fetch-models.sh
+apps/android/gradlew -p apps/android :app:testDebugUnitTest :app:assembleDebug :app:assembleBenchmark
 .venv-bench/bin/python scripts/bench/score_body.py qa-assets/bench-out/body-shorts/rX6wXhLqOIQ/input.mp4 --out qa-assets/bench-out/body-shorts/rX6wXhLqOIQ
 ```
 

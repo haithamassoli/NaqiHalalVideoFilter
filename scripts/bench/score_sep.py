@@ -31,7 +31,7 @@ import onnxruntime as ort
 import soundfile as sf
 
 REPO = Path(__file__).resolve().parents[2]
-ASSETS = REPO / "app/src/main/assets/models"
+ASSETS = REPO / "apps/android/app/src/main/assets/models"
 QA_MODELS = REPO / "qa-assets/models"
 OUT = REPO / "qa-assets/bench-out/sep"
 SRC = OUT / "src"
@@ -593,7 +593,7 @@ def write_sources_md() -> None:
         "",
         "## Models",
         "",
-        "- SEP-0: `app/src/main/assets/models/htdemucs_s26_f16.onnx` (incumbent).",
+        "- SEP-0: `apps/android/app/src/main/assets/models/htdemucs_s26_f16.onnx` (incumbent).",
         "- SEP-1/2: https://github.com/TRvlvr/model_repo/releases/tag/all_public_uvr_models",
         "  Geometry from https://raw.githubusercontent.com/TRvlvr/application_data/main/mdx_model_data/model_data_new.json",
         "  keyed by MD5 of the last 10000×1024 bytes (UVR / python-audio-separator).",

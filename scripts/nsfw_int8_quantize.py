@@ -1,7 +1,7 @@
 """Build the static-INT8 NSFW gate (`nsfw_mnv2_140_int8.onnx`) and prove it is trustworthy.
 
-Produces `app/src/main/assets/models/nsfw_mnv2_140_int8.onnx` from the shipped
-`nsfw_mnv2_140_f32.onnx`, per docs/video-performance-plan-v2.md §5.3:
+Produces `apps/android/app/src/main/assets/models/nsfw_mnv2_140_int8.onnx` from the shipped
+`nsfw_mnv2_140_f32.onnx`, per apps/android/docs/video-performance-plan-v2.md §5.3:
   1. AveragePool[7,7] -> GlobalAveragePool (bit-parity; removes the only node that hard-codes 7x7,
      so the graph stays valid for symbolic H/W and ORT can fuse the head).
   2. quant_pre_process (symbolic shape inference + constant folding — quantize_static is unreliable
@@ -36,7 +36,7 @@ from onnxruntime.quantization.shape_inference import quant_pre_process
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIDEO = os.path.join(REPO, "qa-assets", "test-video-1.webm")
-MODELS = os.path.join(REPO, "app", "src", "main", "assets", "models")
+MODELS = os.path.join(REPO, "apps", "android", "app", "src", "main", "assets", "models")
 FP32 = os.path.join(MODELS, "nsfw_mnv2_140_f32.onnx")
 INT8 = os.path.join(MODELS, "nsfw_mnv2_140_int8.onnx")
 

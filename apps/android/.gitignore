@@ -1,0 +1,19 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+/build
+/captures
+# Bundled ONNX models (large binaries) — fetch/regenerate with scripts/fetch-models.sh
+/app/src/main/assets/models
+.externalNativeBuild
+.cxx
+local.properties
+
+# Release build outputs — a 134 MB .aab was staged for commit once; git is not an artifact store.
+/app/release/

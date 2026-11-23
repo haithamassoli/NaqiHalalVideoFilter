@@ -76,7 +76,7 @@ object Eta {
 
     /**
      * Added to either factor when body or precise body coverage runs YOLO11n-seg at 10 fps. Measured
-     * 2026-10-12 on the S23, benchmark build, 53.3 s Shorts clip (`docs/bench/body-10fps-2026-10.md`):
+     * 2026-10-12 on the S23, benchmark build, 53.3 s Shorts clip (root `docs/bench/body-10fps-2026-10.md`):
      * analysis took 4.6 s for faces, 73.8 s for body and 73.3 s for precise body, i.e. ~1.30x the
      * source length on top of face mode. ponytail: one clip, one surcharge for both body modes;
      * re-measure on a longer film before trusting it at feature length.

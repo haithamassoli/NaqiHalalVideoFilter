@@ -26,7 +26,7 @@ import onnxruntime as ort
 import soundfile as sf
 
 ROOT = Path(__file__).resolve().parents[2]
-ASSETS = ROOT / "app/src/main/assets/models"
+ASSETS = ROOT / "apps/android/app/src/main/assets/models"
 QA = ROOT / "qa-assets"
 MODELS = QA / "models"
 OUT = QA / "bench-out" / "gate"

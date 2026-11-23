@@ -111,7 +111,7 @@ def main():
     exported.write_bytes(data)
     parity(YOLO(str(weights)), exported)
     assert digest == MODEL_SHA, f"Export changed ({digest}); validate parity before updating the model hash"
-    target = ROOT / "app/src/main/assets/models/yolo11n-seg.onnx"
+    target = ROOT / "apps/android/app/src/main/assets/models/yolo11n-seg.onnx"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.with_suffix(".tmp").write_bytes(data)
     target.with_suffix(".tmp").replace(target)

@@ -4,7 +4,7 @@
 **Goal:** end with one decision table: **which model and which runtime fill each slot** of the
 pipeline, backed by numbers on a controlled rig and a device matrix, with every licence cleared.
 **Inputs:** four research passes on 2026-09-30 (separators, audio gates, vision models, Android
-runtimes/measurement), plus everything `perf-plan-v5.md`, `perf-plan-v4.md` §6 and `plan-censor-who.md`
+runtimes/measurement), plus everything `apps/android/docs/perf-plan-v5.md`, `apps/android/docs/perf-plan-v4.md` §6 and `apps/android/docs/plan-censor-who.md`
 §9 already measured. Candidate links are in [Appendix A](#appendix-a--candidate-catalog-with-sources).
 
 ---

@@ -31,7 +31,7 @@ OVERHEAD_S = 60
 
 usage = modal.Dict.from_name("naqi-usage", create_if_missing=True)
 uploads = modal.Volume.from_name("naqi-uploads-v2", create_if_missing=True, version=2)
-MODELS = Path(__file__).parent.parent / "app/src/main/assets/models"  # gitignored; scripts/fetch-models.sh
+MODELS = Path(__file__).parent.parent / "apps/android/app/src/main/assets/models"  # gitignored; apps/android/scripts/fetch-models.sh
 
 
 def _bake_demucs():

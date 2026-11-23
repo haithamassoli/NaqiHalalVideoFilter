@@ -2,15 +2,16 @@
 # Restore the ONNX models from the last complete release into gitignored assets.
 # Verify every artifact against the inference contract in ml/Models.kt.
 cd "$(dirname "$0")/.."
+REPO=../..  # monorepo root: model tooling and the bench venv live there
 DEST=app/src/main/assets/models
 mkdir -p "$DEST"
 
 # YOLO11n-seg is exported locally; it is not present in the historical APK below.
 if [ ! -s "$DEST/yolo11n-seg.onnx" ]; then
-  if [ -x .venv-bench/bin/python ]; then
-    .venv-bench/bin/python scripts/export_person.py
+  if [ -x "$REPO/.venv-bench/bin/python" ]; then
+    "$REPO/.venv-bench/bin/python" "$REPO/scripts/export_person.py"
   else
-    python3 scripts/export_person.py
+    python3 "$REPO/scripts/export_person.py"
   fi
 fi
 

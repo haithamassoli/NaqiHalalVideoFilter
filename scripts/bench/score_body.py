@@ -30,7 +30,7 @@ def main():
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     cv2.setNumThreads(1)
-    model = REPO / "app/src/main/assets/models/yolo11n-seg.onnx"
+    model = REPO / "apps/android/app/src/main/assets/models/yolo11n-seg.onnx"
     session = cpu_session(model, 4)
     outputs = ["output0", "output1"] if args.masks else ["output0"]
     session.run(outputs, {"images": np.zeros((1, 3, 640, 640), np.float32)})
