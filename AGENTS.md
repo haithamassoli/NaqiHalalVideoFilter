@@ -49,8 +49,8 @@ the release APK, see `apps/windows/README.md`):
 ./gradlew :app:run                              # the window; with --args="--input … --output …" the CLI
 ```
 
-Web, from `apps/web` (Node.js and pnpm; the vision models come from Windows' or Android's staged
-folders, see `apps/web/README.md`):
+Web, from `apps/web` (Node.js and pnpm; the vision models come from both Windows' and Android's
+staged folders, YuNet from Windows and YOLO11n-seg from Android's exporter, see `apps/web/README.md`):
 
 ```sh
 ./scripts/fetch-models.sh                       # vision models into public/models (gitignored), sha256-checked

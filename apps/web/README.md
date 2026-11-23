@@ -39,7 +39,8 @@ tab, and the result is written back to your disk. No video, frame, sound or resu
 - **Input:** a local video file the browser can decode with WebCodecs: MP4, MOV, WebM or MKV, with
   H.264, VP9 or AV1 video (HEVC where the system has a decoder) and AAC, Opus or MP3 audio.
 - **Output:** an MP4 with H.264 video and AAC audio (`<name>-naqi.mp4`). Where the browser lacks an
-  encoder, it falls back to VP9 or AV1 and Opus, and says so. In Chrome and Edge the output streams
+  encoder, it falls back to VP9 or AV1 and Opus, and says so. A file saved through the dialog is always
+  MP4; only the in-memory download of Opus audio over VP9 or AV1 can be WebM (`.webm`). In Chrome and Edge the output streams
   straight to the file you choose in the save dialog; elsewhere it is built in memory (up to 2 GiB of
   input) and offered as a download.
 - **Remove music:** Spleeter 2-stem (Deezer's weights, through Musicless) keeps the vocals. The
@@ -79,10 +80,11 @@ pnpm preview                  # serve dist/
 ```
 
 **Models.** `fetch-models.sh` copies YuNet, `genderage`, the NSFW model and YOLO11n-seg from the other
-apps' staged folders: `../windows/models` (run `./gradlew :app:stageModels` there, see
-[`apps/windows/README.md`](../windows/README.md)) or `../android/app/src/main/assets/models` (run
-`./scripts/fetch-models.sh` there, see [`apps/android/README.md`](../android/README.md);
-`yolo11n-seg.onnx` comes from there). `build-spleeter.sh` needs `curl`, `tar` and
+apps' staged folders, and needs both: `../windows/models` (run `./gradlew :app:stageModels` there, see
+[`apps/windows/README.md`](../windows/README.md); YuNet comes only from there) and
+`../android/app/src/main/assets/models` (run `./scripts/fetch-models.sh` there, see
+[`apps/android/README.md`](../android/README.md); `yolo11n-seg.onnx` comes only from there). A copy in
+`public/models` that does not match its pinned hash is replaced. `build-spleeter.sh` needs `curl`, `tar` and
 [uv](https://docs.astral.sh/uv/). It downloads sherpa-onnx's Spleeter 2-stem export, merges its two
 networks into one mask model with `scripts/build_model.py` (from Musicless, pinned `onnx` and `numpy`)
 and checks the result against Musicless' tested hash. Never commit the models.

@@ -39,6 +39,7 @@
 | iPhone and iPad | [App Store](https://apps.apple.com/app/id6798173054) (free) | iOS / iPadOS 18 or newer | [`apps/apple`](apps/apple) |
 | Mac | Build from source for now; a signed download is planned | macOS 15 or newer | [`apps/apple`](apps/apple) |
 | Windows | Beta, in development: build from source, or the unsigned MSI or portable zip from the [Windows workflow](.github/workflows/windows.yml)'s artifacts | Windows 10 or 11, x64 | [`apps/windows`](apps/windows) |
+| Web | In development, not deployed: run from source; filters in the browser, nothing uploaded | Desktop Chrome or Edge | [`apps/web`](apps/web) |
 
 The Android APK on GitHub is the full build. Download by link, sharing into Naqi and the in-app
 updater ship only there, because Google Play's policies do not allow them. The filtering is the same
@@ -113,6 +114,7 @@ whole-frame mode on.
 apps/android/   Android app (Kotlin, Gradle) with its scripts and design docs
 apps/apple/     iPhone, iPad and Mac app (Swift, Xcode), imported with its history
 apps/windows/   Windows app (Kotlin, Compose Desktop; beta, in development)
+apps/web/       Naqi Web: filters in the browser, no backend (TypeScript, Vite; in development)
 core/           pure-Kotlin logic shared by the Android and Windows apps (EDL, DSP, gates)
 models/         model export, conversion and quantization scripts, and model benchmarks
 server/         optional server for long videos (Modal)
@@ -132,6 +134,9 @@ Each app's README has the full steps.
   need extra steps. See [`apps/apple/README.md`](apps/apple/README.md).
 - **Windows** — JDK 21, then `cd apps/windows && ./gradlew :app:stageModels :app:run`. It builds and
   runs on macOS too. See [`apps/windows/README.md`](apps/windows/README.md).
+- **Web app** — stage the Android and Windows models first, then `cd apps/web && pnpm install &&
+  ./scripts/fetch-models.sh && ./scripts/build-spleeter.sh && pnpm dev`. See
+  [`apps/web/README.md`](apps/web/README.md).
 - **Website** — `cd web && pnpm install && pnpm dev`. See [`web/README.md`](web/README.md).
 
 ## Releases

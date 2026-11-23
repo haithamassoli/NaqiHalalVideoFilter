@@ -1,7 +1,8 @@
 #!/bin/bash
 # Stage the vision models into the gitignored public/models/, copied from the other apps' staged
-# folders and checked against the same SHA-256 pins as apps/android and apps/windows. The music model
-# comes from scripts/build-spleeter.sh instead. Writes public/models/SHA256SUMS.
+# folders and checked against the same SHA-256 pins as apps/android and apps/windows. Both apps are
+# needed: YuNet comes from Windows, YOLO11n-seg from Android. A copy that does not match its pin is
+# replaced. The music model comes from scripts/build-spleeter.sh instead. Writes public/models/SHA256SUMS.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 DEST=public/models
@@ -14,17 +15,19 @@ a119f46d1eb44acefb071c9733b2f12fc9bd89cfc581f7df4151cdb6ba758c41  yolo11n-seg.on
 
 mkdir -p "$DEST"
 missing=()
-while read -r _ model; do
-  [ -s "$DEST/$model" ] && continue
+pinned() { [ -s "$1" ] && [ "$(shasum -a 256 "$1" | cut -d' ' -f1)" = "$2" ]; }
+while read -r sum model; do
+  pinned "$DEST/$model" "$sum" && continue
+  rm -f "$DEST/$model" # stale, truncated or from older pins: replaced from a source that matches the pin
   for src in "${SOURCES[@]}"; do
-    if [ -s "$src/$model" ]; then cp "$src/$model" "$DEST/$model"; break; fi
+    if pinned "$src/$model" "$sum"; then cp "$src/$model" "$DEST/$model"; break; fi
   done
-  [ -s "$DEST/$model" ] || missing+=("$model")
+  pinned "$DEST/$model" "$sum" || missing+=("$model")
 done <<< "$PINS"
 
 if [ ${#missing[@]} -gt 0 ]; then
-  echo "Missing: ${missing[*]}" >&2
-  echo "Stage them in apps/android or apps/windows first:" >&2
+  echo "Missing, or not matching the pinned SHA-256: ${missing[*]}" >&2
+  echo "Stage them in both apps/android and apps/windows first:" >&2
   echo "  - apps/android/README.md (scripts/fetch-models.sh; yolo11n-seg.onnx comes from there)" >&2
   echo "  - apps/windows/README.md (./gradlew :app:stageModels; face_detection_yunet_2023mar.onnx comes from there)" >&2
   exit 1

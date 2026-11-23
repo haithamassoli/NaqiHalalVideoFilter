@@ -1,5 +1,5 @@
 // The pipeline worker: pass 1 (analysis -> EDL) when anything in the picture is censored, then one pass that
-// writes the output (plan §3):
+// writes the output:
 //   - nothing selected, or nothing to change (empty EDL, music kept) -> refused, nothing is written;
 //   - empty EDL (or no censoring) with music removal -> video packets copied, audio replaced by Spleeter's vocals;
 //   - non-empty EDL -> every frame decoded, covered per the EDL (render/blur.ts), re-encoded (H.264 where the
@@ -24,7 +24,6 @@ import {
   type InputVideoTrack,
   Mp4OutputFormat,
   Output,
-  type OutputFormat,
   QUALITY_HIGH,
   StreamTarget,
   VideoSample,
@@ -39,6 +38,7 @@ import { RATE } from './audio/grid';
 import { loadSpleeter, separate, type Masker } from './audio/separate';
 import type { Edl } from './core/edl';
 import { censorFaces, type FilterOps } from './core/filterOps';
+import { pickFormat } from './outputFormat';
 import type { FromWorker, Phase, ToWorker } from './protocol';
 import { Censor } from './render/blur';
 
@@ -115,7 +115,12 @@ async function run({ file, ops, target }: Extract<ToWorker, { type: 'start' }>):
     }
 
     const audio = await planAudio(input, ops.removeMusic);
-    const format = pickFormat(video, reencode, audio, target.kind === 'buffer');
+    const format = pickFormat({
+      videoCodec: reencode?.codec ?? video?.codec ?? null,
+      copiedMatrix: video && !reencode ? await video.getTransformationMatrix() : null,
+      opusVocals: audio?.mode === 'music' && audio.codec === 'opus',
+      inMemory: target.kind === 'buffer',
+    });
     if (audio?.mode === 'music' && audio.codec === 'opus') {
       notice(
         `This browser cannot encode AAC audio, so the audio is Opus${format instanceof WebMOutputFormat ? ' and the file is WebM (.webm)' : ''}.`,
@@ -222,21 +227,6 @@ async function planAudio(input: Input, removeMusic: boolean): Promise<AudioPlan 
   const codec = (await track.canDecode()) ? await encodableAudio(track.numberOfChannels, track.sampleRate) : null;
   if (!codec) throw new Error(`The video's audio (${track.codec ?? 'unknown codec'}) can be neither copied nor re-encoded here.`);
   return { track, mode: 'transcode', codec };
-}
-
-/** MP4, except Opus vocals over a video WebM can hold (as before the render pass): WebM. */
-function pickFormat(
-  video: InputVideoTrack | null,
-  reencode: VideoEncode | null,
-  audio: AudioPlan | null,
-  inMemory: boolean,
-): OutputFormat {
-  const videoCodec = reencode?.codec ?? video?.codec ?? null;
-  const webm = new WebMOutputFormat();
-  if (audio?.mode === 'music' && audio.codec === 'opus' && (!videoCodec || webm.getSupportedVideoCodecs().includes(videoCodec))) {
-    return webm;
-  }
-  return new Mp4OutputFormat({ fastStart: inMemory ? 'in-memory' : false });
 }
 
 /** The output pass. `reencode` set: frames are covered per its EDL and re-encoded; else video packets are copied. */

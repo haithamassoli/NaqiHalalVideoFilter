@@ -2,7 +2,8 @@
 // EDL says. Same rules and constants as Windows' vision/Censor.kt (Android's CensorEffect): an opaque solid
 // fill wins over everything; otherwise a Gaussian blur, sigma 40 px at amount 100 on a 1080-px short side,
 // run at the smallest downscale in {1, 2, 4, 8} that keeps the low-res sigma <= 4; BT.709 grayscale on top
-// when asked; the one style that would change nothing (blur 0, no gray, no fill) becomes a light blur; and
+// when asked; a blur at amount 0 becomes a light blur, grayscale or not (Android exempts grayscale, its own
+// toggle there; here "Grayscale blur" is a blur style, and grey alone leaves a face recognizable); and
 // a feather that ramps OUTWARD from each rect, so softening never uncovers a pixel the hard rect covered.
 // Precise body silhouettes follow Android's rasterizeMasks: each mask grown by one empty cell and sampled
 // bilinearly, so its edge ramps outward over one cell from the model's outline, never into it.
@@ -28,7 +29,7 @@ const MIN_FEATHER = 0.002;
 export interface CensorStyle {
   /** CSS colour of the opaque fill, or null to blur. */
   solid: string | null;
-  /** Blur amount 0..100 after the no-op rule. */
+  /** Blur amount 0..100 after the minimum-blur rule. */
   amount: number;
   grayscale: boolean;
 }
@@ -36,7 +37,7 @@ export interface CensorStyle {
 /** FilterOps' style fields -> what is drawn. */
 export function censorStyle(ops: Pick<FilterOps, 'blurAmount' | 'grayscale' | 'solidColor'>): CensorStyle {
   const solid = ops.solidColor !== BLUR;
-  const amount = ops.blurAmount > 0 || ops.grayscale || solid ? Math.min(100, Math.max(0, ops.blurAmount)) : MIN_EFFECTIVE_BLUR;
+  const amount = ops.blurAmount > 0 || solid ? Math.min(100, Math.max(0, ops.blurAmount)) : MIN_EFFECTIVE_BLUR;
   const c = ops.solidColor;
   return {
     solid: solid ? `rgb(${(c >> 16) & 255} ${(c >> 8) & 255} ${c & 255})` : null,

@@ -187,38 +187,45 @@ class InputPcm {
 }
 
 /**
- * Stereo from any channel layout, with the Web Audio API's down-mix rules: mono is duplicated, quad
- * and 5.1 fold their centre and surrounds in, anything else keeps its first two channels.
+ * Extra channels folded into each side at -3 dB, by channel count, in the decoded (WAV/WebCodecs) order:
+ * [both sides (centre, back centre), left only, right only]. The LFE is dropped. Quad is the Web Audio
+ * API's average instead; any other count keeps its first two channels.
  */
+const FOLDS: Record<number, [number[], number[], number[]]> = {
+  3: [[2], [], []], // L R C
+  5: [[2], [3], [4]], // 5.0: L R C SL SR
+  6: [[2], [4], [5]], // 5.1: L R C LFE SL SR
+  7: [[2, 4], [5], [6]], // 6.1: L R C LFE BC SL SR
+  8: [[2], [4, 6], [5, 7]], // 7.1: L R C LFE SL SR BL BR
+};
+
+/** Stereo from planar channels: mono duplicated, quad averaged, centre and surrounds folded in (FOLDS). */
+export function toStereo(planes: readonly Float32Array[]): [Float32Array, Float32Array] {
+  if (planes.length === 1) return [planes[0], planes[0]];
+  const left = planes[0].slice();
+  const right = planes[1].slice();
+  if (planes.length === 4) {
+    for (let i = 0; i < left.length; i++) {
+      left[i] = 0.5 * (left[i] + planes[2][i]);
+      right[i] = 0.5 * (right[i] + planes[3][i]);
+    }
+    return [left, right];
+  }
+  const [both, onlyLeft, onlyRight] = FOLDS[planes.length] ?? [[], [], []];
+  const add = (into: Float32Array, indices: number[]) => {
+    for (const c of indices) for (let i = 0; i < into.length; i++) into[i] += Math.SQRT1_2 * planes[c][i];
+  };
+  add(left, [...both, ...onlyLeft]);
+  add(right, [...both, ...onlyRight]);
+  return [left, right];
+}
+
 function stereo(sample: AudioSample): [Float32Array, Float32Array] {
   const n = sample.numberOfChannels;
-  const frames = sample.numberOfFrames;
-  const read = (planeIndex: number) => {
-    const plane = new Float32Array(frames);
+  const planes = Array.from({ length: n === 4 || FOLDS[n] ? n : Math.min(n, 2) }, (_, planeIndex) => {
+    const plane = new Float32Array(sample.numberOfFrames);
     sample.copyTo(plane, { planeIndex, format: 'f32-planar' });
     return plane;
-  };
-  if (n === 1) {
-    const mono = read(0);
-    return [mono, mono];
-  }
-  const left = read(0);
-  const right = read(1);
-  if (n === 4) {
-    const sl = read(2);
-    const sr = read(3);
-    for (let i = 0; i < frames; i++) {
-      left[i] = 0.5 * (left[i] + sl[i]);
-      right[i] = 0.5 * (right[i] + sr[i]);
-    }
-  } else if (n === 6) {
-    const c = read(2);
-    const sl = read(4);
-    const sr = read(5);
-    for (let i = 0; i < frames; i++) {
-      left[i] += Math.SQRT1_2 * (c[i] + sl[i]);
-      right[i] += Math.SQRT1_2 * (c[i] + sr[i]);
-    }
-  }
-  return [left, right];
+  });
+  return toStereo(planes);
 }

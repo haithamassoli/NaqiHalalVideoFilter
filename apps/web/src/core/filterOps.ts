@@ -29,7 +29,7 @@ export interface FilterOps {
   grayscale: boolean;
   /** BLUR (0) or an opaque ARGB colour. */
   solidColor: number;
-  /** Spleeter keeps vocals only; "vocals_other" is not offered on the web (plan §4). */
+  /** Spleeter keeps vocals only; "vocals_other" is not offered on the web (the 2-stem model has no "other" stem). */
   keepStems: 'vocals';
 }
 

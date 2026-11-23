@@ -1,7 +1,7 @@
 import { AudioSample } from 'mediabunny';
 import { describe, expect, it } from 'vitest';
 import { RATE, STRIDE_SAMPLES } from '../src/audio/grid';
-import { separate, type VocalsChunk } from '../src/audio/separate';
+import { separate, toStereo, type VocalsChunk } from '../src/audio/separate';
 
 /** Decoder-like stream: 1024-frame planar f32 samples of a sine at `rate`, starting at `t0`. */
 async function* tone(rate: number, channels: number, seconds: number, t0: number, freq: number) {
@@ -64,5 +64,29 @@ describe('audio separate', () => {
     chunks[0].left.forEach((v, i) => (worst = Math.max(worst, Math.abs(v - chunks[0].right[i]))));
     expect(worst).toBeLessThan(1e-6);
     expect(await collect(separate(tone(44100, 2, 0, 0, 300), ones))).toEqual([]);
+  });
+});
+
+describe('toStereo', () => {
+  const planes = (n: number, values: Record<number, number>) =>
+    Array.from({ length: n }, (_, c) => new Float32Array(4).fill(values[c] ?? 0));
+  const k = Math.SQRT1_2;
+
+  it('keeps the centre (dialogue) of 3.0, 5.0, 5.1, 6.1 and 7.1 in both sides', () => {
+    for (const n of [3, 5, 6, 7, 8]) {
+      const [l, r] = toStereo(planes(n, { 2: 1 }));
+      expect(l[0], `${n} channels`).toBeCloseTo(k, 6);
+      expect(r[0], `${n} channels`).toBeCloseTo(k, 6);
+    }
+  });
+  it('folds 7.1 side and back surrounds into their own side and drops the LFE', () => {
+    const [l, r] = toStereo(planes(8, { 0: 0.1, 1: 0.2, 3: 1, 4: 1, 6: 1, 5: 0.5, 7: 0.5 }));
+    expect(l[0]).toBeCloseTo(0.1 + 2 * k, 6);
+    expect(r[0]).toBeCloseTo(0.2 + k, 6);
+  });
+  it('duplicates mono, averages quad and keeps the first two of an unknown layout', () => {
+    expect(toStereo(planes(1, { 0: 0.3 })).map((p) => p[0])).toEqual([0.3, 0.3].map(Math.fround));
+    expect(toStereo(planes(4, { 0: 1, 2: 0.5, 3: 1 })).map((p) => p[0])).toEqual([0.75, 0.5]);
+    expect(toStereo(planes(2, { 0: 0.25, 1: 0.5 })).map((p) => p[0])).toEqual([0.25, 0.5]);
   });
 });

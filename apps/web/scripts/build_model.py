@@ -32,7 +32,8 @@ which halves the download without changing the fp32 arithmetic.
 The mask is v / (v + 2a) of the two networks' magnitude estimates, where
 Spleeter's own is v^2 / (v^2 + a^2). It removes more of the music that plays
 under speech and scores better on voice quality (PESQ), at the cost of some
-signal fidelity (see docs/how-it-works.md).
+signal fidelity (see docs/how-it-works.md in Musicless,
+https://github.com/ieasybooks/musicless).
 
 Usage: build_model.py <dir containing vocals.onnx and accompaniment.onnx> <out.onnx>
 """

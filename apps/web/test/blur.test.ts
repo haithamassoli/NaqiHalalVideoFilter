@@ -12,8 +12,10 @@ describe('censorStyle', () => {
   it('turns the no-op style into a light blur', () => {
     expect(censorStyle({ blurAmount: 0, grayscale: false, solidColor: BLUR })).toEqual({ solid: null, amount: MIN_EFFECTIVE_BLUR, grayscale: false });
   });
-  it('keeps blur 0 when grayscale or a fill does the censoring', () => {
-    expect(censorStyle({ blurAmount: 0, grayscale: true, solidColor: BLUR }).amount).toBe(0);
+  it('gives grayscale blur at 0 the same light blur: grey alone leaves a face recognizable', () => {
+    expect(censorStyle({ blurAmount: 0, grayscale: true, solidColor: BLUR })).toEqual({ solid: null, amount: MIN_EFFECTIVE_BLUR, grayscale: true });
+  });
+  it('keeps blur 0 when a fill does the censoring', () => {
     expect(censorStyle({ blurAmount: 0, grayscale: false, solidColor: SOLID_COLORS[1] }).amount).toBe(0);
   });
   it('makes a solid fill opaque and win over grayscale', () => {

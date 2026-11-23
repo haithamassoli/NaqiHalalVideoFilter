@@ -42,7 +42,8 @@
   MKV، بفيديو H.264 أو VP9 أو AV1 (وHEVC حيث يوفّر النظام مفكّكًا له) وصوت AAC أو Opus أو MP3.
 - **المخرج:** ملف MP4 بفيديو H.264 وصوت AAC (`<name>-naqi.mp4`). وإن لم يتوفّر في المتصفح المرمِّز
   المطلوب، يلجأ إلى VP9 أو AV1 وOpus ويُعلمك بذلك. في كروم وإيدج يُكتب المخرج مباشرة في الملف الذي
-  تختاره من نافذة الحفظ؛ وفي غيرهما يُبنى في الذاكرة (لمدخل حتى 2 GiB) ويُعرض للتنزيل.
+  تختاره من نافذة الحفظ؛ وفي غيرهما يُبنى في الذاكرة (لمدخل حتى 2 GiB) ويُعرض للتنزيل. والملف المحفوظ
+  عبر نافذة الحفظ يكون MP4 دائمًا؛ ولا يكون WebM (`.webm`) إلا التنزيل من الذاكرة بصوت Opus فوق VP9 أو AV1.
 - **إزالة الموسيقى:** نموذج Spleeter ذو المسارين (أوزان Deezer، عبر Musicless) يُبقي الأصوات. يعمل
   الفصل على الملف كله، نحو 12 ثانية في كل مرة مع تداخل متدرّج بين النوافذ.
 - **حجب الوجوه:** تختار من يُحجب: الجميع، أو النساء، أو الرجال. يكتشف نموذج YuNet الوجوه ويتتبّعها
@@ -81,10 +82,11 @@ pnpm preview                  # serve dist/
 ```
 
 **النماذج.** ينسخ `fetch-models.sh` نماذج YuNet و`genderage` ونموذج المشاهد غير اللائقة وYOLO11n-seg
-من المجلدات التي جهّزتها التطبيقات الأخرى: `../windows/models` (شغّل هناك `./gradlew :app:stageModels`،
-انظر [`apps/windows/README.ar.md`](../windows/README.ar.md)) أو `../android/app/src/main/assets/models`
-(شغّل هناك `./scripts/fetch-models.sh`، انظر [`apps/android/README.ar.md`](../android/README.ar.md)؛ ومنه
-يأتي `yolo11n-seg.onnx`). ويحتاج `build-spleeter.sh` إلى `curl` و`tar` و[uv](https://docs.astral.sh/uv/).
+من المجلدات التي جهّزتها التطبيقات الأخرى، ويحتاج إلى كليهما: `../windows/models` (شغّل هناك
+`./gradlew :app:stageModels`، انظر [`apps/windows/README.ar.md`](../windows/README.ar.md)؛ ومنه وحده يأتي
+YuNet) و`../android/app/src/main/assets/models` (شغّل هناك `./scripts/fetch-models.sh`، انظر
+[`apps/android/README.ar.md`](../android/README.ar.md)؛ ومنه وحده يأتي `yolo11n-seg.onnx`). وأي نسخة في
+`public/models` لا تطابق بصمتها المثبّتة تُستبدل. ويحتاج `build-spleeter.sh` إلى `curl` و`tar` و[uv](https://docs.astral.sh/uv/).
 ينزّل تصدير sherpa-onnx لنموذج Spleeter ذي المسارين، ويدمج شبكتيه في نموذج قناع واحد عبر
 `scripts/build_model.py` (من Musicless، بإصدارات `onnx` و`numpy` مثبّتة)، ثم يطابق الناتج مع البصمة
 التي اختبرها Musicless. لا تُودِع النماذج في المستودع أبدًا.

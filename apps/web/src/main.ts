@@ -102,7 +102,8 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
-  // The save picker needs this click's user activation, so it opens before any other await.
+  // The save picker needs this click's user activation, so it opens before any other await. A file
+  // picked here is always written as MP4 (outputFormat.ts), so its .mp4 name stays true.
   let target: SaveTarget;
   if (useFilePicker()) {
     try {
