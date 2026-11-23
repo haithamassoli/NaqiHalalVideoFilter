@@ -9,7 +9,9 @@ type GhRelease = { tag_name: string; draft: boolean; prerelease: boolean; assets
 // /releases/latest would follow whichever platform shipped last, so list and filter instead.
 const ANDROID_TAG = /^v\d/;
 
-export async function latestRelease(repo: string, ext: string): Promise<Release> {
+// Windows ships as pre-releases while in beta, so its lookup passes prerelease = true.
+// No `version` on the result means nothing matched: the page shows "Coming soon".
+export async function latestRelease(repo: string, ext: string, tag = ANDROID_TAG, prerelease = false): Promise<Release> {
   const fallback = { url: `https://github.com/${repo}/releases/latest` };
   try {
     // 100 per page (GitHub's maximum) so a run of desktop releases can't push the newest Android one off it.
@@ -25,7 +27,7 @@ export async function latestRelease(repo: string, ext: string): Promise<Release>
     if (releases.length === 0) return { url: `https://github.com/${repo}` }; // no release yet
     // GitHub lists newest first (by creation date), the same order /releases/latest uses.
     for (const r of releases) {
-      if (r.draft || r.prerelease || !ANDROID_TAG.test(r.tag_name)) continue;
+      if (r.draft || (r.prerelease && !prerelease) || !tag.test(r.tag_name)) continue;
       const asset = r.assets?.find((a) => a.name.endsWith(ext));
       if (asset) {
         return { url: asset.browser_download_url, version: r.tag_name, sizeMb: Math.round(asset.size / 1e6) };

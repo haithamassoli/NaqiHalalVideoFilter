@@ -18,3 +18,18 @@ test('finds the Android release behind a long run of desktop releases', async ()
   assert.equal(r.version, 'v1.9.0');
   assert.equal(r.url, 'https://example.test/naqi-1.9.0.apk');
 });
+
+test('finds a Windows pre-release and ignores Android ones', async () => {
+  const releases = [
+    { tag_name: 'v2.0.0', draft: false, prerelease: false,
+      assets: [{ name: 'naqi-2.0.0.apk', size: 50e6, browser_download_url: 'https://example.test/naqi.apk' }] },
+    { tag_name: 'windows-v0.1.0', draft: false, prerelease: true,
+      assets: [{ name: 'Naqi-0.1.0.msi', size: 300e6, browser_download_url: 'https://example.test/naqi.msi' }] },
+  ];
+  globalThis.fetch = async () => Response.json(releases);
+  const r = await latestRelease('o/r', '.msi', /^windows-v\d/, true);
+  assert.equal(r.version, 'windows-v0.1.0');
+  assert.equal(r.url, 'https://example.test/naqi.msi');
+  globalThis.fetch = async () => Response.json(releases.slice(0, 1));
+  assert.equal((await latestRelease('o/r', '.msi', /^windows-v\d/, true)).version, undefined);
+});
