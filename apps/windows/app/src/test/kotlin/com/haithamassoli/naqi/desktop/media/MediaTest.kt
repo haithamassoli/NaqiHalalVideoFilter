@@ -365,4 +365,41 @@ class MediaTest {
         assertEquals(resumeS, startS + resumeAt / 44_100.0, aacFrameS)
         assertEquals(endS, startS + samples.size / 44_100.0, aacFrameS)
     }
+
+    @Test
+    fun aTimestampDiscontinuityInAnMpegTsNeitherInsertsSilenceNorDropsAudio() = runBlocking {
+        // Codex re-review, finding 6: three MPEG-TS segments back to back, the second's clock 60 s ahead and
+        // the third's reset to where the first began, as a broadcast splice or a concatenated recording has.
+        // It used to come out as 60 s of silence with the third segment dropped.
+        val tones = listOf(440 to 1.0, 880 to 1.5, 1320 to 2.0)
+        val parts = tones.mapIndexed { i, (hz, s) ->
+            tmp.root.resolve("p$i.ts").also {
+                ff("-f", "lavfi", "-i", "sine=frequency=$hz:sample_rate=44100:duration=$s", "-c:a", "aac",
+                    *(if (i == 1) arrayOf("-output_ts_offset", "60") else emptyArray()), "-f", "mpegts", it.path)
+            }
+        }
+        val ts = tmp.root.resolve("splice.ts")
+        ts.writeBytes(parts.fold(ByteArray(0)) { acc, f -> acc + f.readBytes() })
+
+        val left = ArrayList<Float>()
+        assertTrue(AudioDecoder.decode(ts) { pcm, n -> for (i in 0 until n) left += pcm[2 * i] })
+        // Every segment, once: their sum, plus at most two AAC frames each (priming and end padding, which
+        // MPEG-TS has no way to trim).
+        val sum = tones.sumOf { it.second * 44_100 }.toInt()
+        assertTrue("decoded ${left.size} of $sum", left.size in sum..sum + 3 * 2048)
+        // No inserted hole: never 100 ms of silence in a row.
+        var run = 0
+        var longest = 0
+        for (x in left) { run = if (abs(x) < 1e-3f) run + 1 else 0; longest = maxOf(longest, run) }
+        assertTrue("silent for $longest samples", longest < 4_410)
+        // And in order: the tone over the middle of each segment is that segment's.
+        var at = 0.0
+        for ((hz, s) in tones) {
+            val from = ((at + s / 4) * 44_100).toInt()
+            val to = ((at + s * 3 / 4) * 44_100).toInt()
+            val crossings = (from + 1 until to).count { (left[it - 1] < 0f) != (left[it] < 0f) }
+            assertEquals("tone at ${at + s / 2} s", hz.toDouble(), crossings / 2.0 / ((to - from) / 44_100.0), hz * 0.05)
+            at += s
+        }
+    }
 }
