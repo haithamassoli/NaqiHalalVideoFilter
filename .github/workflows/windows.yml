@@ -9,12 +9,14 @@ on:
       - core/** # shared Kotlin, included by settings.gradle.kts
       - apps/android/gradle/libs.versions.toml # the version catalog apps/windows reads
       - .github/workflows/windows.yml
+      - LICENSE # bundled next to apps/windows/NOTICE
   pull_request:
     paths:
       - apps/windows/**
       - core/**
       - apps/android/gradle/libs.versions.toml
       - .github/workflows/windows.yml
+      - LICENSE # bundled next to apps/windows/NOTICE
 
 permissions:
   contents: read

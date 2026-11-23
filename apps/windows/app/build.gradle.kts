@@ -46,12 +46,19 @@ val stageModels = tasks.register<Exec>("stageModels") {
     inputs.file(rootProject.file("scripts/stage-models.sh"))
     outputs.dir(rootProject.file("models"))
 }
+// NOTICE (third-party licences and the GPL FFmpeg source offer) and LICENSE ride along as plain files, so the
+// MSI and the portable zip both carry them; the jar gets NOTICE too, for the About screen.
+val notice = rootProject.file("NOTICE")
 val appResources = layout.buildDirectory.dir("app-resources")
 val bundleModels = tasks.register<Sync>("bundleModels") {
-    from(stageModels)
-    into(appResources.map { it.dir("common/models") })
+    from(stageModels) { into("models") }
+    from(notice, rootProject.file("../../LICENSE"))
+    into(appResources.map { it.dir("common") })
 }
 tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(bundleModels) }
+tasks.processResources {
+    from(notice) { into("com/haithamassoli/naqi/desktop/ui") }
+}
 
 tasks.test {
     // Tests that need a model read it from the staged dir and skip when it is absent (see Models.kt).
