@@ -10,6 +10,7 @@ holds every app. Read the README of the directory you work in before changing it
 | `apps/android/` | Android app: Kotlin, Gradle, Compose; its docs in `apps/android/docs/` | GPL-3.0-or-later (root `LICENSE`) |
 | `apps/apple/` | iPhone, iPad and Mac app: Swift 6, Xcode; its docs in `apps/apple/docs/` | Naqi Personal Non-Commercial License (`apps/apple/LICENSE`) |
 | `apps/windows/` | Windows app (beta): Kotlin/JVM 21, Compose Desktop, JavaCPP FFmpeg, ONNX Runtime on the CPU; package contract in `apps/windows/SEAMS.md` | GPL-3.0-or-later (root `LICENSE`) |
+| `apps/web/` | Naqi Web: in-browser filter, no backend; vanilla TypeScript, Vite, WebCodecs (Mediabunny), ONNX Runtime Web on WebAssembly; desktop Chrome/Edge | GPL-3.0-or-later (root `LICENSE`) |
 | `core/` | pure-Kotlin logic shared by `apps/android` and `apps/windows` (EDL, NSFW gate, face-track rules, demucs chunking, DSP); both builds include it as `:core` | GPL-3.0-or-later |
 | `models/` | model export, conversion and quantization scripts; benchmarks in `models/bench/` | GPL-3.0-or-later |
 | `server/` | optional Modal server for videos of 10 minutes or more | GPL-3.0-or-later |
@@ -48,8 +49,19 @@ the release APK, see `apps/windows/README.md`):
 ./gradlew :app:run                              # the window; with --args="--input … --output …" the CLI
 ```
 
+Web, from `apps/web` (Node.js and pnpm; the vision models come from both Windows' and Android's
+staged folders, YuNet from Windows and YOLO11n-seg from Android's exporter, see `apps/web/README.md`):
+
+```sh
+./scripts/fetch-models.sh                       # vision models into public/models (gitignored), sha256-checked
+./scripts/build-spleeter.sh                     # the Spleeter music model (needs uv), sha256-checked
+pnpm install && pnpm test && pnpm build         # the gate
+pnpm dev                                        # the page at http://localhost:5173
+```
+
 A change to `core/` must pass both Android's and Windows' tests. Windows is ported from
-`apps/android`; never port from `apps/apple` (different licence).
+`apps/android`; never port from `apps/apple` (different licence). `apps/web` ports `core/` to
+TypeScript, so a change to the Kotlin rules needs the same change and test there.
 
 Website, from `web`: `pnpm install && pnpm build`.
 

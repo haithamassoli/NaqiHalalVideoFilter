@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Naqi Web</title>
+    <link rel="stylesheet" href="/src/ui.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Naqi</h1>
+      <p class="lede">Filter a video on this computer: remove music, censor faces or scenes. Nothing is uploaded.</p>
+
+      <form id="form">
+        <label class="file">
+          Video
+          <input id="file" type="file" accept="video/*,.mkv,.mov,.webm,.mp4" required />
+        </label>
+
+        <fieldset>
+          <legend>Audio</legend>
+          <label><input id="removeMusic" type="checkbox" /> Remove music</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Censor</legend>
+          <label>
+            Faces
+            <select id="censorWho">
+              <option value="none">None</option>
+              <option value="everyone">Everyone</option>
+              <option value="women">Women</option>
+              <option value="men">Men</option>
+            </select>
+          </label>
+          <label><input id="censorNsfw" type="checkbox" /> NSFW scenes</label>
+          <label for="strictness">
+            Strictness <output id="strictnessOut"></output>
+            <input id="strictness" type="range" min="0" max="100" step="1" />
+          </label>
+          <label>
+            Bodies
+            <select id="body">
+              <option value="off">Off</option>
+              <option value="box">Box around each person</option>
+              <option value="precise">Outline of each person</option>
+            </select>
+          </label>
+          <p class="note" id="bodyNote">
+            Covers the whole person of each censored face. Needs a Faces choice and is slower: an extra model
+            (YOLO11n-seg, AGPL-3.0 licence) is downloaded only when this is on. Unknown people are covered, and
+            the whole picture is covered while a face has no body around it.
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Effect</legend>
+          <label>
+            Style
+            <select id="effect">
+              <option value="blur">Blur</option>
+              <option value="grayscale">Grayscale blur</option>
+              <option value="solid">Solid</option>
+            </select>
+          </label>
+          <label for="amount">
+            Amount <output id="amountOut"></output>
+            <input id="amount" type="range" min="0" max="100" step="1" />
+          </label>
+        </fieldset>
+
+        <div class="actions">
+          <button id="start" type="submit">Start</button>
+          <button id="cancel" type="button" hidden>Cancel</button>
+        </div>
+      </form>
+
+      <section id="status" hidden>
+        <progress id="bar" max="1" value="0"></progress>
+        <p id="phase"></p>
+        <p id="notice" hidden></p>
+        <a id="save" hidden>Save video</a>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

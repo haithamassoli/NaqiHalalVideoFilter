@@ -40,6 +40,7 @@
 | آيفون وآيباد | [App Store](https://apps.apple.com/app/id6798173054) (مجانًا) | iOS / iPadOS 18 فأحدث | [`apps/apple`](apps/apple) |
 | ماك | يُبنى من المصدر حاليًا، ونسخة موقّعة للتنزيل مخطط لها | macOS 15 فأحدث | [`apps/apple`](apps/apple) |
 | ويندوز | تجريبي قيد التطوير: يُبنى من المصدر، أو خذ ملف MSI أو الملف المضغوط المحمول غير الموقّعَين من مخرجات [سير عمل ويندوز](.github/workflows/windows.yml) | ويندوز 10 أو 11، x64 | [`apps/windows`](apps/windows) |
+| الويب | قيد التطوير وغير منشور: يُشغَّل من المصدر، ويرشّح الفيديو داخل المتصفح دون رفع أي شيء | كروم أو إيدج على الحاسوب | [`apps/web`](apps/web) |
 
 نسخة APK على GitHub هي النسخة الكاملة لأندرويد. التنزيل بالرابط، والمشاركة إلى نقي، والمُحدِّث
 الذاتي تأتي فيها وحدها، لأن سياسات Google Play لا تسمح بها. أما الفلترة نفسها فهي واحدة في
@@ -111,6 +112,7 @@
 apps/android/   Android app (Kotlin, Gradle) with its scripts and design docs
 apps/apple/     iPhone, iPad and Mac app (Swift, Xcode), imported with its history
 apps/windows/   Windows app (Kotlin, Compose Desktop; beta, in development)
+apps/web/       Naqi Web: filters in the browser, no backend (TypeScript, Vite; in development)
 core/           pure-Kotlin logic shared by the Android and Windows apps (EDL, DSP, gates)
 models/         model export, conversion and quantization scripts, and model benchmarks
 server/         optional server for long videos (Modal)
@@ -133,6 +135,9 @@ docs/           cross-platform docs: model benchmarks and screenshots
   [`apps/apple/README.ar.md`](apps/apple/README.ar.md).
 - **ويندوز** — بوجود JDK 21، نفّذ `cd apps/windows && ./gradlew :app:stageModels :app:run`. ويُبنى
   ويعمل على macOS أيضًا. انظر [`apps/windows/README.ar.md`](apps/windows/README.ar.md).
+- **تطبيق الويب** — جهّز نماذج أندرويد وويندوز أولًا، ثم نفّذ `cd apps/web && pnpm install &&
+  ./scripts/fetch-models.sh && ./scripts/build-spleeter.sh && pnpm dev`. انظر
+  [`apps/web/README.ar.md`](apps/web/README.ar.md).
 - **الموقع** — `cd web && pnpm install && pnpm dev`. انظر [`web/README.md`](web/README.md).
 
 ## الإصدارات
