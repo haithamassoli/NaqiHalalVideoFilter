@@ -1,6 +1,7 @@
 # Goes red when desktop releases have pushed the newest Android release out of the 10 newest, the only ones
-# older Android builds read (docs/RELEASING.md, "Page depth"). Before publishing a desktop release, run
-# `.github/scripts/release-depth.sh 9` by hand: this check only notices once it has happened.
+# older Android builds read (docs/RELEASING.md, "Page depth"). release-windows.yml runs the same guard before it
+# publishes; this is the alarm afterwards, for what is still published by hand (Apple releases, a release
+# created or edited on github.com).
 name: Release depth
 
 on:
