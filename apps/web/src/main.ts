@@ -20,6 +20,7 @@ const cancelBtn = $<HTMLButtonElement>('cancel');
 const status = $<HTMLElement>('status');
 const bar = $<HTMLProgressElement>('bar');
 const phaseText = $<HTMLElement>('phase');
+const noticeText = $<HTMLElement>('notice');
 const saveLink = $<HTMLAnchorElement>('save');
 
 // Entry-point defaults: face censoring opens on DEFAULT_WHO, like the apps (FilterOps.kt).
@@ -57,16 +58,26 @@ function readOps(): FilterOps {
 const PHASES: Record<Phase, string> = {
   open: 'Opening the video…',
   analyze: 'Analyzing the picture…',
-  remux: 'Writing the MP4…',
   model: 'Loading the music model…',
   music: 'Removing music…',
+  render: 'Censoring and writing the video…',
   finalize: 'Finishing…',
 };
 
 const useFilePicker = () =>
   typeof window.showSaveFilePicker === 'function' && !new URLSearchParams(location.search).has('e2e');
 
+/** How long a canceled worker gets to discard its output before it is stopped outright. */
+const CANCEL_GRACE_MS = 5000;
+
 let worker: Worker | null = null;
+
+function eta(seconds: number | undefined): string {
+  if (seconds === undefined || !Number.isFinite(seconds)) return '';
+  if (seconds < 60) return ' · under a minute left';
+  const min = Math.round(seconds / 60);
+  return min < 120 ? ` · about ${min} min left` : ` · about ${Math.round(min / 60)} h left`;
+}
 
 function setBusy(busy: boolean) {
   startBtn.disabled = busy;
@@ -83,6 +94,11 @@ form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const file = fileIn.files?.[0];
   if (!file || worker) return;
+  const ops = readOps();
+  if (!ops.removeMusic && ops.censorWho === 'none' && !ops.censorNsfw && !ops.bodyBlur) {
+    show('Nothing to do: choose Remove music, faces to censor or NSFW scenes.');
+    return;
+  }
 
   // The save picker needs this click's user activation, so it opens before any other await.
   let target: SaveTarget;
@@ -108,21 +124,23 @@ form.addEventListener('submit', async (e) => {
   saveLink.hidden = true;
   saveLink.removeAttribute('href');
   bar.value = 0;
+  noticeText.hidden = true;
+  noticeText.textContent = '';
   show(PHASES.open);
   setBusy(true);
 
   const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
   worker = w;
-  let notice = '';
   w.onmessage = (ev: MessageEvent<FromWorker>) => {
     const msg = ev.data;
     if (msg.type === 'notice') {
-      notice = ` ${msg.message}`;
+      noticeText.hidden = false;
+      noticeText.textContent = `${noticeText.textContent} ${msg.message}`.trim();
       return;
     }
     if (msg.type === 'progress') {
       bar.value = msg.pct;
-      show(`${PHASES[msg.phase]} ${Math.round(msg.pct * 100)}%`);
+      show(`${PHASES[msg.phase]} ${Math.round(msg.pct * 100)}%${eta(msg.eta)}`);
       return;
     }
     finish();
@@ -133,22 +151,30 @@ form.addEventListener('submit', async (e) => {
       saveLink.href = URL.createObjectURL(new Blob([msg.buffer], { type: msg.mimeType }));
       saveLink.download = outputName(file, msg.mimeType);
       saveLink.hidden = false;
-      show(`Done.${notice} Save the video:`);
+      show('Done. Save the video:');
     } else {
       bar.value = 1;
-      show(`Done. Saved as ${target.kind === 'file' ? target.handle.name : outputName(file)}.${notice}`);
+      show(`Done. Saved as ${target.kind === 'file' ? target.handle.name : outputName(file)}.`);
     }
   };
   w.onerror = (ev) => {
     finish();
     show(`Failed: ${ev.message || 'the worker crashed'}. Nothing was saved.`);
   };
-  w.postMessage({ type: 'start', file, ops: readOps(), target } satisfies ToWorker);
+  w.postMessage({ type: 'start', file, ops, target } satisfies ToWorker);
 });
 
 cancelBtn.addEventListener('click', () => {
-  worker?.postMessage({ type: 'cancel' } satisfies ToWorker);
+  const w = worker;
+  if (!w) return;
+  w.postMessage({ type: 'cancel' } satisfies ToWorker);
   show('Canceling…');
+  // A model run or a stuck decoder can hold the worker; stopping it drops the unclosed file unsaved.
+  setTimeout(() => {
+    if (worker !== w) return;
+    finish();
+    show('Canceled. Nothing was saved.');
+  }, CANCEL_GRACE_MS);
 });
 
 function finish() {

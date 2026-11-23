@@ -1,6 +1,11 @@
-// The pipeline worker. Without "remove music" it remuxes the file to MP4 (packets copied where the
-// codec fits). With it, the primary video track is copied and the audio is replaced by Spleeter's
-// vocals, separated window by window and encoded as it goes (plan §3, render case 2).
+// The pipeline worker: pass 1 (analysis -> EDL) when anything in the picture is censored, then one pass that
+// writes the output (plan §3):
+//   - nothing selected, or nothing to change (empty EDL, music kept) -> refused, nothing is written;
+//   - empty EDL (or no censoring) with music removal -> video packets copied, audio replaced by Spleeter's vocals;
+//   - non-empty EDL -> every frame decoded, covered per the EDL (render/blur.ts), re-encoded (H.264 where the
+//     browser can), with the vocals or the original audio.
+// Audio drives the pass and video follows it in lockstep, so the muxer never queues more than about one
+// audio step (one Spleeter window at most) of the other track. Output streams to disk through StreamTarget.
 import {
   ALL_FORMATS,
   AudioSample,
@@ -9,7 +14,9 @@ import {
   BlobSource,
   BufferTarget,
   canEncodeAudio,
-  Conversion,
+  canEncodeVideo,
+  EncodedAudioPacketSource,
+  type EncodedPacket,
   EncodedPacketSink,
   EncodedVideoPacketSource,
   Input,
@@ -17,16 +24,23 @@ import {
   type InputVideoTrack,
   Mp4OutputFormat,
   Output,
+  type OutputFormat,
   QUALITY_HIGH,
   StreamTarget,
+  VideoSample,
+  VideoSampleSink,
+  VideoSampleSource,
   WebMOutputFormat,
   type AudioCodec,
   type StreamTargetChunk,
+  type VideoCodec,
 } from 'mediabunny';
 import { RATE } from './audio/grid';
-import { loadSpleeter, separate } from './audio/separate';
+import { loadSpleeter, separate, type Masker } from './audio/separate';
+import type { Edl } from './core/edl';
 import { censorFaces, type FilterOps } from './core/filterOps';
 import type { FromWorker, Phase, ToWorker } from './protocol';
+import { Censor } from './render/blur';
 
 let canceled = false;
 let cancelCurrent: (() => Promise<void>) | null = null;
@@ -35,8 +49,29 @@ function post(msg: FromWorker, transfer: Transferable[] = []): void {
   self.postMessage(msg, { transfer });
 }
 
+const notice = (message: string) => post({ type: 'notice', message });
+
+let shownPhase: Phase | null = null;
+let phaseStart = 0;
+let lastPost = 0;
+
+/** Progress at most four times a second per phase, with an ETA once the phase has run a few seconds. */
 function progress(phase: Phase, pct: number): void {
-  post({ type: 'progress', phase, pct });
+  const now = performance.now();
+  if (phase !== shownPhase) {
+    shownPhase = phase;
+    phaseStart = now;
+  } else if (now - lastPost < 250 && pct < 1) {
+    return;
+  }
+  lastPost = now;
+  const elapsed = (now - phaseStart) / 1000;
+  const eta = pct > 0.01 && pct < 1 && elapsed > 3 ? (elapsed * (1 - pct)) / pct : undefined;
+  post({ type: 'progress', phase, pct, eta });
+}
+
+function stopIfCanceled(): void {
+  if (canceled) throw new Error('Canceled.');
 }
 
 self.onmessage = (e: MessageEvent<ToWorker>) => {
@@ -49,22 +84,42 @@ self.onmessage = (e: MessageEvent<ToWorker>) => {
   }
 };
 
+/** Whether anything in the picture is censored (faces, NSFW scenes, bodies). */
+const censorsPicture = (ops: FilterOps) => censorFaces(ops) || ops.censorNsfw || ops.bodyBlur;
+
 async function run({ file, ops, target }: Extract<ToWorker, { type: 'start' }>): Promise<void> {
   canceled = false;
+  shownPhase = null;
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   let disk: FileSystemWritableFileStream | null = null;
   try {
+    if (!ops.removeMusic && !censorsPicture(ops)) {
+      throw new Error('Nothing to do: choose Remove music, faces to censor or NSFW scenes.');
+    }
     progress('open', 0);
-    await analyzePicture(input, ops);
-    const mp4 = new Mp4OutputFormat({ fastStart: target.kind === 'buffer' ? 'in-memory' : false });
-    const music = ops.removeMusic ? await planMusicRemoval(input) : null;
-    // AAC in MP4 where the browser can encode it. Otherwise Opus, in WebM when the video fits WebM.
-    const format = music?.codec === 'opus' && music.webm ? new WebMOutputFormat() : mp4;
-    if (music?.codec === 'opus') {
-      post({
-        type: 'notice',
-        message: `This browser cannot encode AAC audio, so the audio is Opus${format === mp4 ? '' : ' and the file is WebM (.webm)'}.`,
-      });
+    const video = await input.getPrimaryVideoTrack();
+    if (video && !video.codec) throw new Error('The video uses a codec this app does not know.');
+    let encode: VideoEncode | null = null;
+    let edl: Edl | null = null;
+    if (censorsPicture(ops)) {
+      if (!video) {
+        if (!ops.removeMusic) throw new Error('This file has no video to censor.');
+      } else {
+        encode = await planVideoEncode(video); // before the analysis: no point analyzing what cannot be written
+        edl = await analyzePicture(video, ops);
+      }
+    }
+    const reencode = edl && (edl.censorIntervalsMs.length > 0 || edl.faceTracks.length > 0) ? { ...encode!, edl } : null;
+    if (!reencode && !ops.removeMusic) {
+      throw new Error('The analysis found nothing to cover and music removal is off, so there is nothing to change.');
+    }
+
+    const audio = await planAudio(input, ops.removeMusic);
+    const format = pickFormat(video, reencode, audio, target.kind === 'buffer');
+    if (audio?.mode === 'music' && audio.codec === 'opus') {
+      notice(
+        `This browser cannot encode AAC audio, so the audio is Opus${format instanceof WebMOutputFormat ? ' and the file is WebM (.webm)' : ''}.`,
+      );
     }
     const buffer = target.kind === 'buffer' ? new BufferTarget() : null;
     if (target.kind === 'file') disk = await target.handle.createWritable();
@@ -73,15 +128,14 @@ async function run({ file, ops, target }: Extract<ToWorker, { type: 'start' }>):
       target: buffer ?? new StreamTarget(commitOnlyOnSuccess(disk!), { chunked: true }),
     });
 
-    if (music) await removeMusic(input, output, music);
-    else await remux(input, output);
+    await write(input, output, video, reencode, audio, ops);
 
     progress('finalize', 1);
     if (disk) await disk.close(); // the only place the file on disk is committed
     if (buffer) post({ type: 'done', buffer: buffer.buffer!, mimeType: format.mimeType }, [buffer.buffer!]);
     else post({ type: 'done', mimeType: format.mimeType });
   } catch (err) {
-    await disk?.abort().catch(() => {}); // discard the partial output
+    await disk?.abort().catch(() => {}); // closes the writable and discards the partial output
     const message = canceled ? 'Canceled.' : err instanceof Error ? err.message : String(err);
     post({ type: 'error', message, canceled });
   } finally {
@@ -90,137 +144,290 @@ async function run({ file, ops, target }: Extract<ToWorker, { type: 'start' }>):
   }
 }
 
-/**
- * Pass 1 when anything in the picture is censored. Until the render pass exists, an EDL with anything in
- * it stops the export: the video is never written with what should have been covered left bare. An empty
- * EDL (analyzed, nothing to cover) goes on to the copy paths below (plan §3, render case 2).
- */
-async function analyzePicture(input: Input, ops: FilterOps): Promise<void> {
-  if (!censorFaces(ops) && !ops.censorNsfw) return;
-  const video = await input.getPrimaryVideoTrack();
-  if (!video) return; // no picture, nothing to censor in it
+/** Pass 1. Anything that cannot be analyzed throws (vision/analyze.ts); an empty EDL means nothing to cover. */
+async function analyzePicture(video: InputVideoTrack, ops: FilterOps): Promise<Edl> {
   progress('analyze', 0);
   const { analyze } = await import('./vision/analyze');
-  const edl = await analyze(
-    video,
-    ops,
-    (pct) => progress('analyze', pct),
-    () => {
-      if (canceled) throw new Error('Canceled.');
-    },
-  );
-  if (edl.censorIntervalsMs.length > 0 || edl.faceTracks.length > 0) {
-    throw new Error(
-      `The analysis found ${edl.faceTracks.length} face span(s) and ${edl.censorIntervalsMs.length} whole-frame span(s) to cover, and this build cannot render censored video yet.`,
-    );
-  }
+  return analyze(video, ops, (pct) => progress('analyze', pct), stopIfCanceled);
 }
 
-/** Milestone 1 path: copy every track it can into the new container. */
-async function remux(input: Input, output: Output): Promise<void> {
-  const conversion = await Conversion.init({ input, output, showWarnings: false });
-  cancelCurrent = () => conversion.cancel();
-  const dropped = conversion.discardedTracks.filter((d) => d.track.type !== 'subtitle');
-  if (!conversion.isValid || dropped.length > 0) {
-    const why = dropped.map((d) => `${d.track.type} track: ${d.reason}`).join('; ');
-    throw new Error(`This file cannot be converted${why ? ` (${why})` : ''}.`);
-  }
-  conversion.onProgress = (p) => progress('remux', p);
-  if (canceled) await conversion.cancel();
-  await conversion.execute();
+interface VideoEncode {
+  codec: VideoCodec;
+  /** Upright output size, even on both sides (4:2:0). */
+  width: number;
+  height: number;
+  hardwareAcceleration: 'prefer-hardware' | 'no-preference';
 }
 
-interface MusicPlan {
-  video: InputVideoTrack | null;
-  audio: InputAudioTrack;
+/** H.264 first, then VP9 and AV1; hardware first. */
+const ENCODE_CODECS: VideoCodec[] = ['avc', 'vp9', 'av1'];
+
+/** Size limits (warn above 1080p, refuse above 4K) and the encoder, checked before any work. */
+async function planVideoEncode(video: InputVideoTrack): Promise<VideoEncode> {
+  const w = await video.getDisplayWidth();
+  const h = await video.getDisplayHeight();
+  if (Math.max(w, h) > 4096 || Math.min(w, h) > 2160) {
+    throw new Error(`The video is ${w}x${h}; censoring handles up to 4K (3840x2160).`);
+  }
+  if (Math.min(w, h) > 1080) notice(`The video is ${w}x${h}, above 1080p: censoring it is slow and needs much memory.`);
+  if (!(await video.canDecode())) {
+    throw new Error(`This browser cannot decode the video (${video.codec ?? 'unknown codec'}), so it cannot be censored.`);
+  }
+  const width = Math.max(2, w & ~1);
+  const height = Math.max(2, h & ~1);
+  for (const codec of ENCODE_CODECS) {
+    for (const hardwareAcceleration of ['prefer-hardware', 'no-preference'] as const) {
+      if (await canEncodeVideo(codec, { width, height, quality: QUALITY_HIGH, hardwareAcceleration })) {
+        return { codec, width, height, hardwareAcceleration };
+      }
+    }
+  }
+  throw new Error(`This browser cannot encode ${width}x${height} video (H.264, VP9 or AV1), so it cannot write censored video.`);
+}
+
+interface AudioPlan {
+  track: InputAudioTrack;
+  /** Spleeter's vocals, the original packets as they are, or the original decoded and re-encoded. */
+  mode: 'music' | 'copy' | 'transcode';
+  /** The output codec. */
   codec: AudioCodec;
-  /** Whether WebM can hold the video packets as they are. */
-  webm: boolean;
 }
 
-async function planMusicRemoval(input: Input): Promise<MusicPlan> {
-  const audio = await input.getPrimaryAudioTrack();
-  if (!audio) throw new Error('This video has no audio, so there is no music to remove.');
-  if (!(await audio.canDecode())) {
-    throw new Error(`This browser cannot decode the video's audio (${audio.codec ?? 'unknown codec'}).`);
-  }
-  const video = await input.getPrimaryVideoTrack();
-  if (video && !video.codec) throw new Error('The video uses a codec this app does not know.');
-  const options = { numberOfChannels: 2, sampleRate: RATE, quality: QUALITY_HIGH };
-  const codec: AudioCodec | null = (await canEncodeAudio('aac', options))
-    ? 'aac'
-    : (await canEncodeAudio('opus', options))
-      ? 'opus'
-      : null;
-  if (!codec) throw new Error('This browser can encode neither AAC nor Opus audio.');
-  const webm = !video || new WebMOutputFormat().getSupportedVideoCodecs().includes(video.codec!);
-  return { video, audio, codec, webm };
+/** AAC where the browser can encode it, else Opus. */
+async function encodableAudio(numberOfChannels: number, sampleRate: number): Promise<AudioCodec | null> {
+  const options = { numberOfChannels, sampleRate, quality: QUALITY_HIGH };
+  if (await canEncodeAudio('aac', options)) return 'aac';
+  if (await canEncodeAudio('opus', options)) return 'opus';
+  return null;
 }
 
-/**
- * The primary video track's packets are copied as they are; the audio is replaced by Spleeter's
- * vocals. Both keep their source timestamps (the muxer writes the start offsets), so they stay in
- * sync. Video is copied in lockstep with the audio, so the muxer never queues more than about one
- * window of it. Every other audio track is dropped: it would still carry music.
- */
-async function removeMusic(input: Input, output: Output, { video, audio, codec }: MusicPlan): Promise<void> {
-  if (video && !output.format.getSupportedVideoCodecs().includes(video.codec!)) {
-    throw new Error(`The video (${video.codec}) cannot be copied into ${output.format.fileExtension} with ${codec} audio.`);
+async function planAudio(input: Input, removeMusic: boolean): Promise<AudioPlan | null> {
+  const track = await input.getPrimaryAudioTrack();
+  if (!track) {
+    if (removeMusic) throw new Error('This video has no audio, so there is no music to remove.');
+    return null;
   }
-  const videoSource = video ? new EncodedVideoPacketSource(video.codec!) : null;
-  if (video && videoSource) {
-    output.addVideoTrack(videoSource, { transformationMatrix: await video.getTransformationMatrix() });
+  if (removeMusic) {
+    if (!(await track.canDecode())) {
+      throw new Error(`This browser cannot decode the video's audio (${track.codec ?? 'unknown codec'}).`);
+    }
+    const codec = await encodableAudio(2, RATE);
+    if (!codec) throw new Error('This browser can encode neither AAC nor Opus audio.');
+    return { track, mode: 'music', codec };
   }
-  const audioSource = new AudioSampleSource({ codec, quality: QUALITY_HIGH });
-  output.addAudioTrack(audioSource);
+  // Censoring only: the original audio, copied when MP4 can carry it.
+  if (track.codec && new Mp4OutputFormat().getSupportedAudioCodecs().includes(track.codec)) {
+    return { track, mode: 'copy', codec: track.codec };
+  }
+  const codec = (await track.canDecode()) ? await encodableAudio(track.numberOfChannels, track.sampleRate) : null;
+  if (!codec) throw new Error(`The video's audio (${track.codec ?? 'unknown codec'}) can be neither copied nor re-encoded here.`);
+  return { track, mode: 'transcode', codec };
+}
+
+/** MP4, except Opus vocals over a video WebM can hold (as before the render pass): WebM. */
+function pickFormat(
+  video: InputVideoTrack | null,
+  reencode: VideoEncode | null,
+  audio: AudioPlan | null,
+  inMemory: boolean,
+): OutputFormat {
+  const videoCodec = reencode?.codec ?? video?.codec ?? null;
+  const webm = new WebMOutputFormat();
+  if (audio?.mode === 'music' && audio.codec === 'opus' && (!videoCodec || webm.getSupportedVideoCodecs().includes(videoCodec))) {
+    return webm;
+  }
+  return new Mp4OutputFormat({ fastStart: inMemory ? 'in-memory' : false });
+}
+
+/** The output pass. `reencode` set: frames are covered per its EDL and re-encoded; else video packets are copied. */
+async function write(
+  input: Input,
+  output: Output,
+  video: InputVideoTrack | null,
+  reencode: (VideoEncode & { edl: Edl }) | null,
+  audio: AudioPlan | null,
+  ops: FilterOps,
+): Promise<void> {
+  const duration = await input.computeDuration();
+  const phase: Phase = reencode ? 'render' : 'music';
+  const report = (t: number) => progress(phase, duration > 0 ? Math.min(1, Math.max(0, t / duration)) : 0);
+
+  let videoTrack: VideoTrack | null = null;
+  if (video && reencode) {
+    const source = new VideoSampleSource({
+      codec: reencode.codec,
+      quality: QUALITY_HIGH,
+      hardwareAcceleration: reencode.hardwareAcceleration,
+    });
+    output.addVideoTrack(source); // frames are drawn upright: no rotation metadata
+    videoTrack = encodedVideo(video, source, new Censor(reencode.width, reencode.height, ops), reencode.edl, report);
+  } else if (video) {
+    if (!output.format.getSupportedVideoCodecs().includes(video.codec!)) {
+      throw new Error(`The video (${video.codec}) cannot be copied into ${output.format.fileExtension}.`);
+    }
+    const source = new EncodedVideoPacketSource(video.codec!);
+    output.addVideoTrack(source, { transformationMatrix: await video.getTransformationMatrix() });
+    videoTrack = copiedVideo(video, source);
+  }
+
+  // Every other audio track is dropped: with music removal it would still carry music.
+  const audioSource = audio
+    ? audio.mode === 'copy'
+      ? new EncodedAudioPacketSource(audio.codec)
+      : new AudioSampleSource({ codec: audio.codec, quality: QUALITY_HIGH })
+    : null;
+  if (audioSource) output.addAudioTrack(audioSource);
   cancelCurrent = () => output.cancel();
-  const stopIfCanceled = () => {
-    if (canceled) throw new Error('Canceled.');
-  };
 
-  progress('model', 0);
-  const spleeter = await loadSpleeter(new URL(`${import.meta.env.BASE_URL}models/spleeter-2stems.onnx`, self.location.href).href);
+  let spleeter: { mask: Masker; release: () => Promise<void> } | null = null;
   try {
-    stopIfCanceled();
-    await output.start();
-    const packets = video ? new EncodedPacketSink(video).packets() : null;
-    const decoderConfig = (await video?.getDecoderConfig()) ?? undefined;
-    let first = true;
-    let pending = await packets?.next();
-    /** Copies video packets (decode order) until one is presented at or after `until`. */
-    const copyVideo = async (until: number) => {
-      while (videoSource && pending && !pending.done && pending.value.timestamp < until) {
-        await videoSource.add(pending.value, first ? { decoderConfig } : undefined);
-        first = false;
-        pending = await packets!.next();
-      }
-    };
-
-    const duration = await input.computeDuration();
-    progress('music', 0);
-    for await (const chunk of separate(new AudioSampleSink(audio).samples(), spleeter.mask)) {
-      stopIfCanceled();
-      const data = new Float32Array(2 * chunk.left.length);
-      data.set(chunk.left);
-      data.set(chunk.right, chunk.left.length);
-      const sample = new AudioSample({ data, format: 'f32-planar', numberOfChannels: 2, sampleRate: RATE, timestamp: chunk.timestamp });
-      try {
-        await audioSource.add(sample);
-      } finally {
-        sample.close();
-      }
-      const end = chunk.timestamp + chunk.left.length / RATE;
-      await copyVideo(end);
-      progress('music', duration > 0 ? Math.min(1, end / duration) : 0);
+    if (audio?.mode === 'music') {
+      progress('model', 0);
+      spleeter = await loadSpleeter(new URL(`${import.meta.env.BASE_URL}models/spleeter-2stems.onnx`, self.location.href).href);
     }
     stopIfCanceled();
-    await copyVideo(Infinity);
+    await output.start();
+    progress(phase, 0);
+    const steps = !audio
+      ? null
+      : audio.mode === 'music'
+        ? vocals(audio.track, audioSource as AudioSampleSource, spleeter!.mask)
+        : audio.mode === 'copy'
+          ? copiedAudio(audio.track, audioSource as EncodedAudioPacketSource)
+          : transcodedAudio(audio.track, audioSource as AudioSampleSource);
+    if (steps) {
+      for await (const end of steps) {
+        stopIfCanceled();
+        await videoTrack?.until(end);
+        report(end);
+      }
+    }
+    stopIfCanceled();
+    await videoTrack?.until(Infinity);
+    stopIfCanceled();
     await output.finalize();
   } catch (err) {
     await output.cancel().catch(() => {});
     throw err;
   } finally {
-    await spleeter.release().catch(() => {});
+    await videoTrack?.close().catch(() => {});
+    await spleeter?.release().catch(() => {});
+  }
+}
+
+/** Video written up to a time, following the audio. */
+interface VideoTrack {
+  /** Writes every frame presented before `time` (seconds). */
+  until(time: number): Promise<void>;
+  /** Stops reading (on error or cancel), closing what is held. */
+  close(): Promise<void>;
+}
+
+/** Packets copied in decode order until one is presented at or after `time`. */
+function copiedVideo(video: InputVideoTrack, source: EncodedVideoPacketSource): VideoTrack {
+  const packets = new EncodedPacketSink(video).packets();
+  let config: VideoDecoderConfig | null | undefined;
+  let first = true;
+  let pending: IteratorResult<EncodedPacket> | null = null;
+  return {
+    async until(time) {
+      if (config === undefined) config = await video.getDecoderConfig();
+      pending ??= await packets.next();
+      while (!pending.done && pending.value.timestamp < time) {
+        await source.add(pending.value, first ? { decoderConfig: config ?? undefined } : undefined);
+        first = false;
+        pending = await packets.next();
+      }
+    },
+    async close() {
+      await packets.return();
+    },
+  };
+}
+
+/** Frames decoded in presentation order, covered, and encoded with their own timestamps and durations. */
+function encodedVideo(
+  video: InputVideoTrack,
+  source: VideoSampleSource,
+  censor: Censor,
+  edl: Edl,
+  report: (t: number) => void,
+): VideoTrack {
+  const samples = new VideoSampleSink(video).samples();
+  let pending: IteratorResult<VideoSample> | null = null;
+  let frames = 0;
+  return {
+    async until(time) {
+      pending ??= await samples.next();
+      while (!pending.done && pending.value.timestamp < time) {
+        const sample = pending.value;
+        pending = null;
+        const { timestamp, duration } = sample;
+        try {
+          stopIfCanceled();
+          const frame = new VideoSample(censor.draw(sample, edl), { timestamp, duration });
+          try {
+            await source.add(frame);
+          } finally {
+            frame.close();
+          }
+        } finally {
+          sample.close();
+        }
+        frames++;
+        report(timestamp);
+        pending = await samples.next();
+      }
+      if (pending.done && time === Infinity && frames === 0) {
+        throw new Error('No frame of the video could be decoded, so it cannot be censored.');
+      }
+    },
+    async close() {
+      if (pending && !pending.done) pending.value.close();
+      await samples.return();
+    },
+  };
+}
+
+/** Spleeter's vocals, window by window; yields where each chunk ends (seconds). */
+async function* vocals(track: InputAudioTrack, source: AudioSampleSource, mask: Masker): AsyncGenerator<number> {
+  for await (const chunk of separate(new AudioSampleSink(track).samples(), mask)) {
+    stopIfCanceled();
+    const data = new Float32Array(2 * chunk.left.length);
+    data.set(chunk.left);
+    data.set(chunk.right, chunk.left.length);
+    const sample = new AudioSample({ data, format: 'f32-planar', numberOfChannels: 2, sampleRate: RATE, timestamp: chunk.timestamp });
+    try {
+      await source.add(sample);
+    } finally {
+      sample.close();
+    }
+    yield chunk.timestamp + chunk.left.length / RATE;
+  }
+}
+
+/** The original audio packets as they are. */
+async function* copiedAudio(track: InputAudioTrack, source: EncodedAudioPacketSource): AsyncGenerator<number> {
+  const decoderConfig = await track.getDecoderConfig();
+  if (!decoderConfig) throw new Error(`The video's audio (${track.codec}) cannot be read.`);
+  let first = true;
+  for await (const packet of new EncodedPacketSink(track).packets()) {
+    await source.add(packet, first ? { decoderConfig } : undefined);
+    first = false;
+    yield packet.timestamp + packet.duration;
+  }
+}
+
+/** The original audio decoded and re-encoded (a codec MP4 cannot carry). */
+async function* transcodedAudio(track: InputAudioTrack, source: AudioSampleSource): AsyncGenerator<number> {
+  for await (const sample of new AudioSampleSink(track).samples()) {
+    const end = sample.timestamp + sample.duration;
+    try {
+      await source.add(sample);
+    } finally {
+      sample.close();
+    }
+    yield end;
   }
 }
 

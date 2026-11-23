@@ -8,10 +8,11 @@ export type ToWorker =
   | { type: 'start'; file: File; ops: FilterOps; target: SaveTarget }
   | { type: 'cancel' };
 
-export type Phase = 'open' | 'analyze' | 'remux' | 'model' | 'music' | 'finalize';
+export type Phase = 'open' | 'analyze' | 'model' | 'music' | 'render' | 'finalize';
 
 export type FromWorker =
-  | { type: 'progress'; phase: Phase; pct: number }
+  /** `pct` 0..1 within `phase`; `eta` seconds left in it, once it can be estimated. */
+  | { type: 'progress'; phase: Phase; pct: number; eta?: number }
   /** Something the user should know about the output, e.g. a codec fallback. */
   | { type: 'notice'; message: string }
   /** `buffer` is set only for a `buffer` target; `mimeType` is the output container's. */
