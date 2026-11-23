@@ -1,0 +1,923 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AB0000000000000000000003 /* FFmpeg-Kit in Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000002 /* FFmpeg-Kit */; };
+		AB0000000000000000000004 /* FFmpeg-Kit in Embed Frameworks */ = {isa = PBXBuildFile; productRef = AB0000000000000000000002 /* FFmpeg-Kit */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		AA0000000000000000000003 /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000002 /* onnxruntime */; };
+		AA000000000000000000002E /* NaqiShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000020 /* NaqiShare.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA000000000000000000002F /* NaqiWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000021 /* NaqiWidgets.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AA000000000000000000001A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BE4718E93021E434001C874F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BE4718F03021E434001C874F;
+			remoteInfo = naqi;
+		};
+		AA0000000000000000000031 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BE4718E93021E434001C874F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA0000000000000000000025;
+			remoteInfo = NaqiShare;
+		};
+		AA0000000000000000000033 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BE4718E93021E434001C874F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA0000000000000000000026;
+			remoteInfo = NaqiWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AB0000000000000000000005 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				AB0000000000000000000004 /* FFmpeg-Kit in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA000000000000000000002D /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA000000000000000000002E /* NaqiShare.appex in Embed Foundation Extensions */,
+				AA000000000000000000002F /* NaqiWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		AA0000000000000000000011 /* naqiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = naqiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000020 /* NaqiShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NaqiShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000021 /* NaqiWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NaqiWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BE4718F13021E434001C874F /* naqi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = naqi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AA000000000000000000003A /* Exceptions for "NaqiShare" folder in "NaqiShare" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA0000000000000000000025 /* NaqiShare */;
+		};
+		AA000000000000000000003B /* Exceptions for "NaqiWidgets" folder in "NaqiWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA0000000000000000000026 /* NaqiWidgets */;
+		};
+		AA000000000000000000003C /* Exceptions for "naqi" folder in "naqi" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = BE4718F03021E434001C874F /* naqi */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		AA0000000000000000000012 /* naqiTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = naqiTests;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000022 /* NaqiShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = NaqiShared;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000023 /* NaqiShare */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA000000000000000000003A /* Exceptions for "NaqiShare" folder in "NaqiShare" target */,
+			);
+			path = NaqiShare;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000024 /* NaqiWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA000000000000000000003B /* Exceptions for "NaqiWidgets" folder in "NaqiWidgets" target */,
+			);
+			path = NaqiWidgets;
+			sourceTree = "<group>";
+		};
+		BE4718F33021E434001C874F /* naqi */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA000000000000000000003C /* Exceptions for "naqi" folder in "naqi" target */,
+			);
+			path = naqi;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AA0000000000000000000014 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0000000000000000000028 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA000000000000000000002B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BE4718EE3021E434001C874F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000000000003 /* onnxruntime in Frameworks */,
+				AB0000000000000000000003 /* FFmpeg-Kit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		BE4718E83021E434001C874F = {
+			isa = PBXGroup;
+			children = (
+				BE4718F33021E434001C874F /* naqi */,
+				AA0000000000000000000022 /* NaqiShared */,
+				AA0000000000000000000023 /* NaqiShare */,
+				AA0000000000000000000024 /* NaqiWidgets */,
+				AA0000000000000000000012 /* naqiTests */,
+				BE4718F23021E434001C874F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		BE4718F23021E434001C874F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BE4718F13021E434001C874F /* naqi.app */,
+				AA0000000000000000000011 /* naqiTests.xctest */,
+				AA0000000000000000000020 /* NaqiShare.appex */,
+				AA0000000000000000000021 /* NaqiWidgets.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AA0000000000000000000010 /* naqiTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000016 /* Build configuration list for PBXNativeTarget "naqiTests" */;
+			buildPhases = (
+				AA0000000000000000000013 /* Sources */,
+				AA0000000000000000000014 /* Frameworks */,
+				AA0000000000000000000015 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA0000000000000000000019 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000012 /* naqiTests */,
+			);
+			name = naqiTests;
+			packageProductDependencies = (
+			);
+			productName = naqiTests;
+			productReference = AA0000000000000000000011 /* naqiTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		AA0000000000000000000025 /* NaqiShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000036 /* Build configuration list for PBXNativeTarget "NaqiShare" */;
+			buildPhases = (
+				AA0000000000000000000027 /* Sources */,
+				AA0000000000000000000028 /* Frameworks */,
+				AA0000000000000000000029 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000022 /* NaqiShared */,
+				AA0000000000000000000023 /* NaqiShare */,
+			);
+			name = NaqiShare;
+			packageProductDependencies = (
+			);
+			productName = NaqiShare;
+			productReference = AA0000000000000000000020 /* NaqiShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		AA0000000000000000000026 /* NaqiWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000039 /* Build configuration list for PBXNativeTarget "NaqiWidgets" */;
+			buildPhases = (
+				AA000000000000000000002A /* Sources */,
+				AA000000000000000000002B /* Frameworks */,
+				AA000000000000000000002C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000022 /* NaqiShared */,
+				AA0000000000000000000024 /* NaqiWidgets */,
+			);
+			name = NaqiWidgets;
+			packageProductDependencies = (
+			);
+			productName = NaqiWidgets;
+			productReference = AA0000000000000000000021 /* NaqiWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		BE4718F03021E434001C874F /* naqi */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BE4718FC3021E43A001C874F /* Build configuration list for PBXNativeTarget "naqi" */;
+			buildPhases = (
+				BE4718ED3021E434001C874F /* Sources */,
+				BE4718EE3021E434001C874F /* Frameworks */,
+				BE4718EF3021E434001C874F /* Resources */,
+				AB0000000000000000000005 /* Embed Frameworks */,
+				AA000000000000000000002D /* Embed Foundation Extensions */,
+				AA0000000000000000000040 /* Prepare embedded frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA0000000000000000000030 /* PBXTargetDependency */,
+				AA0000000000000000000032 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000022 /* NaqiShared */,
+				BE4718F33021E434001C874F /* naqi */,
+			);
+			name = naqi;
+			packageProductDependencies = (
+				AA0000000000000000000002 /* onnxruntime */,
+				AB0000000000000000000002 /* FFmpeg-Kit */,
+			);
+			productName = naqi;
+			productReference = BE4718F13021E434001C874F /* naqi.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		BE4718E93021E434001C874F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					AA0000000000000000000010 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = BE4718F03021E434001C874F;
+					};
+					AA0000000000000000000025 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					AA0000000000000000000026 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					BE4718F03021E434001C874F = {
+						CreatedOnToolsVersion = 26.6;
+					};
+				};
+			};
+			buildConfigurationList = BE4718EC3021E434001C874F /* Build configuration list for PBXProject "naqi" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				ar,
+				Base,
+			);
+			mainGroup = BE4718E83021E434001C874F;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AA0000000000000000000001 /* XCLocalSwiftPackageReference "Packages/OnnxRuntime" */,
+				AB0000000000000000000001 /* XCRemoteSwiftPackageReference "ffmpeg-kit-spm" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = BE4718F23021E434001C874F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				BE4718F03021E434001C874F /* naqi */,
+				AA0000000000000000000025 /* NaqiShare */,
+				AA0000000000000000000026 /* NaqiWidgets */,
+				AA0000000000000000000010 /* naqiTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA0000000000000000000015 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0000000000000000000029 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA000000000000000000002C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BE4718EF3021E434001C874F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AA0000000000000000000040 /* Prepare embedded frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Prepare embedded frameworks";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/prepare-frameworks.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AA0000000000000000000013 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0000000000000000000027 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA000000000000000000002A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BE4718ED3021E434001C874F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA0000000000000000000019 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BE4718F03021E434001C874F /* naqi */;
+			targetProxy = AA000000000000000000001A /* PBXContainerItemProxy */;
+		};
+		AA0000000000000000000030 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = AA0000000000000000000025 /* NaqiShare */;
+			targetProxy = AA0000000000000000000031 /* PBXContainerItemProxy */;
+		};
+		AA0000000000000000000032 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = AA0000000000000000000026 /* NaqiWidgets */;
+			targetProxy = AA0000000000000000000033 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AA0000000000000000000017 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 22;
+				DEVELOPMENT_TEAM = U3C6DM4QX4;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Naqi saves the filtered copy back to your photo library. Your original is never changed.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Naqi reads the video you pick so it can filter it. Videos of 10 minutes or more may be processed on Naqi's server unless you turn that off in Settings.";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.haithamassoli.naqiTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/naqi.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/naqi";
+			};
+			name = Debug;
+		};
+		AA0000000000000000000018 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 22;
+				DEVELOPMENT_TEAM = U3C6DM4QX4;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Naqi saves the filtered copy back to your photo library. Your original is never changed.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Naqi reads the video you pick so it can filter it. Videos of 10 minutes or more may be processed on Naqi's server unless you turn that off in Settings.";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.haithamassoli.naqiTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/naqi.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/naqi";
+			};
+			name = Release;
+		};
+		AA0000000000000000000034 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Entitlements/NaqiShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 22;
+				DEVELOPMENT_TEAM = U3C6DM4QX4;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NaqiShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Naqi;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.haithamassoli.naqi.Share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA0000000000000000000035 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Entitlements/NaqiShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 22;
+				DEVELOPMENT_TEAM = U3C6DM4QX4;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NaqiShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Naqi;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.haithamassoli.naqi.Share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AA0000000000000000000037 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Entitlements/NaqiWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 22;
+				DEVELOPMENT_TEAM = U3C6DM4QX4;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NaqiWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Naqi;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.haithamassoli.naqi.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA0000000000000000000038 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Entitlements/NaqiWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 22;
+				DEVELOPMENT_TEAM = U3C6DM4QX4;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NaqiWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Naqi;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.haithamassoli.naqi.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		BE4718FA3021E43A001C874F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = U3C6DM4QX4;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		BE4718FB3021E43A001C874F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = U3C6DM4QX4;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		BE4718FD3021E43A001C874F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphone*]" = Entitlements/naqi.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Entitlements/naqi-macos.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 22;
+				DEVELOPMENT_TEAM = U3C6DM4QX4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GENERATE_INFOPLIST_FILE = YES;
+				"INFOPLIST_FILE[sdk=iphoneos*]" = naqi/Info.plist;
+				"INFOPLIST_FILE[sdk=iphonesimulator*]" = naqi/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Naqi | نقي";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Naqi saves the filtered copy back to your photo library. Your original is never changed.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Naqi reads the video you pick so it can filter it. Videos of 10 minutes or more may be processed on Naqi's server unless you turn that off in Settings.";
+				"INFOPLIST_KEY_NSSupportsLiveActivities[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_NSSupportsLiveActivities[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.1.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.haithamassoli.naqi;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "naqi/naqi-Bridging-Header.h";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BE4718FE3021E43A001C874F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphone*]" = Entitlements/naqi.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Entitlements/naqi-macos.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 22;
+				DEVELOPMENT_TEAM = U3C6DM4QX4;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
+				GENERATE_INFOPLIST_FILE = YES;
+				"INFOPLIST_FILE[sdk=iphoneos*]" = naqi/Info.plist;
+				"INFOPLIST_FILE[sdk=iphonesimulator*]" = naqi/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Naqi | نقي";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Naqi saves the filtered copy back to your photo library. Your original is never changed.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Naqi reads the video you pick so it can filter it. Videos of 10 minutes or more may be processed on Naqi's server unless you turn that off in Settings.";
+				"INFOPLIST_KEY_NSSupportsLiveActivities[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_NSSupportsLiveActivities[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.1.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.haithamassoli.naqi;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "naqi/naqi-Bridging-Header.h";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AA0000000000000000000016 /* Build configuration list for PBXNativeTarget "naqiTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000017 /* Debug */,
+				AA0000000000000000000018 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA0000000000000000000036 /* Build configuration list for PBXNativeTarget "NaqiShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000034 /* Debug */,
+				AA0000000000000000000035 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA0000000000000000000039 /* Build configuration list for PBXNativeTarget "NaqiWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000037 /* Debug */,
+				AA0000000000000000000038 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BE4718EC3021E434001C874F /* Build configuration list for PBXProject "naqi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BE4718FA3021E43A001C874F /* Debug */,
+				BE4718FB3021E43A001C874F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BE4718FC3021E43A001C874F /* Build configuration list for PBXNativeTarget "naqi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BE4718FD3021E43A001C874F /* Debug */,
+				BE4718FE3021E43A001C874F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AA0000000000000000000001 /* XCLocalSwiftPackageReference "Packages/OnnxRuntime" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/OnnxRuntime;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AB0000000000000000000001 /* XCRemoteSwiftPackageReference "ffmpeg-kit-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tylerjonesio/ffmpeg-kit-spm";
+			requirement = {
+				kind = revision;
+				revision = 6053b0e4f8607314ff5e14e0b18fc250c0f87c9b;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA0000000000000000000002 /* onnxruntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0000000000000000000001 /* XCLocalSwiftPackageReference "Packages/OnnxRuntime" */;
+			productName = onnxruntime;
+		};
+		AB0000000000000000000002 /* FFmpeg-Kit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AB0000000000000000000001 /* XCRemoteSwiftPackageReference "ffmpeg-kit-spm" */;
+			productName = "FFmpeg-Kit";
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = BE4718E93021E434001C874F /* Project object */;
+}

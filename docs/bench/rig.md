@@ -8,8 +8,8 @@ Build, install, and let the app create its external files dir **before** pushing
 
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-./gradlew :app:assembleBenchmark
-adb -s R3CW5070LGM install -r app/build/outputs/apk/benchmark/app-benchmark.apk
+apps/android/gradlew -p apps/android :app:assembleBenchmark
+adb -s R3CW5070LGM install -r apps/android/app/build/outputs/apk/benchmark/app-benchmark.apk
 
 PKG=com.haithamassoli.naqi.benchmark
 BENCH=/sdcard/Android/data/$PKG/files/bench
@@ -17,8 +17,8 @@ BENCH=/sdcard/Android/data/$PKG/files/bench
 adb -s R3CW5070LGM shell am start -n $PKG/com.haithamassoli.naqi.MainActivity \
   -e bench_model $BENCH/yamnet.onnx --ei bench_iters 1
 
-adb -s R3CW5070LGM push app/src/main/assets/models/yamnet.onnx $BENCH/yamnet.onnx
-adb -s R3CW5070LGM push app/src/main/assets/models/htdemucs_s26_f16.onnx $BENCH/htdemucs_s26_f16.onnx
+adb -s R3CW5070LGM push apps/android/app/src/main/assets/models/yamnet.onnx $BENCH/yamnet.onnx
+adb -s R3CW5070LGM push apps/android/app/src/main/assets/models/htdemucs_s26_f16.onnx $BENCH/htdemucs_s26_f16.onnx
 ```
 
 Any readable path works. `/data/local/tmp` is not readable on this non-debuggable build; use `$BENCH`.

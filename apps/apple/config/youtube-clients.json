@@ -1,0 +1,31 @@
+{
+  "clients": [
+    {
+      "name": "VISIONOS",
+      "version": "1.02",
+      "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+      "deviceMake": "Apple",
+      "deviceModel": "RealityDevice17,1",
+      "osName": "visionOS",
+      "osVersion": "26.5.23O471"
+    },
+    {
+      "name": "ANDROID_VR",
+      "version": "1.65.10",
+      "ua": "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip",
+      "deviceMake": "Oculus",
+      "deviceModel": "Quest 3",
+      "osName": "Android",
+      "osVersion": "12L",
+      "androidSdkVersion": 32
+    },
+    {
+      "name": "ANDROID",
+      "version": "21.26.364",
+      "ua": "com.google.android.youtube/21.26.364 (Linux; U; Android 11) gzip",
+      "osName": "Android",
+      "osVersion": "11",
+      "androidSdkVersion": 30
+    }
+  ]
+}

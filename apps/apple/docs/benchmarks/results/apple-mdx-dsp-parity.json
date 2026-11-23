@@ -1,0 +1,13 @@
+{
+  "scope": "native Accelerate DFT7680 DSP versus CPU Torch STFT and complete Python-CoreML-ALL WAV reference",
+  "input": "singing-mix0db.wav",
+  "source_frames": 220500,
+  "native_frames": 220500,
+  "python_frames": 220500,
+  "spectrum_relative_rms_error": 1.7558145624664176e-07,
+  "spectrum_signal_to_error_db": 135.11042706643642,
+  "spectrum_max_abs_error": 6.103515625e-05,
+  "wave_relative_rms_error": 0.00040156206830333516,
+  "wave_signal_to_error_db": 67.92494635075545,
+  "wave_max_abs_error": 0.0003276541829109192
+}

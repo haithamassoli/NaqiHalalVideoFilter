@@ -1,0 +1,22 @@
+{
+  "model_id": "UVR-MDX-NET-Voc_FT.mlpackage",
+  "source": "https://huggingface.co/gyoom/UVR-MDX-CoreML/tree/aa27ab16896fdb298cdb73cceb76c950e7580c00",
+  "commit": "aa27ab16896fdb298cdb73cceb76c950e7580c00",
+  "files": [
+    {
+      "file": "Data/com.apple.CoreML/model.mlmodel",
+      "bytes": 115669,
+      "sha256": "bdd6a5c0b2d3d9eae431f82a58e194c43f08cc3f9da664fdb4daa9d7c4b9bc43"
+    },
+    {
+      "file": "Data/com.apple.CoreML/weights/weight.bin",
+      "bytes": 33377792,
+      "sha256": "ee8aeba2251618d8248bfc3bbad49bb5d3b3ee0b6caa47182e08f2e5e3131c22"
+    },
+    {
+      "file": "Manifest.json",
+      "bytes": 617,
+      "sha256": "966971d49a91cbd9d43d15e40ca61e95aac72fcfe0e0acd3ece5df9818680b34"
+    }
+  ]
+}

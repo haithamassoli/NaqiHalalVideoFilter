@@ -1,0 +1,10 @@
+ultralytics==8.4.29
+torch==2.7.0
+torchvision==0.22.0
+numpy==2.2.6
+coremltools==9.0
+onnxruntime==1.30.0
+timm==0.8.13.dev0
+safetensors==0.8.0
+opencv-python==5.0.0.93
+pillow==12.3.0

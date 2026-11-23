@@ -1,0 +1,90 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Naqi | نقي"
+          }
+        }
+      }
+    },
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "naqi"
+          }
+        }
+      }
+    },
+    "NSCameraUsageDescription" : {
+      "comment" : "Required by FFmpeg libavdevice's capture API references. Naqi does not request camera capture.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يستخدم نقي مكتبة لمعالجة الوسائط تدعم التصوير بالكاميرا. يعالج نقي مقاطع الفيديو التي تختارها على جهازك ولا يسجّل من الكاميرا."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi uses a media-processing library that supports camera capture. Naqi filters your selected videos locally and does not record from the camera."
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription" : {
+      "comment" : "Required by FFmpeg libavdevice's capture API references. Naqi does not request microphone recording.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يستخدم نقي مكتبة لمعالجة الوسائط تدعم التسجيل بالميكروفون. يعالج نقي الملفات التي تختارها على جهازك ولا يسجّل من الميكروفون."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi uses a media-processing library that supports microphone recording. Naqi processes your selected files locally and does not record from the microphone."
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryAddUsageDescription" : {
+      "comment" : "Privacy - Photo Library Additions Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Naqi saves the filtered copy back to your photo library. Your original is never changed."
+          }
+        }
+      }
+    },
+    "NSPhotoLibraryUsageDescription" : {
+      "comment" : "Privacy - Photo Library Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Naqi reads the video you pick so it can filter it. Videos of 10 minutes or more may be processed on Naqi's server unless you turn that off in Settings."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

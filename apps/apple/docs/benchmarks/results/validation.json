@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-02",
+  "host": "Apple M3 MacBook Air, 24GB, macOS 27.0.1, Xcode 27.0",
+  "physical_iphone": false,
+  "sdk_typechecks": {
+    "apple_voice_isolation_with_shared_io": "PASS arm64 iOS18",
+    "apple_mdx_audio_with_shared_io": "PASS arm64 iOS18",
+    "apple_coreml_audio": "PASS arm64 iOS18",
+    "vision_native_new_revisions": "PASS arm64 iOS27"
+  },
+  "runnable_checks": {
+    "audio_compare_self_check": "PASS STFT packing/inverse, silence/partial OLA, gain metrics and source overwrite guard",
+    "native_mdx_self_check": "PASS RIFF complete/truncated payload, DFT7680, STFT, nonzero/silence/short/final-window OLA",
+    "native_voice_isolation_self_check": "PASS silence, finite samples and final partial buffer",
+    "vision_native_self_check": "PASS coordinate transform and float-mask PNG encoding",
+    "vision_yolo_self_check": "PASS IoU and ambiguous face/body association",
+    "vision_gender_self_check": "PASS edge-clamped RGB crop",
+    "native_audio_path_collision_checks": "PASS all three CLIs reject input/output/results collisions"
+  },
+  "artifact_checks": {
+    "json_and_jsonl_parse": "PASS",
+    "local_markdown_links": "PASS",
+    "native_mdx_and_corrected_demucs_external_wave_integrity": "PASS 19 outputs with exact original frames, sample rate, stereo channels and finite samples",
+    "original_short_wave_frames": [2390794, 2350222],
+    "vision_frame_result_rows": 2568,
+    "superseded_invalid_native_controls": 9,
+    "git_diff_check": "PASS"
+  },
+  "limits": "SDK typechecking is not device execution. Benchmarks exclude complete exported video jobs, phone thermals/energy and person tracking. Superseded single-read controls are excluded from quality decisions."
+}

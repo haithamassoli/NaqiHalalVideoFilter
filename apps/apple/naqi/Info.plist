@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- FFmpeg libavdevice references capture APIs. Naqi processes selected files
+	     and never requests camera or microphone capture. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Naqi uses a media-processing library that supports camera capture. Naqi filters your selected videos locally and does not record from the camera.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Naqi uses a media-processing library that supports microphone recording. Naqi processes your selected files locally and does not record from the microphone.</string>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.webmproject.webm</string>
+			<key>UTTypeDescription</key>
+			<string>WebM media</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.movie</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array><string>webm</string></array>
+				<key>public.mime-type</key>
+				<array><string>video/webm</string><string>audio/webm</string></array>
+			</dict>
+		</dict>
+	</array>
+	<!-- Thmanyah Sans (NaqiShared/Fonts, flattened into the bundle root). -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>thmanyahsans-Regular.otf</string>
+		<string>thmanyahsans-Medium.otf</string>
+		<string>thmanyahsans-Bold.otf</string>
+	</array>
+	<key>ATSApplicationFontsPath</key>
+	<string>.</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.haithamassoli.naqi.processing</string>
+	</array>
+	<!-- Finished videos and audio live in Documents (OutputLibrary); these two
+	     make that folder show up as "On My iPhone > Naqi" in the Files app. -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<!-- PublishPreset.schemes: which platforms the saved card offers. Only
+	     canOpenURL is asked; nothing here is ever opened. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+		<string>twitter</string>
+		<string>instagram</string>
+		<string>snapchat</string>
+		<string>tg</string>
+		<string>fb-messenger</string>
+		<string>tiktok</string>
+		<string>snssdk1233</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+	</array>
+</dict>
+</plist>

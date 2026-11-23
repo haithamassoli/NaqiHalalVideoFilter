@@ -1,0 +1,55 @@
+== /Users/goldentik/AndroidStudioProjects/NaqiHalalVideoFilter/app/src/main/assets/models/nsfw_mnv2_140_f32.onnx
+  CPU t=1                load=     18ms  median=  16.960ms  min=  16.616ms  maxAbsDiff=0.000000
+  CPU t=2                load=      6ms  median=   9.530ms  min=   9.208ms  maxAbsDiff=0.016134
+  CPU t=4                load=      7ms  median=   7.922ms  min=   5.755ms  maxAbsDiff=0.028217
+  XNNPACK t=2            load=     27ms  median=   8.547ms  min=   7.909ms  maxAbsDiff=0.007310
+  XNNPACK t=4            load=     25ms  median=   5.346ms  min=   4.481ms  maxAbsDiff=0.013528
+  CoreML ALL/MLProgram   load=      7ms  median=  17.528ms  min=  17.000ms  maxAbsDiff=0.001043
+  CoreML ANE/MLProgram   load=      7ms  median=  17.619ms  min=  16.754ms  maxAbsDiff=0.013489
+  CoreML GPU/MLProgram   load=      7ms  median=  17.105ms  min=  16.888ms  maxAbsDiff=0.007322
+  CoreML ALL/NeuralNet   load=      6ms  median=  17.215ms  min=  16.654ms  maxAbsDiff=0.008442
+
+== nsfw_f32_static.onnx
+  CPU t=1                load=     15ms  median=  17.543ms  min=  16.782ms  maxAbsDiff=0.000000
+  CPU t=2                load=      7ms  median=   9.809ms  min=   9.198ms  maxAbsDiff=0.016134
+  CPU t=4                load=      9ms  median=   6.983ms  min=   5.839ms  maxAbsDiff=0.028217
+  XNNPACK t=2            load=     26ms  median=   8.713ms  min=   8.160ms  maxAbsDiff=0.007310
+  XNNPACK t=4            load=     25ms  median=   6.385ms  min=   4.848ms  maxAbsDiff=0.013528
+  CoreML ALL/MLProgram   FAILED: Error compiling model: Failed to parse the model specification. Error: Unable to parse ML Program: in operation StatefulPartitionedCall/sequential/keras_layer/StatefulPartitionedCa
+  CoreML ANE/MLProgram   FAILED: Error compiling model: Failed to parse the model specification. Error: Unable to parse ML Program: in operation StatefulPartitionedCall/sequential/keras_layer/StatefulPartitionedCa
+  CoreML GPU/MLProgram   FAILED: Error compiling model: Failed to parse the model specification. Error: Unable to parse ML Program: in operation StatefulPartitionedCall/sequential/keras_layer/StatefulPartitionedCa
+  CoreML ALL/NeuralNet   load=    556ms  median=   0.667ms  min=   0.619ms  maxAbsDiff=0.007946
+
+== nsfw_int8_static.onnx
+  CPU t=1                load=     19ms  median=   4.837ms  min=   4.692ms  maxAbsDiff=0.000000
+  CPU t=2                load=     15ms  median=   3.009ms  min=   2.806ms  maxAbsDiff=0.031373
+  CPU t=4                load=     16ms  median=   2.270ms  min=   1.920ms  maxAbsDiff=0.023529
+  XNNPACK t=2            load=     19ms  median=   3.231ms  min=   3.013ms  maxAbsDiff=0.015686
+  XNNPACK t=4            load=     18ms  median=   2.413ms  min=   1.950ms  maxAbsDiff=0.023529
+  CoreML ALL/MLProgram   load=    661ms  median=   6.352ms  min=   6.205ms  maxAbsDiff=0.003922
+  CoreML ANE/MLProgram   load=    624ms  median=   6.650ms  min=   6.254ms  maxAbsDiff=0.023529
+  CoreML GPU/MLProgram   load=    645ms  median=   6.290ms  min=   6.066ms  maxAbsDiff=0.047059
+  CoreML ALL/NeuralNet   load=    270ms  median=   8.667ms  min=   8.347ms  maxAbsDiff=0.019608
+
+== genderage_static.onnx
+  CPU t=1                load=      5ms  median=   0.466ms  min=   0.457ms  maxAbsDiff=0.000000
+  CPU t=2                load=      3ms  median=   0.395ms  min=   0.357ms  maxAbsDiff=0.002754
+  CPU t=4                load=      5ms  median=   0.436ms  min=   0.404ms  maxAbsDiff=0.000117
+  XNNPACK t=2            load=      5ms  median=   0.276ms  min=   0.251ms  maxAbsDiff=0.002858
+  XNNPACK t=4            load=      5ms  median=   0.263ms  min=   0.234ms  maxAbsDiff=0.000889
+  CoreML ALL/MLProgram   load=    170ms  median=   0.967ms  min=   0.559ms  maxAbsDiff=0.003270
+  CoreML ANE/MLProgram   load=    122ms  median=   0.289ms  min=   0.280ms  maxAbsDiff=0.003460
+  CoreML GPU/MLProgram   load=    117ms  median=   0.989ms  min=   0.592ms  maxAbsDiff=0.004174
+  CoreML ALL/NeuralNet   load=     24ms  median=   0.312ms  min=   0.300ms  maxAbsDiff=0.002442
+
+== /Users/goldentik/AndroidStudioProjects/NaqiHalalVideoFilter/app/src/main/assets/models/yamnet.onnx
+  CPU t=1                load=     14ms  median=   2.901ms  min=   2.823ms  maxAbsDiff=0.000000
+  CPU t=2                load=      8ms  median=   1.750ms  min=   1.691ms  maxAbsDiff=0.322067
+  CPU t=4                load=      8ms  median=   1.771ms  min=   1.291ms  maxAbsDiff=0.108094
+  XNNPACK t=2            load=     55ms  median=   1.662ms  min=   1.625ms  maxAbsDiff=0.286422
+  XNNPACK t=4            load=     54ms  median=   1.496ms  min=   1.362ms  maxAbsDiff=0.167038
+  CoreML ALL/MLProgram   load=   1028ms  median=   1.134ms  min=   0.884ms  maxAbsDiff=0.122720
+  CoreML ANE/MLProgram   load=    698ms  median=   1.187ms  min=   1.101ms  maxAbsDiff=0.379723
+  CoreML GPU/MLProgram   load=    781ms  median=   1.420ms  min=   0.873ms  maxAbsDiff=0.180585
+  CoreML ALL/NeuralNet   load=    250ms  median=   1.304ms  min=   1.223ms  maxAbsDiff=0.233608
+

@@ -1,0 +1,8 @@
+build/
+.gradle/
+.kotlin/
+.idea/
+*.iml
+local.properties
+# The bundled ONNX models (large binaries) — scripts/stage-models.sh recreates them.
+/models/

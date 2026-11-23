@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Thmanyah Sans (NaqiShared/Fonts, flattened into the bundle root). -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>thmanyahsans-Regular.otf</string>
+		<string>thmanyahsans-Medium.otf</string>
+		<string>thmanyahsans-Bold.otf</string>
+	</array>
+	<!-- Written out rather than set via INFOPLIST_KEY_NSExtensionPointIdentifier:
+	     that setting produced a plist with no NSExtension dict at all, which
+	     builds and embeds cleanly and then silently never loads. -->
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+</dict>
+</plist>

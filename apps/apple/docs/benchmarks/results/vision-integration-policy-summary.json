@@ -1,0 +1,96 @@
+[
+  {
+    "clip": "short1",
+    "tracks": 76,
+    "shot_track_counts": {
+      "0": 12,
+      "1": 11,
+      "2": 4,
+      "3": 16,
+      "4": 9,
+      "5": 8,
+      "6": 5,
+      "7": 11
+    },
+    "classifications": {
+      "female": 13,
+      "unknown": 63
+    },
+    "classification_min_votes": 2,
+    "face_only_tracks": 7,
+    "median_track_span_ms": 401.0,
+    "analysis": "short1-final-person-sceneoff-women.mp4.analysis.json",
+    "analysis_sha256": "cc4ad9fe1aeec5a9d7981b7f15965b4cbd541142250a46b6b4ffaecf773de3e8",
+    "policies": {
+      "women": {
+        "total_frames": 1626,
+        "whole_frame_frames": 90,
+        "region_frames": 1522,
+        "uncensored_frames": 14
+      },
+      "men": {
+        "total_frames": 1626,
+        "whole_frame_frames": 45,
+        "region_frames": 560,
+        "uncensored_frames": 1021
+      },
+      "everyone": {
+        "total_frames": 1626,
+        "whole_frame_frames": 90,
+        "region_frames": 1522,
+        "uncensored_frames": 14
+      }
+    }
+  },
+  {
+    "clip": "short2",
+    "tracks": 433,
+    "shot_track_counts": {
+      "0": 4,
+      "2": 32,
+      "3": 2,
+      "4": 9,
+      "5": 8,
+      "6": 30,
+      "7": 4,
+      "8": 9,
+      "9": 1,
+      "10": 40,
+      "11": 256,
+      "12": 21,
+      "13": 2,
+      "14": 1,
+      "15": 11,
+      "16": 3
+    },
+    "classifications": {
+      "female": 5,
+      "unknown": 428
+    },
+    "classification_min_votes": 2,
+    "face_only_tracks": 7,
+    "median_track_span_ms": 101,
+    "analysis": "short2-final-person-sceneoff-women.mp4.analysis.json",
+    "analysis_sha256": "d09e26439f8b4427cc9916a2293c475dbd0262b85f1297468689d450963bbc4a",
+    "policies": {
+      "women": {
+        "total_frames": 1598,
+        "whole_frame_frames": 219,
+        "region_frames": 1123,
+        "uncensored_frames": 256
+      },
+      "men": {
+        "total_frames": 1598,
+        "whole_frame_frames": 180,
+        "region_frames": 996,
+        "uncensored_frames": 422
+      },
+      "everyone": {
+        "total_frames": 1598,
+        "whole_frame_frames": 219,
+        "region_frames": 1123,
+        "uncensored_frames": 256
+      }
+    }
+  }
+]

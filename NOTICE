@@ -60,12 +60,12 @@ Demucs (htdemucs) — github.com/facebookresearch/demucs
 
 nsfw_model (MobileNetV2 1.4-224) — github.com/GantMan/nsfw_model
   NOASSERTION upstream. See the unresolved-licence section above. The shipped
-  artifact is the INT8 quantization of it (scripts/nsfw_int8_quantize.py); the
+  artifact is the INT8 quantization of it (models/nsfw_int8_quantize.py); the
   fp32 graph it was quantized from is kept alongside as the A/B baseline.
 
 YAMNet — github.com/tensorflow/models/tree/master/research/audioset/yamnet
   Apache License 2.0. Google's TF2 SavedModel, converted to ONNX by
-  scripts/yamnet_export.py. Answers "is there music in this chunk?" so silent
+  models/yamnet_export.py. Answers "is there music in this chunk?" so silent
   and speech-only stretches skip stem separation.
 
 InsightFace (buffalo_l — genderage.onnx) — github.com/deepinsight/insightface

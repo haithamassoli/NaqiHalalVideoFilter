@@ -1,0 +1,50 @@
+{
+  "candidate": "MiVOLO-v2",
+  "hf_revision": "53393526c220e34cdd7b722b36d22b6f9e5f4241",
+  "source_revision": "37475e3f8818b5f22448003feec3e64b01bfb188",
+  "checkpoint_url": "https://huggingface.co/iitolstykh/mivolo_v2/resolve/53393526c220e34cdd7b722b36d22b6f9e5f4241/model.safetensors",
+  "checkpoint_sha256": "96efb47051c038ebeec74b73b4253c5fd000433e5afcab7deee0bd8f3fa7bf18",
+  "checkpoint_bytes": 115078528,
+  "checkpoint_license": "Apache-2.0",
+  "export_attempt": {
+    "coremltools": "9.0",
+    "torch": "2.7.0",
+    "timm": "0.8.13.dev0",
+    "method": "torch.jit.trace -> mlprogram",
+    "precision": "FP16",
+    "minimum_deployment_target": "iOS18",
+    "input_shape": [
+      1,
+      6,
+      384,
+      384
+    ],
+    "status": "failed",
+    "error": "ValueError: Only supports stride >= kernel_size for col2im (fold).",
+    "produced_coreml_artifact": false
+  },
+  "crop_screening": {
+    "crops": 17,
+    "distinct_principal_presenters": 2,
+    "genderage_votes": {
+      "female": 17
+    },
+    "mivolo_votes": {
+      "female": 16,
+      "unknown": 1
+    },
+    "genderage_median_ms": 0.5992500082356855,
+    "mivolo_warm_median_ms": 80.41983350267401,
+    "mivolo_warm_policy": "discard first three crop records; unknown record has no inference",
+    "limitation": "two female-presenting principal presenters; appearance review not identity; cannot establish male/female accuracy"
+  },
+  "mask_png_check": {
+    "input_float": 0.5,
+    "default_ci_png_rgb": [
+      128,
+      128,
+      128
+    ],
+    "passed": true
+  }
+}

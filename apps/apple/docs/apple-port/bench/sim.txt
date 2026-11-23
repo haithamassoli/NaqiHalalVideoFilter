@@ -1,0 +1,10 @@
+== /private/tmp/claude-501/-Users-goldentik-Documents-naqi/40c5cb1e-be34-4c66-b791-42a3d1062694/scratchpad/genderage_static.onnx
+  CPU t=1                load=     52ms  median=   0.970ms  min=   0.539ms  maxAbsDiff=0.000000
+  CPU t=2                load=     10ms  median=   1.070ms  min=   0.461ms  maxAbsDiff=0.002754
+  CPU t=4                load=     12ms  median=   1.170ms  min=   0.789ms  maxAbsDiff=0.000117
+  XNNPACK t=2            load=     17ms  median=   0.635ms  min=   0.338ms  maxAbsDiff=0.002858
+  XNNPACK t=4            load=     17ms  median=   0.395ms  min=   0.271ms  maxAbsDiff=0.000889
+E5RT encountered an STL exception. msg = Espresso exception: "Invalid state": MpsGraph backend validation on incompatible OS.E5RT encountered an STL exception. msg = Espresso exception: "Invalid state": MpsGraph backend validation on incompatible OS.  CoreML ALL/MLProgram   load=    540ms  median=   1.796ms  min=   0.722ms  maxAbsDiff=0.002844
+  CoreML ANE/MLProgram   load=    326ms  median=   2.756ms  min=   2.265ms  maxAbsDiff=0.001549
+E5RT encountered an STL exception. msg = Espresso exception: "Invalid state": MpsGraph backend validation on incompatible OS.E5RT encountered an STL exception. msg = Espresso exception: "Invalid state": MpsGraph backend validation on incompatible OS.  CoreML GPU/MLProgram   load=    523ms  median=   2.355ms  min=   1.107ms  maxAbsDiff=0.004929
+  CoreML ALL/NeuralNet   load=     76ms  median=   1.864ms  min=   1.043ms  maxAbsDiff=0.003066

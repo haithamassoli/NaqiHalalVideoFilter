@@ -1,0 +1,177 @@
+{
+  "id": "EnBXjdgQ9X0",
+  "source": "https://youtu.be/EnBXjdgQ9X0",
+  "collected_utc": "2026-10-02T13:42:11.405436+00:00",
+  "purpose": "Production iOS integration comparison; keep singing while suppressing instruments",
+  "metadata": {
+    "title": "Amr Diab - Maak Alby (Official Lyric Video) | (\u0639\u0645\u0631\u0648 \u062f\u064a\u0627\u0628 - \u0645\u0639\u0627\u0643 \u0642\u0644\u0628\u064a (\u0643\u0644\u0645\u0627\u062a",
+    "duration": 192,
+    "upload_date": "20160427",
+    "channel": "Amr Diab",
+    "webpage_url": "https://www.youtube.com/watch?v=EnBXjdgQ9X0",
+    "format_id": "616+251",
+    "vcodec": "vp09.00.40.08",
+    "acodec": "opus",
+    "width": 1920,
+    "height": 1080,
+    "fps": 25.0
+  },
+  "reference_stems": false,
+  "human_audio_region_labels": null,
+  "assets": [
+    {
+      "file": "qa-assets/modelbench/EnBXjdgQ9X0.mp4",
+      "sha256": "697ed689dae19a7e5fe6b17b9f127f4ac0f123e19f9a1fc93fd2f381c2d78d50",
+      "bytes": 17841466,
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp9",
+            "width": 1920,
+            "height": 1080,
+            "r_frame_rate": "25/1",
+            "start_time": "0.000000",
+            "duration": "191.440000"
+          },
+          {
+            "codec_name": "opus",
+            "sample_rate": "48000",
+            "channels": 2,
+            "r_frame_rate": "0/0",
+            "start_time": "0.000000",
+            "duration": "191.474000"
+          }
+        ],
+        "format": {
+          "duration": "191.474000",
+          "size": "17841466"
+        }
+      }
+    },
+    {
+      "file": "qa-assets/modelbench/EnBXjdgQ9X0.wav",
+      "sha256": "40f1329af5ce0a1147a455d311badbb593b9f6bbea92afc6472f77c947c66be3",
+      "bytes": 67551772,
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "pcm_f32le",
+            "sample_rate": "44100",
+            "channels": 2,
+            "r_frame_rate": "0/0",
+            "duration": "191.473016"
+          }
+        ],
+        "format": {
+          "duration": "191.473016",
+          "size": "67551772"
+        }
+      }
+    },
+    {
+      "file": "qa-assets/modelbench/EnBXjdgQ9X0.ios.mp4",
+      "sha256": "d3e20d0e3ee6cfc559f2943d6c35a5cd4e195f3127a136aeaa540022d3598471",
+      "bytes": 98302567,
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 1920,
+            "height": 1080,
+            "r_frame_rate": "25/1",
+            "start_time": "0.000000",
+            "duration": "191.440000"
+          },
+          {
+            "codec_name": "aac",
+            "sample_rate": "48000",
+            "channels": 2,
+            "r_frame_rate": "0/0",
+            "start_time": "0.000000",
+            "duration": "191.474000"
+          }
+        ],
+        "format": {
+          "duration": "191.474000",
+          "size": "98302567"
+        }
+      }
+    },
+    {
+      "file": "qa-assets/modelbench/EnBXjdgQ9X0.info.json",
+      "sha256": "c29af25e8867d43bff1b0d294df2cc1f67d699c85c529a9b16bfaf82d7ff424c",
+      "bytes": 581044
+    }
+  ],
+  "derivative_commands": [
+    [
+      "ffmpeg",
+      "-hide_banner",
+      "-v",
+      "error",
+      "-n",
+      "-i",
+      "/Users/goldentik/Documents/naqi/qa-assets/modelbench/EnBXjdgQ9X0.mp4",
+      "-vn",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
+      "-c:a",
+      "pcm_f32le",
+      "/Users/goldentik/Documents/naqi/qa-assets/modelbench/EnBXjdgQ9X0.wav"
+    ],
+    [
+      "ffmpeg",
+      "-hide_banner",
+      "-v",
+      "error",
+      "-n",
+      "-threads",
+      "2",
+      "-i",
+      "/Users/goldentik/Documents/naqi/qa-assets/modelbench/EnBXjdgQ9X0.mp4",
+      "-c:v",
+      "h264_videotoolbox",
+      "-b:v",
+      "4000k",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "192k",
+      "-movflags",
+      "+faststart",
+      "/Users/goldentik/Documents/naqi/qa-assets/modelbench/EnBXjdgQ9X0.ios.mp4"
+    ]
+  ],
+  "acquisition_command": [
+    "yt-dlp",
+    "--no-playlist",
+    "--write-info-json",
+    "--merge-output-format",
+    "mp4",
+    "--format",
+    "bv*[height<=1080]+ba/b[height<=1080]",
+    "--output",
+    "/Users/goldentik/Documents/naqi/qa-assets/modelbench/%(id)s.%(ext)s",
+    "https://youtu.be/EnBXjdgQ9X0"
+  ],
+  "duration_note": "YouTube metadata rounds duration to192s; actual fetched container191.474s, video191.440s, audio191.474s. WAV191.473016s. No120s truncation or manualtrim.",
+  "notes": [
+    "The downloaded source and Apple-readable derivative are complete; YouTube metadata rounds duration to192 seconds, actual container duration is191.474 seconds.",
+    "Old/new production comparisons must read the same .ios.mp4 derivative; original Opus WAV and AAC-derived PCM are distinct representations even where decoded frame counts agree.",
+    "No isolated singing/instrument stems or manually audited instrument-only intervals were supplied for this song."
+  ],
+  "acquisition_tools": {
+    "yt_dlp": "2026.08.19",
+    "ffmpeg": "9.0.2"
+  }
+}

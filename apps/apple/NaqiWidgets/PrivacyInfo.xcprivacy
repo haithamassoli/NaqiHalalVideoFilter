@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Scanned as its own binary, so it carries its own manifest. This
+	     extension draws the Live Activity for a running job — lock screen and
+	     Dynamic Island. It collects nothing, tracks nothing, and has no
+	     networking; the job state reaches it through ActivityKit, not through
+	     any store it reads itself.
+
+	     Same reason as NaqiShare: `NaqiShared/AppGroup.swift` compiles into
+	     this target and calls `UserDefaults(suiteName:)`, so the symbol is in
+	     the binary whether or not the widget ever reaches it. The scanner is
+	     symbol-based and a missing required-reason declaration is an automatic
+	     rejection, so it is declared. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<!-- App Group suite shared with the containing app. -->
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

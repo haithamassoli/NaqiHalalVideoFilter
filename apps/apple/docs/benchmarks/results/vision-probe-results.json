@@ -1,0 +1,327 @@
+[
+  {
+    "video": "-dQJ3djthDc",
+    "frame": "0037.png",
+    "candidate": "human-r2",
+    "covered_probes": 14,
+    "total_probes": 14,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "frame": "0037.png",
+    "candidate": "human-r3",
+    "covered_probes": 14,
+    "total_probes": 14,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "frame": "0037.png",
+    "candidate": "person-instance",
+    "covered_probes": 11,
+    "total_probes": 14,
+    "missed_coordinates": [
+      [
+        0.2361,
+        0.7563
+      ],
+      [
+        0.3444,
+        0.7672
+      ],
+      [
+        0.3333,
+        0.8453
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "frame": "0037.png",
+    "candidate": "semantic-fast",
+    "covered_probes": 14,
+    "total_probes": 14,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "frame": "0037.png",
+    "candidate": "semantic-balanced",
+    "covered_probes": 13,
+    "total_probes": 14,
+    "missed_coordinates": [
+      [
+        0.3444,
+        0.7672
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "frame": "0037.png",
+    "candidate": "semantic-accurate",
+    "covered_probes": 14,
+    "total_probes": 14,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "frame": "0037.png",
+    "candidate": "yolo26n-seg",
+    "covered_probes": 13,
+    "total_probes": 14,
+    "missed_coordinates": [
+      [
+        0.3444,
+        0.7672
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "frame": "0037.png",
+    "candidate": "yolo11n-seg",
+    "covered_probes": 13,
+    "total_probes": 14,
+    "missed_coordinates": [
+      [
+        0.3444,
+        0.7672
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0029.png",
+    "candidate": "human-r2",
+    "covered_probes": 5,
+    "total_probes": 5,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0029.png",
+    "candidate": "human-r3",
+    "covered_probes": 5,
+    "total_probes": 5,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0029.png",
+    "candidate": "person-instance",
+    "covered_probes": 4,
+    "total_probes": 5,
+    "missed_coordinates": [
+      [
+        0.88,
+        0.1
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0029.png",
+    "candidate": "semantic-fast",
+    "covered_probes": 5,
+    "total_probes": 5,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0029.png",
+    "candidate": "semantic-balanced",
+    "covered_probes": 4,
+    "total_probes": 5,
+    "missed_coordinates": [
+      [
+        0.88,
+        0.1
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0029.png",
+    "candidate": "semantic-accurate",
+    "covered_probes": 4,
+    "total_probes": 5,
+    "missed_coordinates": [
+      [
+        0.88,
+        0.1
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0029.png",
+    "candidate": "yolo26n-seg",
+    "covered_probes": 4,
+    "total_probes": 5,
+    "missed_coordinates": [
+      [
+        0.88,
+        0.1
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0029.png",
+    "candidate": "yolo11n-seg",
+    "covered_probes": 4,
+    "total_probes": 5,
+    "missed_coordinates": [
+      [
+        0.88,
+        0.1
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0053.png",
+    "candidate": "human-r2",
+    "covered_probes": 0,
+    "total_probes": 9,
+    "missed_coordinates": [
+      [
+        0.4,
+        0.1
+      ],
+      [
+        0.5,
+        0.13
+      ],
+      [
+        0.45,
+        0.3
+      ],
+      [
+        0.4,
+        0.4333
+      ],
+      [
+        0.5,
+        0.4633
+      ],
+      [
+        0.45,
+        0.6333
+      ],
+      [
+        0.4,
+        0.7667
+      ],
+      [
+        0.5,
+        0.7967
+      ],
+      [
+        0.45,
+        0.9667
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0053.png",
+    "candidate": "human-r3",
+    "covered_probes": 9,
+    "total_probes": 9,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0053.png",
+    "candidate": "person-instance",
+    "covered_probes": 7,
+    "total_probes": 9,
+    "missed_coordinates": [
+      [
+        0.4,
+        0.1
+      ],
+      [
+        0.4,
+        0.7667
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0053.png",
+    "candidate": "semantic-fast",
+    "covered_probes": 9,
+    "total_probes": 9,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0053.png",
+    "candidate": "semantic-balanced",
+    "covered_probes": 8,
+    "total_probes": 9,
+    "missed_coordinates": [
+      [
+        0.4,
+        0.7667
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0053.png",
+    "candidate": "semantic-accurate",
+    "covered_probes": 8,
+    "total_probes": 9,
+    "missed_coordinates": [
+      [
+        0.4,
+        0.7667
+      ]
+    ],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0053.png",
+    "candidate": "yolo26n-seg",
+    "covered_probes": 9,
+    "total_probes": 9,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "frame": "0053.png",
+    "candidate": "yolo11n-seg",
+    "covered_probes": 9,
+    "total_probes": 9,
+    "missed_coordinates": [],
+    "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+  }
+]

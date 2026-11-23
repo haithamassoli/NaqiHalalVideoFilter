@@ -1,0 +1,403 @@
+[
+  {
+    "source": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/-dQJ3djthDc.ios.mp4",
+    "source_sha256": "31547a16c9fd9b6d1b54aed0c141b75ca64c23ae46f3e0d204c59d400e41ce30",
+    "scope": "Untimed independent AAC decoding/PTS validation; not performance or quality",
+    "streams": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "index": 0,
+          "codec_name": "h264",
+          "codec_type": "video",
+          "time_base": "1/15360",
+          "start_time": "0.000000",
+          "duration_ts": 832512,
+          "duration": "54.200000"
+        },
+        {
+          "index": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "sample_rate": "48000",
+          "channels": 2,
+          "time_base": "1/48000",
+          "start_time": "0.000000",
+          "duration_ts": 2602272,
+          "duration": "54.214000"
+        }
+      ],
+      "format": {
+        "duration": "54.214000"
+      }
+    },
+    "decoded_audio_frame_first": {
+      "pts_time": "0.000000",
+      "best_effort_timestamp_time": "0.000000",
+      "duration_time": "0.022333",
+      "nb_samples": 1024
+    },
+    "decoded_audio_frame_last": {
+      "pts_time": "54.209000",
+      "best_effort_timestamp_time": "54.209000",
+      "duration_time": "0.005000",
+      "nb_samples": 240
+    },
+    "compressed_packet_first": {
+      "pts_time": "-0.021333",
+      "dts_time": "-0.021333",
+      "duration_time": "0.021333",
+      "side_data_list": [
+        {
+          "side_data_type": "Skip Samples",
+          "skip_samples": 1024,
+          "discard_padding": 0,
+          "skip_reason": 0,
+          "discard_reason": 0
+        }
+      ]
+    },
+    "compressed_packet_last": {
+      "pts_time": "54.209000",
+      "dts_time": "54.209000",
+      "duration_time": "0.005000",
+      "side_data_list": [
+        {
+          "side_data_type": "Skip Samples",
+          "skip_samples": 0,
+          "discard_padding": 784,
+          "skip_reason": 0,
+          "discard_reason": 0
+        }
+      ]
+    },
+    "reference_pcm": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/integration-audit/-dQJ3djthDc.ios.mp4.reader-audit-1.wav",
+    "reference_pcm_sha256": "1acc09962ee0e14a274ac62a06721eca69fdf8ace52d0eb975fea7b584fd1ff1",
+    "resampled_rate": 44100,
+    "resampled_channels": 2,
+    "resampled_frames": 2390794,
+    "resampled_duration_s": 54.21301587301587,
+    "finite": true,
+    "ffmpeg_samples_at_codec_rate": 2602224
+  },
+  {
+    "source": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/rX6wXhLqOIQ.ios.mp4",
+    "source_sha256": "34829e08dead10ca59c9f8722f31cce64ea68ccdd18934ec05f5fd6bbab3e307",
+    "scope": "Untimed independent AAC decoding/PTS validation; not performance or quality",
+    "streams": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "index": 0,
+          "codec_name": "h264",
+          "codec_type": "video",
+          "time_base": "1/15360",
+          "start_time": "0.000000",
+          "duration_ts": 818176,
+          "duration": "53.266667"
+        },
+        {
+          "index": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "sample_rate": "48000",
+          "channels": 2,
+          "time_base": "1/48000",
+          "start_time": "0.000000",
+          "duration_ts": 2558112,
+          "duration": "53.294000"
+        }
+      ],
+      "format": {
+        "duration": "53.294000"
+      }
+    },
+    "decoded_audio_frame_first": {
+      "pts_time": "0.000000",
+      "best_effort_timestamp_time": "0.000000",
+      "duration_time": "0.022333",
+      "nb_samples": 1024
+    },
+    "decoded_audio_frame_last": {
+      "pts_time": "53.291667",
+      "best_effort_timestamp_time": "53.291667",
+      "duration_time": "0.002333",
+      "nb_samples": 112
+    },
+    "compressed_packet_first": {
+      "pts_time": "-0.021333",
+      "dts_time": "-0.021333",
+      "duration_time": "0.021333",
+      "side_data_list": [
+        {
+          "side_data_type": "Skip Samples",
+          "skip_samples": 1024,
+          "discard_padding": 0,
+          "skip_reason": 0,
+          "discard_reason": 0
+        }
+      ]
+    },
+    "compressed_packet_last": {
+      "pts_time": "53.291667",
+      "dts_time": "53.291667",
+      "duration_time": "0.002333",
+      "side_data_list": [
+        {
+          "side_data_type": "Skip Samples",
+          "skip_samples": 0,
+          "discard_padding": 912,
+          "skip_reason": 0,
+          "discard_reason": 0
+        }
+      ]
+    },
+    "reference_pcm": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/integration-audit/rX6wXhLqOIQ.ios.mp4.reader-audit-1.wav",
+    "reference_pcm_sha256": "0a52a4a1d072c682cfff38b40ccc38d3e7320951dfc930b465fdc036e8b94226",
+    "resampled_rate": 44100,
+    "resampled_channels": 2,
+    "resampled_frames": 2350222,
+    "resampled_duration_s": 53.293015873015875,
+    "finite": true,
+    "ffmpeg_samples_at_codec_rate": 2558064
+  },
+  {
+    "source": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/EnBXjdgQ9X0.ios.mp4",
+    "source_sha256": "d3e20d0e3ee6cfc559f2943d6c35a5cd4e195f3127a136aeaa540022d3598471",
+    "scope": "Untimed independent AAC decoding/PTS validation; not performance or quality",
+    "streams": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "index": 0,
+          "codec_name": "h264",
+          "codec_type": "video",
+          "time_base": "1/12800",
+          "start_time": "0.000000",
+          "duration_ts": 2450432,
+          "duration": "191.440000"
+        },
+        {
+          "index": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "sample_rate": "48000",
+          "channels": 2,
+          "time_base": "1/48000",
+          "start_time": "0.000000",
+          "duration_ts": 9190752,
+          "duration": "191.474000"
+        }
+      ],
+      "format": {
+        "duration": "191.474000"
+      }
+    },
+    "decoded_audio_frame_first": {
+      "pts_time": "0.000000",
+      "best_effort_timestamp_time": "0.000000",
+      "duration_time": "0.022333",
+      "nb_samples": 1024
+    },
+    "decoded_audio_frame_last": {
+      "pts_time": "191.467667",
+      "best_effort_timestamp_time": "191.467667",
+      "duration_time": "0.006333",
+      "nb_samples": 304
+    },
+    "compressed_packet_first": {
+      "pts_time": "-0.021333",
+      "dts_time": "-0.021333",
+      "duration_time": "0.021333",
+      "side_data_list": [
+        {
+          "side_data_type": "Skip Samples",
+          "skip_samples": 1024,
+          "discard_padding": 0,
+          "skip_reason": 0,
+          "discard_reason": 0
+        }
+      ]
+    },
+    "compressed_packet_last": {
+      "pts_time": "191.467667",
+      "dts_time": "191.467667",
+      "duration_time": "0.006333",
+      "side_data_list": [
+        {
+          "side_data_type": "Skip Samples",
+          "skip_samples": 0,
+          "discard_padding": 720,
+          "skip_reason": 0,
+          "discard_reason": 0
+        }
+      ]
+    },
+    "reference_pcm": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/integration-audit/EnBXjdgQ9X0.ios.mp4.reader-audit-1.wav",
+    "reference_pcm_sha256": "a74ea4db6456f04332357e3d1257ec68d01ee6010baf9c5beea8e2b41223e0aa",
+    "resampled_rate": 44100,
+    "resampled_channels": 2,
+    "resampled_frames": 8443960,
+    "resampled_duration_s": 191.47301587301587,
+    "finite": true,
+    "ffmpeg_samples_at_codec_rate": 9190704
+  },
+  {
+    "source": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/short1-new-face-gateon.mp4",
+    "source_sha256": "644a0d429426b9aa15de83abfe595d2115b9762640579ff445e90b63c887e0c8",
+    "scope": "Untimed independent AAC decoding/PTS validation; not performance or quality",
+    "streams": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "index": 0,
+          "codec_name": "h264",
+          "codec_type": "video",
+          "time_base": "1/15360",
+          "start_time": "0.000000",
+          "duration_ts": 832512,
+          "duration": "54.200000"
+        },
+        {
+          "index": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "sample_rate": "44100",
+          "channels": 2,
+          "time_base": "1/44100",
+          "start_time": "0.000000",
+          "duration_ts": 2391470,
+          "duration": "54.228345"
+        }
+      ],
+      "format": {
+        "duration": "54.228345"
+      }
+    },
+    "decoded_audio_frame_first": {
+      "pts_time": "0.000000",
+      "best_effort_timestamp_time": "0.000000",
+      "duration_time": "0.021769",
+      "nb_samples": 960
+    },
+    "decoded_audio_frame_last": {
+      "pts_time": "54.217143",
+      "best_effort_timestamp_time": "54.217143",
+      "duration_time": "0.011202",
+      "nb_samples": 494
+    },
+    "compressed_packet_first": {
+      "pts_time": "-0.047891",
+      "dts_time": "-0.047891",
+      "duration_time": "0.023220",
+      "side_data_list": [
+        {
+          "side_data_type": "Skip Samples",
+          "skip_samples": 2112,
+          "discard_padding": 0,
+          "skip_reason": 0,
+          "discard_reason": 0
+        }
+      ]
+    },
+    "compressed_packet_last": {
+      "pts_time": "54.217143",
+      "dts_time": "54.217143",
+      "duration_time": "0.023220",
+      "side_data_list": [
+        {
+          "side_data_type": "Skip Samples",
+          "skip_samples": 0,
+          "discard_padding": 530,
+          "skip_reason": 0,
+          "discard_reason": 0
+        }
+      ]
+    },
+    "reference_pcm": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/integration-audit/short1-new-face-gateon.mp4.reader-audit-1.wav",
+    "reference_pcm_sha256": "e29206fbfe5800c45e6b11e70e444eda70cf1f7a3bea3c2eb81d2eed9ba72c48",
+    "resampled_rate": 44100,
+    "resampled_channels": 2,
+    "resampled_frames": 2391470,
+    "resampled_duration_s": 54.22834467120182,
+    "finite": true,
+    "ffmpeg_samples_at_codec_rate": 2391470
+  },
+  {
+    "source": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/short1-new-face-gateon.mp4.separated.mp4",
+    "source_sha256": "12d54d06f3e607e2ba39979a12bc5cb8d513dfa953e71d14b22054c5b6eaa271",
+    "scope": "Untimed independent AAC decoding/PTS validation; not performance or quality",
+    "streams": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "index": 0,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "sample_rate": "44100",
+          "channels": 2,
+          "time_base": "1/44100",
+          "start_time": "0.000000",
+          "duration_ts": 2391513,
+          "duration": "54.229320"
+        }
+      ],
+      "format": {
+        "duration": "54.229320"
+      }
+    },
+    "decoded_audio_frame_first": {
+      "pts_time": "0.000000",
+      "best_effort_timestamp_time": "0.000000",
+      "duration_time": "0.021769",
+      "nb_samples": 960
+    },
+    "decoded_audio_frame_last": {
+      "pts_time": "54.217143",
+      "best_effort_timestamp_time": "54.217143",
+      "duration_time": "0.012177",
+      "nb_samples": 537
+    },
+    "compressed_packet_first": {
+      "pts_time": "-0.047891",
+      "dts_time": "-0.047891",
+      "duration_time": "0.023220",
+      "side_data_list": [
+        {
+          "side_data_type": "Skip Samples",
+          "skip_samples": 2112,
+          "discard_padding": 0,
+          "skip_reason": 0,
+          "discard_reason": 0
+        }
+      ]
+    },
+    "compressed_packet_last": {
+      "pts_time": "54.217143",
+      "dts_time": "54.217143",
+      "duration_time": "0.023220",
+      "side_data_list": [
+        {
+          "side_data_type": "Skip Samples",
+          "skip_samples": 0,
+          "discard_padding": 487,
+          "skip_reason": 0,
+          "discard_reason": 0
+        }
+      ]
+    },
+    "reference_pcm": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/integration-audit/short1-new-face-gateon.mp4.separated.mp4.reader-audit-1.wav",
+    "reference_pcm_sha256": "23219a4ea9ce1597cf7d76ce2fd2f2a99f19f97d20b443ce00cf485e7e0b14c9",
+    "resampled_rate": 44100,
+    "resampled_channels": 2,
+    "resampled_frames": 2391513,
+    "resampled_duration_s": 54.22931972789116,
+    "finite": true,
+    "ffmpeg_samples_at_codec_rate": 2391513
+  }
+]

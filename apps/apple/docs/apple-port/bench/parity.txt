@@ -1,0 +1,7 @@
+fp32 graph  CPU t=1  [GOLD]    load=    203ms  median=  1122.9ms  rt= 2.32x  nonFinite=0/0  SNRvsGOLD spec= 330.0dB wave= 320.3dB
+fp32 graph  CPU t=8            load=    153ms  median=   617.8ms  rt= 4.21x  nonFinite=0/0  SNRvsGOLD spec= 114.8dB wave= 135.1dB
+fp16 graph  CPU t=1            load=    600ms  median=  1216.4ms  rt= 2.14x  nonFinite=0/0  SNRvsGOLD spec=  60.1dB wave=  73.4dB
+fp16 graph  CPU t=8            load=    255ms  median=   554.8ms  rt= 4.69x  nonFinite=0/0  SNRvsGOLD spec=  60.5dB wave=  73.4dB
+fp16 graph  CoreML GPU         load=  33393ms  median=   128.8ms  rt=20.19x  nonFinite=0/0  SNRvsGOLD spec=  46.3dB wave=  61.1dB
+E5RT encountered an STL exception. msg = MILCompilerForANE error: failed to compile ANE model using ANEF. Error=_ANECompiler : ANECCompile() FAILED.E5RT encountered an STL exception. msg = MILCompilerForANE error: failed to compile ANE model using ANEF. Error=_ANECompiler : ANECCompile() FAILED.E5RT encountered an STL exception. msg = MILCompilerForANE error: failed to compile ANE model using ANEF. Error=_ANECompiler : ANECCompile() FAILED.fp16 graph  CoreML ALL         load=  72088ms  median=   299.6ms  rt= 8.68x  nonFinite=0/0  SNRvsGOLD spec=  31.3dB wave=  59.6dB
+fp32 graph  CoreML GPU         load=  72184ms  median=   160.2ms  rt=16.23x  nonFinite=0/0  SNRvsGOLD spec=  86.6dB wave= 112.5dB

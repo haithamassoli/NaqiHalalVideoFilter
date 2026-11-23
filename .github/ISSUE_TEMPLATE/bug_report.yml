@@ -2,6 +2,17 @@ name: Bug report
 description: Something is broken or behaves wrong
 labels: [bug]
 body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Android
+        - iPhone-iPad
+        - Mac
+        - Windows
+    validations:
+      required: true
   - type: textarea
     id: what
     attributes:
@@ -19,8 +30,8 @@ body:
   - type: input
     id: device
     attributes:
-      label: Device and Android version
-      placeholder: Galaxy S23, Android 15
+      label: Device and OS version
+      placeholder: Galaxy S23, Android 15 / iPhone 15, iOS 18.5 / MacBook Air M2, macOS 15.5
     validations:
       required: true
   - type: textarea
@@ -28,15 +39,18 @@ body:
     attributes:
       label: The job
       description: >
-        Which operations were on (remove music / censor faces / NSFW gate), who was selected,
-        strictness, and roughly how long the input is. Source format helps too (MP4, MKV, a link).
+        Which operations were on (remove music / censor faces or bodies / NSFW gate), who was
+        selected, strictness, and roughly how long the input is. Source format helps too (MP4, MKV,
+        a link).
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
-      label: Logcat, if you have it
-      description: "`adb logcat -d | grep -i naqi` around the failure. Optional, but it usually decides the issue."
+      label: Logs, if you have them
+      description: >
+        Android: `adb logcat -d | grep -i naqi` around the failure. iPhone, iPad or Mac: the Xcode
+        console, or Console.app filtered to Naqi. Optional, but it usually decides the issue.
       render: text
   - type: checkboxes
     id: accuracy

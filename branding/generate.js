@@ -38,7 +38,7 @@ const reach = Math.max(
 if (reach > 33) throw new Error(`mark reaches r=${reach.toFixed(1)}, outside the 66dp safe circle`);
 
 const REPO = path.resolve(__dirname, '..');
-const RES = REPO + '/app/src/main/res';
+const RES = REPO + '/apps/android/app/src/main/res';
 const BRAND = REPO + '/branding';
 const TMP = __dirname + '/out';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';

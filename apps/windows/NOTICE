@@ -1,0 +1,417 @@
+Naqi — Halal Video Filter (desktop)
+Copyright (C) 2026 Haitham Assoli
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. The full text is in the LICENSE file installed next to this NOTICE.
+
+Naqi's own source code: https://github.com/haithamassoli/NaqiHalalVideoFilter
+(apps/windows, core/, and the tag of the release you installed).
+
+======================================================
+UNRESOLVED LICENCE ISSUE — READ BEFORE ANY PUBLIC RELEASE
+======================================================
+
+  The NSFW gate (nsfw_mnv2_140_int8.onnx, quantized from nsfw_mnv2_140_f32.onnx,
+  from GantMan/nsfw_model 1.2.0) is marked NOASSERTION upstream and still
+  needs review before distribution.
+
+======================================================
+THIRD-PARTY COMPONENTS
+======================================================
+
+--- Video
+
+FFmpeg 8.1.2 — ffmpeg.org
+  Bundled as the JavaCPP Presets GPL build, Maven artifact
+  org.bytedeco:ffmpeg:8.1.2-1.5.14:windows-x86_64-gpl (the macOS test builds
+  use the -macosx-arm64-gpl / -macosx-x86_64-gpl classifiers of the same
+  version). It is configured with --enable-gpl --enable-version3, so the
+  build as a whole is under the GNU General Public License version 3 or
+  later, the same licence as Naqi (full text in LICENSE). Decodes and
+  encodes every video.
+
+x264 (commit b35605ace3ddf7c1a5d67a2eb553f034aef41d55, X264_BUILD 165) —
+  videolan.org/developers/x264.html
+  GPL-2.0-or-later. Statically linked into that FFmpeg build (avcodec);
+  encodes the filtered video. The build script fetches x264's "stable"
+  branch; this is the commit that branch held when JavaCPP Presets 1.5.14
+  was built (unchanged from 2025-06-08 through the 2026-08-10 release).
+
+x265 3.4 — github.com/videolan/x265
+  GPL-2.0-or-later. Statically linked into that FFmpeg build.
+
+  The same build also links, under GPL-compatible terms, zlib, LAME, Speex,
+  Opus, opencore-amr, vo-amrwbenc, OpenSSL, OpenH264, libvpx, FreeType,
+  HarfBuzz, libxml2, SRT, libwebp, libaom, SVT-AV1, zimg, mfx_dispatch and
+  nv-codec-headers. Their exact versions and download URLs are in the build
+  script linked below.
+
+JavaCPP 1.5.14 and JavaCPP Presets — github.com/bytedeco/javacpp-presets
+  Apache License 2.0 (full text below), or GPL-2.0 with the Classpath
+  Exception. The Java bindings to FFmpeg.
+
+--- Corresponding source for the GPL FFmpeg build
+
+  The FFmpeg, x264 and x265 binaries above are distributed under the GPL, so
+  their complete corresponding source is available to you:
+
+  The Windows release page of this version carries the FFmpeg, x264 and
+  x265 tarballs and the build scripts below as files next to the installer.
+
+  Build scripts and patches (tag 1.5.14, which is commit d57d8a2…):
+    https://github.com/bytedeco/javacpp-presets/tree/1.5.14/ffmpeg
+    https://github.com/bytedeco/javacpp-presets/tree/d57d8a28635211e174df378611cb1952f751c943/ffmpeg
+    https://github.com/bytedeco/javacpp-presets/blob/d57d8a28635211e174df378611cb1952f751c943/cppbuild.sh
+    https://github.com/bytedeco/javacpp-presets/archive/d57d8a28635211e174df378611cb1952f751c943.tar.gz
+  Source tarballs the build script downloads (sha256 in
+  .github/scripts/gpl-sources.sh of Naqi's repository):
+    FFmpeg 8.1.2 (tag n8.1.2, commit 38b88335f99e76ed89ff3c93f877fdefce736c13):
+    https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.bz2
+    x264 commit b35605ace3ddf7c1a5d67a2eb553f034aef41d55:
+    https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz
+    x265 3.4:
+    https://github.com/videolan/x265/archive/3.4.tar.gz
+    (every other library: the download lines of ffmpeg/cppbuild.sh above)
+  Java sources of the bindings:
+    https://repo1.maven.org/maven2/org/bytedeco/ffmpeg/8.1.2-1.5.14/
+
+  Written offer: for at least three years from the date you received this
+  copy of Naqi, and for as long as this version is offered for download,
+  Haitham Assoli will give anyone who asks a complete machine-readable copy
+  of the corresponding source of the FFmpeg build bundled here (FFmpeg,
+  x264, x265 and the build scripts), for no more than the cost of
+  physically performing that distribution. Ask by opening an issue at
+  https://github.com/haithamassoli/NaqiHalalVideoFilter/issues or by
+  e-mail to haitham.b.assoli@gmail.com, naming the Naqi version you have.
+
+--- Machine learning
+
+ONNX Runtime 1.27.0 — github.com/microsoft/onnxruntime
+  MIT (full text below). Runs every model below, on the CPU. Its own
+  third-party notices ship as ThirdPartyNotices.txt inside the bundled
+  onnxruntime-1.27.0.jar.
+
+Demucs (htdemucs) — github.com/facebookresearch/demucs
+  MIT (full text below). Weights re-exported to ONNX at a 2.6 s segment via
+  github.com/sevagh/demucs.onnx. Used for music removal.
+
+YAMNet — github.com/tensorflow/models/tree/master/research/audioset/yamnet
+  Apache License 2.0 (full text below). Google's TF2 SavedModel, converted to
+  ONNX by models/yamnet_export.py. Answers "is there music in this chunk?" so
+  silent and speech-only stretches skip stem separation.
+
+nsfw_model (MobileNetV2 1.4-224) — github.com/GantMan/nsfw_model
+  NOASSERTION upstream. See the unresolved-licence section above. The shipped
+  artifact is the INT8 quantization of it (models/nsfw_int8_quantize.py).
+
+InsightFace (buffalo_l — genderage.onnx) — github.com/deepinsight/insightface
+  Code MIT; the buffalo_l weight pack is published for non-commercial research
+  use, and that restriction was explicitly waived by the owner on 2026-08-03
+  (recorded at the GENDERAGE entry in the Android app's Models.kt). Shipped
+  verbatim; powers the per-face gender vote behind the Women/Men picker.
+
+YuNet (face_detection_yunet_2023mar.onnx) — github.com/opencv/opencv_zoo
+  MIT (full text below, from models/face_detection_yunet/LICENSE at commit
+  f12e12798e8314f7c074a6656816c048dcc95b7a, the one the model is pinned to).
+  Face detection, in place of the Android app's ML Kit.
+
+--- Desktop / Kotlin
+
+Apache License 2.0 (full text below):
+  Compose Multiplatform (UI, Material 3) and Skiko — JetBrains
+  Kotlin standard library and kotlinx.coroutines — JetBrains
+
+Thmanyah Sans — Thmanyah
+  The interface font, the same files the Android app bundles.
+
+--- Test-only (not shipped)
+
+JUnit 4 — Eclipse Public License 1.0
+
+======================================================
+LICENCE TEXTS
+======================================================
+
+--- YuNet (opencv_zoo models/face_detection_yunet/LICENSE)
+
+MIT License
+
+Copyright (c) 2020 Shiqi Yu <shiqi.yu@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--- ONNX Runtime
+
+MIT License
+
+Copyright (c) Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE
+
+--- Demucs
+
+MIT License
+
+Copyright (c) Meta Platforms, Inc. and affiliates.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--- Apache License 2.0: JavaCPP and JavaCPP Presets, Compose Multiplatform, Skiko,
+    Kotlin, kotlinx.coroutines, YAMNet
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+======================================================
+
+Naqi's own terms, GPL-3.0-or-later, are in LICENSE next to this file and at the
+root of the source repository.

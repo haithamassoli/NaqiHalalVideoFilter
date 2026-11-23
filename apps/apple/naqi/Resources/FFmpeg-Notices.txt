@@ -1,0 +1,16 @@
+FFmpegKit min 5.1 and FFmpeg 5.1
+
+FFmpegKit copyright (c) 2018-2022 Taner Sener.
+FFmpeg copyright (c) 2000-2022 the FFmpeg developers.
+
+Naqi uses the non-GPL min build, dynamically linked, for WebM import.
+FFmpeg and FFmpegKit are distributed under the GNU Lesser General Public
+License version 3 or later. The LGPL and its referenced GPL text are included
+in FFmpeg-LICENSE.txt and FFmpeg-GPL-3.0.txt.
+
+Swift package and binary checksums (pinned revision):
+https://github.com/tylerjonesio/ffmpeg-kit-spm/tree/6053b0e4f8607314ff5e14e0b18fc250c0f87c9b
+
+Upstream source and build scripts:
+https://github.com/arthenica/ffmpeg-kit
+https://github.com/FFmpeg/FFmpeg/tree/n5.1

@@ -1,0 +1,111 @@
+# Publishes a Windows release (docs/RELEASING.md): Actions > Release Windows > Run workflow on main, with the
+# appVersion of apps/windows/app/build.gradle.kts. It checks the release list first and stops if one more
+# release would push the newest Android release out of the 10 newest, then builds and tests on Windows, and
+# publishes windows-v<version> as a pre-release that is not marked Latest, with the MSI, the portable zip and
+# the GPL corresponding source of the bundled FFmpeg build (.github/scripts/gpl-sources.sh).
+name: Release Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, X.Y.Z, equal to appVersion in apps/windows/app/build.gradle.kts
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# One release at a time, so two runs cannot both pass the page-depth check. Not the group windows.yml uses
+# (it is called below, and its group resolves to this workflow's name and ref).
+concurrency:
+  group: release-windows
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      TAG: windows-v${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Test the page-depth guard
+        run: .github/scripts/release-depth.test.sh
+
+      - name: Room for one more release above the newest Android one
+        run: .github/scripts/release-depth.sh 9
+
+      - name: Version, branch and tag
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be X.Y.Z, without a v: got '$VERSION'"
+            exit 1
+          fi
+          if ! grep -qx "val appVersion = \"$VERSION\"" apps/windows/app/build.gradle.kts; then
+            echo "::error::apps/windows/app/build.gradle.kts does not have appVersion = \"$VERSION\"; bump it first"
+            exit 1
+          fi
+          if [ "$GITHUB_REF" != "refs/heads/${{ github.event.repository.default_branch }}" ]; then
+            echo "::error::run this from ${{ github.event.repository.default_branch }}, not $GITHUB_REF"
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::tag $TAG already exists"
+            exit 1
+          fi
+
+      - name: NOTICE links the pinned GPL sources
+        run: .github/scripts/gpl-sources.test.sh
+
+      - name: Download the GPL sources
+        run: .github/scripts/gpl-sources.sh fetch "$RUNNER_TEMP/gpl-sources"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: gpl-sources
+          path: ${{ runner.temp }}/gpl-sources/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Tests, MSI and portable zip, exactly as on every push (stage models, :core:test :app:test, package).
+  build:
+    needs: guard
+    uses: ./.github/workflows/windows.yml
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      TAG: windows-v${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "{naqi-windows-msi,naqi-windows-portable,gpl-sources}"
+          path: dist
+          merge-multiple: true
+
+      # The build takes a while; someone may have published by hand meanwhile.
+      - name: Still room for one more release
+        run: .github/scripts/release-depth.sh 9
+
+      - name: Publish
+        run: |
+          ls -l dist
+          gh release create "$TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "Naqi for Windows $VERSION (beta)" \
+            --prerelease --latest=false \
+            --notes "Unsigned beta build of Naqi for Windows: Naqi-$VERSION.msi installs per user, Naqi-$VERSION-portable.zip needs no installer.
+
+          The other files are the complete corresponding source of the GPL FFmpeg build bundled inside (FFmpeg, x264, x265 and the JavaCPP Presets build scripts), as listed in NOTICE."

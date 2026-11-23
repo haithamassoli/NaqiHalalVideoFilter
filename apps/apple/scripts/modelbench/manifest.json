@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-10-02",
+  "purpose": "iOS vocal/instrument separation and selective person censoring screening",
+  "items": [
+    {
+      "id": "-dQJ3djthDc",
+      "source": "https://youtube.com/shorts/-dQJ3djthDc",
+      "split": "screening",
+      "assets": [
+        {
+          "file": "qa-assets/modelbench/-dQJ3djthDc.mp4",
+          "sha256": "6192fc9cce139b3e3a313a83a7ec8de78285de0083b836b532e8b83ded9b34e5",
+          "probe": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "av1",
+                "width": 608,
+                "height": 1080,
+                "r_frame_rate": "30/1"
+              },
+              {
+                "codec_name": "opus",
+                "sample_rate": "48000",
+                "channels": 2,
+                "r_frame_rate": "0/0"
+              }
+            ],
+            "format": {
+              "duration": "54.214000",
+              "size": "4533330"
+            }
+          }
+        },
+        {
+          "file": "qa-assets/modelbench/-dQJ3djthDc.wav",
+          "sha256": "822e1a08cd0aa34ca67a92332e74a75bc4aea83c6955b5471234312f9d1fb80c",
+          "probe": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "pcm_f32le",
+                "sample_rate": "44100",
+                "channels": 2,
+                "r_frame_rate": "0/0"
+              }
+            ],
+            "format": {
+              "duration": "54.213016",
+              "size": "19126444"
+            }
+          }
+        },
+        {
+          "file": "qa-assets/modelbench/-dQJ3djthDc.ios.mp4",
+          "sha256": "31547a16c9fd9b6d1b54aed0c141b75ca64c23ae46f3e0d204c59d400e41ce30",
+          "probe": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "width": 608,
+                "height": 1080,
+                "r_frame_rate": "30/1"
+              },
+              {
+                "codec_name": "aac",
+                "sample_rate": "48000",
+                "channels": 2,
+                "r_frame_rate": "0/0"
+              }
+            ],
+            "format": {
+              "duration": "54.214000",
+              "size": "28643771"
+            }
+          }
+        }
+      ],
+      "reference_stems": false,
+      "human_labels": null
+    },
+    {
+      "id": "rX6wXhLqOIQ",
+      "source": "https://youtube.com/shorts/rX6wXhLqOIQ",
+      "split": "screening",
+      "assets": [
+        {
+          "file": "qa-assets/modelbench/rX6wXhLqOIQ.mp4",
+          "sha256": "9c1a849a902afa4a61d497ce7865b9edd08b790086b11a638010883add18d4a5",
+          "probe": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "av1",
+                "width": 608,
+                "height": 1080,
+                "r_frame_rate": "30/1"
+              },
+              {
+                "codec_name": "opus",
+                "sample_rate": "48000",
+                "channels": 2,
+                "r_frame_rate": "0/0"
+              }
+            ],
+            "format": {
+              "duration": "53.294000",
+              "size": "4951419"
+            }
+          }
+        },
+        {
+          "file": "qa-assets/modelbench/rX6wXhLqOIQ.wav",
+          "sha256": "7ffd701f279bd7265e959e324e8281634ae426fa6944de4ce0796f1682f6924b",
+          "probe": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "pcm_f32le",
+                "sample_rate": "44100",
+                "channels": 2,
+                "r_frame_rate": "0/0"
+              }
+            ],
+            "format": {
+              "duration": "53.293016",
+              "size": "18801868"
+            }
+          }
+        },
+        {
+          "file": "qa-assets/modelbench/rX6wXhLqOIQ.ios.mp4",
+          "sha256": "34829e08dead10ca59c9f8722f31cce64ea68ccdd18934ec05f5fd6bbab3e307",
+          "probe": {
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "h264",
+                "width": 608,
+                "height": 1080,
+                "r_frame_rate": "30/1"
+              },
+              {
+                "codec_name": "aac",
+                "sample_rate": "48000",
+                "channels": 2,
+                "r_frame_rate": "0/0"
+              }
+            ],
+            "format": {
+              "duration": "53.294000",
+              "size": "28750038"
+            }
+          }
+        }
+      ],
+      "reference_stems": false,
+      "human_labels": null
+    }
+  ]
+}

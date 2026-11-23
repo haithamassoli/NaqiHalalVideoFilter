@@ -1,0 +1,2 @@
+{"candidate": "scnet", "input": "singing-mix0db", "providers": ["cpu", "mps"], "max_abs_error": 8.344650268554688e-07, "rms_relative_error": 8.649870046381906e-07, "snr_db": 121.25980834449145, "scope": "One5s knownreference; notfullcorpusparity"}
+{"candidate": "roformer", "input": "singing-mix0db", "providers": ["cpu", "mps"], "max_abs_error": 1.4007091522216797e-06, "rms_relative_error": 8.416279392917259e-07, "snr_db": 121.49759711592601, "scope": "One5s knownreference; notfullcorpusparity"}

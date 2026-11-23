@@ -1,0 +1,1620 @@
+{
+  "host": "Apple M3 24GB",
+  "os": "macOS 27.0.1 (26A434)",
+  "physical_iphone": false,
+  "frame_sampling_fps": 1,
+  "input_long_side": 640,
+  "limitations": [
+    "No physical-phone speed, memory or thermal claim",
+    "No tracking/identity-switch evaluation",
+    "No dense mask ground truth or every-frame coverage guarantee",
+    "Compute configuration is requested; individual operation placement not traced"
+  ],
+  "summary": [
+    {
+      "candidate": "face-r3",
+      "compute_requested": "cpu",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 22.864917,
+        "p95": 24.234208
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 22.8685,
+        "p95": 24.240958
+      },
+      "detections": 84,
+      "masks": 0
+    },
+    {
+      "candidate": "face-r3",
+      "compute_requested": "default",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 6.904292,
+        "p95": 8.213208
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 6.907958,
+        "p95": 8.215083
+      },
+      "detections": 84,
+      "masks": 0
+    },
+    {
+      "candidate": "face-r4",
+      "compute_requested": "cpu",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 9.044375,
+        "p95": 11.413833
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 9.045667,
+        "p95": 11.415375
+      },
+      "detections": 84,
+      "masks": 0
+    },
+    {
+      "candidate": "face-r4",
+      "compute_requested": "default",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 8.492916,
+        "p95": 9.464125
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 8.49475,
+        "p95": 9.46825
+      },
+      "detections": 84,
+      "masks": 0
+    },
+    {
+      "candidate": "human-r2",
+      "compute_requested": "cpu",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 22.50625,
+        "p95": 23.395375
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 22.508416,
+        "p95": 23.398834
+      },
+      "detections": 73,
+      "masks": 0
+    },
+    {
+      "candidate": "human-r2",
+      "compute_requested": "default",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 6.439875,
+        "p95": 7.267125
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 6.440791,
+        "p95": 7.269125
+      },
+      "detections": 73,
+      "masks": 0
+    },
+    {
+      "candidate": "human-r3",
+      "compute_requested": "cpu",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 8.703209,
+        "p95": 10.028833
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 8.704209,
+        "p95": 10.030041
+      },
+      "detections": 87,
+      "masks": 0
+    },
+    {
+      "candidate": "human-r3",
+      "compute_requested": "default",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 8.777292,
+        "p95": 10.355667
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 8.777708,
+        "p95": 10.35675
+      },
+      "detections": 87,
+      "masks": 0
+    },
+    {
+      "candidate": "person-instance",
+      "compute_requested": "cpu",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 113.704708,
+        "p95": 212.441375
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 132.780125,
+        "p95": 243.644375
+      },
+      "detections": 0,
+      "masks": 101
+    },
+    {
+      "candidate": "person-instance",
+      "compute_requested": "default",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 112.864208,
+        "p95": 212.178708
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 132.081875,
+        "p95": 243.76525
+      },
+      "detections": 0,
+      "masks": 101
+    },
+    {
+      "candidate": "semantic-accurate",
+      "compute_requested": "cpu",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 60.871542,
+        "p95": 64.238625
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 137.2245,
+        "p95": 146.06825
+      },
+      "detections": 0,
+      "masks": 107
+    },
+    {
+      "candidate": "semantic-accurate",
+      "compute_requested": "default",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 60.667209,
+        "p95": 63.6935
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 136.813709,
+        "p95": 146.288792
+      },
+      "detections": 0,
+      "masks": 107
+    },
+    {
+      "candidate": "semantic-balanced",
+      "compute_requested": "cpu",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 18.783792,
+        "p95": 20.333375
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 29.059209,
+        "p95": 31.256208
+      },
+      "detections": 0,
+      "masks": 107
+    },
+    {
+      "candidate": "semantic-balanced",
+      "compute_requested": "default",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 18.877667,
+        "p95": 20.718083
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 29.178375,
+        "p95": 31.927875
+      },
+      "detections": 0,
+      "masks": 107
+    },
+    {
+      "candidate": "semantic-fast",
+      "compute_requested": "cpu",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 8.018792,
+        "p95": 8.979667
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 14.564334,
+        "p95": 15.808833
+      },
+      "detections": 0,
+      "masks": 107
+    },
+    {
+      "candidate": "semantic-fast",
+      "compute_requested": "default",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 101,
+        "median": 8.302666,
+        "p95": 10.094375
+      },
+      "prediction_wall_ms": null,
+      "infer_mask_export_ms": {
+        "count": 101,
+        "median": 15.307333,
+        "p95": 19.177209
+      },
+      "detections": 0,
+      "masks": 107
+    },
+    {
+      "candidate": "yolo11n-seg",
+      "compute_requested": "ALL",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 107,
+        "median": 7.023750004009344,
+        "p95": 7.906207989435643
+      },
+      "prediction_wall_ms": {
+        "count": 107,
+        "median": 8.671167001011781,
+        "p95": 9.960457988199778
+      },
+      "infer_mask_export_ms": {
+        "count": 107,
+        "median": 9.357999995700084,
+        "p95": 11.102459000539966
+      },
+      "detections": 170,
+      "masks": 170
+    },
+    {
+      "candidate": "yolo11n-seg",
+      "compute_requested": "CPU",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 107,
+        "median": 40.44100000464823,
+        "p95": 48.99941700568888
+      },
+      "prediction_wall_ms": {
+        "count": 107,
+        "median": 42.155040995567106,
+        "p95": 50.71979099011514
+      },
+      "infer_mask_export_ms": {
+        "count": 107,
+        "median": 42.854708997765556,
+        "p95": 51.72512499848381
+      },
+      "detections": 167,
+      "masks": 167
+    },
+    {
+      "candidate": "yolo11n-seg",
+      "compute_requested": "CPU_AND_GPU",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 107,
+        "median": 11.932833003811538,
+        "p95": 18.55687500210479
+      },
+      "prediction_wall_ms": {
+        "count": 107,
+        "median": 13.917584001319483,
+        "p95": 20.916584006045014
+      },
+      "infer_mask_export_ms": {
+        "count": 107,
+        "median": 14.66158298717346,
+        "p95": 23.416374999214895
+      },
+      "detections": 168,
+      "masks": 168
+    },
+    {
+      "candidate": "yolo11n-seg",
+      "compute_requested": "CPU_ONLY",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 107,
+        "median": 17.730999999912456,
+        "p95": 18.628334000823088
+      },
+      "prediction_wall_ms": {
+        "count": 107,
+        "median": 19.464459008304402,
+        "p95": 20.710750002763234
+      },
+      "infer_mask_export_ms": {
+        "count": 107,
+        "median": 20.161165986792184,
+        "p95": 22.345582998241298
+      },
+      "detections": 172,
+      "masks": 172
+    },
+    {
+      "candidate": "yolo26n-seg",
+      "compute_requested": "ALL",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 107,
+        "median": 7.841624988941476,
+        "p95": 8.751500005018897
+      },
+      "prediction_wall_ms": {
+        "count": 107,
+        "median": 9.030459012137726,
+        "p95": 10.281458002282307
+      },
+      "infer_mask_export_ms": {
+        "count": 107,
+        "median": 9.69816699216608,
+        "p95": 11.725541000487283
+      },
+      "detections": 148,
+      "masks": 148
+    },
+    {
+      "candidate": "yolo26n-seg",
+      "compute_requested": "CPU",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 107,
+        "median": 40.993749993504025,
+        "p95": 42.99537499900907
+      },
+      "prediction_wall_ms": {
+        "count": 107,
+        "median": 42.18316701008007,
+        "p95": 44.896207997226156
+      },
+      "infer_mask_export_ms": {
+        "count": 107,
+        "median": 42.89150000840891,
+        "p95": 46.962874999735504
+      },
+      "detections": 153,
+      "masks": 153
+    },
+    {
+      "candidate": "yolo26n-seg",
+      "compute_requested": "CPU_AND_GPU",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 107,
+        "median": 11.533416996826418,
+        "p95": 15.569041002891026
+      },
+      "prediction_wall_ms": {
+        "count": 107,
+        "median": 12.877875007689,
+        "p95": 16.81420800741762
+      },
+      "infer_mask_export_ms": {
+        "count": 107,
+        "median": 13.77079199301079,
+        "p95": 17.46862501022406
+      },
+      "detections": 153,
+      "masks": 153
+    },
+    {
+      "candidate": "yolo26n-seg",
+      "compute_requested": "CPU_ONLY",
+      "rows": 107,
+      "errors": 0,
+      "inference_ms": {
+        "count": 107,
+        "median": 18.09924999543,
+        "p95": 18.944790994282812
+      },
+      "prediction_wall_ms": {
+        "count": 107,
+        "median": 19.33633400767576,
+        "p95": 20.957250002538785
+      },
+      "infer_mask_export_ms": {
+        "count": 107,
+        "median": 20.025375008117408,
+        "p95": 22.572249989025295
+      },
+      "detections": 150,
+      "masks": 150
+    }
+  ],
+  "parity": [
+    {
+      "candidate": "yolo11n-seg",
+      "compute_requested": "CPU_ONLY",
+      "matched_box_iou": {
+        "count": 167,
+        "median": 0.9962863962397844,
+        "p95": 0.999180882967566
+      },
+      "matched_mask_iou": {
+        "count": 167,
+        "median": 0.9961873246529027,
+        "p95": 0.9994264560196048
+      },
+      "unmatched_reference_detections": 0,
+      "unmatched_export_detections": 5,
+      "frames_with_changed_count": 4,
+      "threshold": 0.25,
+      "scope": "reference/export agreement, not recall or annotation quality"
+    },
+    {
+      "candidate": "yolo26n-seg",
+      "compute_requested": "CPU_ONLY",
+      "matched_box_iou": {
+        "count": 150,
+        "median": 0.9936289577562731,
+        "p95": 0.997418483577303
+      },
+      "matched_mask_iou": {
+        "count": 150,
+        "median": 0.9956748262328966,
+        "p95": 0.9994478586518148
+      },
+      "unmatched_reference_detections": 3,
+      "unmatched_export_detections": 0,
+      "frames_with_changed_count": 3,
+      "threshold": 0.25,
+      "scope": "reference/export agreement, not recall or annotation quality"
+    },
+    {
+      "candidate": "yolo11n-seg",
+      "compute_requested": "CPU_AND_GPU",
+      "matched_box_iou": {
+        "count": 167,
+        "median": 0.998663359706739,
+        "p95": 0.9995987212735722
+      },
+      "matched_mask_iou": {
+        "count": 167,
+        "median": 0.9995746541110861,
+        "p95": 1.0
+      },
+      "unmatched_reference_detections": 0,
+      "unmatched_export_detections": 1,
+      "frames_with_changed_count": 1,
+      "threshold": 0.25,
+      "scope": "reference/export agreement, not recall or annotation quality"
+    },
+    {
+      "candidate": "yolo26n-seg",
+      "compute_requested": "CPU_AND_GPU",
+      "matched_box_iou": {
+        "count": 153,
+        "median": 0.998945946669726,
+        "p95": 0.9997144564478061
+      },
+      "matched_mask_iou": {
+        "count": 153,
+        "median": 0.999517440609329,
+        "p95": 1.0
+      },
+      "unmatched_reference_detections": 0,
+      "unmatched_export_detections": 0,
+      "frames_with_changed_count": 0,
+      "threshold": 0.25,
+      "scope": "reference/export agreement, not recall or annotation quality"
+    },
+    {
+      "candidate": "yolo11n-seg",
+      "compute_requested": "ALL",
+      "matched_box_iou": {
+        "count": 166,
+        "median": 0.9951026143974797,
+        "p95": 0.9989373523053146
+      },
+      "matched_mask_iou": {
+        "count": 166,
+        "median": 0.9888726038036486,
+        "p95": 0.9971560611446854
+      },
+      "unmatched_reference_detections": 1,
+      "unmatched_export_detections": 4,
+      "frames_with_changed_count": 4,
+      "threshold": 0.25,
+      "scope": "reference/export agreement, not recall or annotation quality"
+    },
+    {
+      "candidate": "yolo26n-seg",
+      "compute_requested": "ALL",
+      "matched_box_iou": {
+        "count": 146,
+        "median": 0.9945196404294735,
+        "p95": 0.9989291387017191
+      },
+      "matched_mask_iou": {
+        "count": 146,
+        "median": 0.9920581786831312,
+        "p95": 0.9982474076237768
+      },
+      "unmatched_reference_detections": 7,
+      "unmatched_export_detections": 2,
+      "frames_with_changed_count": 7,
+      "threshold": 0.25,
+      "scope": "reference/export agreement, not recall or annotation quality"
+    }
+  ],
+  "artifacts": [
+    {
+      "candidate": "yolo11n-seg",
+      "weights_sha256": "55ed65c56c91713d23e8402371c6c49a6fd84f257f7dce452e8d70e41dcbe152",
+      "weights_bytes": 6182636,
+      "checkpoint_source": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11n-seg.pt",
+      "coreml_files": [
+        {
+          "path": "Data/com.apple.CoreML/model.mlmodel",
+          "sha256": "00b2ffe568ec6283c14edbb55f54bdb94139c684b4ebf6492a7c846478a10bd5",
+          "bytes": 181086
+        },
+        {
+          "path": "Data/com.apple.CoreML/weights/weight.bin",
+          "sha256": "8a574d6ee37d277a84103a5b50e6a25cf36defc08aaaefa999b0fc9583d05db7",
+          "bytes": 5801408
+        },
+        {
+          "path": "Manifest.json",
+          "sha256": "5874f9b67d29c2f1826e5f96e14e0d44b1664c8beca3076db077fb773e4eb584",
+          "bytes": 617
+        }
+      ],
+      "export": {
+        "format": "mlprogram",
+        "imgsz": 640,
+        "half": true,
+        "nms": false,
+        "dynamic": false,
+        "ultralytics": "8.4.29",
+        "coremltools": "9.0",
+        "torch": "2.7.0",
+        "numpy": "2.2.6"
+      },
+      "license": "AGPL-3.0 (recorded; not screened out)"
+    },
+    {
+      "candidate": "yolo26n-seg",
+      "weights_sha256": "361fbfabab285c3237700b6bb91d7ecfa602cd945fffda8dbe1242829b71e73f",
+      "weights_bytes": 6719965,
+      "checkpoint_source": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n-seg.pt",
+      "coreml_files": [
+        {
+          "path": "Data/com.apple.CoreML/model.mlmodel",
+          "sha256": "07a936f67d212d208d43940545a312992addb1287dd61e7c7b93ee6601d4b779",
+          "bytes": 219622
+        },
+        {
+          "path": "Data/com.apple.CoreML/weights/weight.bin",
+          "sha256": "81863a6503294d06063a3320de0a45d543d62b9a3d11009c8d54f5d626abd2a0",
+          "bytes": 5512384
+        },
+        {
+          "path": "Manifest.json",
+          "sha256": "964807aeaa51114464188b13dbc39994e9108681fdb7d2741bc311c795a6fc15",
+          "bytes": 617
+        }
+      ],
+      "export": {
+        "format": "mlprogram",
+        "imgsz": 640,
+        "half": true,
+        "nms": false,
+        "dynamic": false,
+        "ultralytics": "8.4.29",
+        "coremltools": "9.0",
+        "torch": "2.7.0",
+        "numpy": "2.2.6"
+      },
+      "license": "AGPL-3.0 (recorded; not screened out)"
+    }
+  ],
+  "presence_diagnostics": [
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0001.png",
+      "candidate": "human-r2",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0001.png",
+      "candidate": "human-r3",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0001.png",
+      "candidate": "person-instance",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0001.png",
+      "candidate": "yolo26n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0001.png",
+      "candidate": "yolo11n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "human-r2",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "human-r3",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "person-instance",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "yolo26n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 2,
+      "unmatched_detections": 1,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "yolo11n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0001.png",
+      "candidate": "human-r2",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0001.png",
+      "candidate": "human-r3",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0001.png",
+      "candidate": "person-instance",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0001.png",
+      "candidate": "yolo26n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0001.png",
+      "candidate": "yolo11n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0009.png",
+      "candidate": "human-r2",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0009.png",
+      "candidate": "human-r3",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0009.png",
+      "candidate": "person-instance",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0009.png",
+      "candidate": "yolo26n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0009.png",
+      "candidate": "yolo11n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0017.png",
+      "candidate": "human-r2",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0017.png",
+      "candidate": "human-r3",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0017.png",
+      "candidate": "person-instance",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0017.png",
+      "candidate": "yolo26n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 2,
+      "unmatched_detections": 1,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0017.png",
+      "candidate": "yolo11n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 2,
+      "unmatched_detections": 1,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0018.png",
+      "candidate": "human-r2",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0018.png",
+      "candidate": "human-r3",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0018.png",
+      "candidate": "person-instance",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0018.png",
+      "candidate": "yolo26n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 2,
+      "unmatched_detections": 1,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0018.png",
+      "candidate": "yolo11n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0021.png",
+      "candidate": "human-r2",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0021.png",
+      "candidate": "human-r3",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0021.png",
+      "candidate": "person-instance",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0021.png",
+      "candidate": "yolo26n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0021.png",
+      "candidate": "yolo11n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 1,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "human-r2",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "human-r3",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "person-instance",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 2,
+      "unmatched_detections": 1,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "yolo26n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 2,
+      "unmatched_detections": 1,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "yolo11n-seg",
+      "expected_principal_appearances": 1,
+      "matched_principal_appearances": 1,
+      "detections": 1,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0037.png",
+      "candidate": "human-r2",
+      "expected_principal_appearances": 0,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0037.png",
+      "candidate": "human-r3",
+      "expected_principal_appearances": 0,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0037.png",
+      "candidate": "person-instance",
+      "expected_principal_appearances": 0,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0037.png",
+      "candidate": "yolo26n-seg",
+      "expected_principal_appearances": 0,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0037.png",
+      "candidate": "yolo11n-seg",
+      "expected_principal_appearances": 0,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 0,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "human-r2",
+      "expected_principal_appearances": 3,
+      "matched_principal_appearances": 0,
+      "detections": 0,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 0,
+      "detected_faces": 3,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "human-r3",
+      "expected_principal_appearances": 3,
+      "matched_principal_appearances": 3,
+      "detections": 3,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 2,
+      "detected_faces": 3,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "person-instance",
+      "expected_principal_appearances": 3,
+      "matched_principal_appearances": 3,
+      "detections": 3,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 1,
+      "detected_faces": 3,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "yolo26n-seg",
+      "expected_principal_appearances": 3,
+      "matched_principal_appearances": 3,
+      "detections": 3,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 2,
+      "detected_faces": 3,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "yolo11n-seg",
+      "expected_principal_appearances": 3,
+      "matched_principal_appearances": 3,
+      "detections": 3,
+      "unmatched_detections": 0,
+      "uniquely_associated_faces": 3,
+      "detected_faces": 3,
+      "scope": "coarse diagnostic matching; positive-scene background detections not fully annotated"
+    }
+  ],
+  "sparse_pixel_probes": [
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "human-r2",
+      "covered_probes": 14,
+      "total_probes": 14,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "human-r3",
+      "covered_probes": 14,
+      "total_probes": 14,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "person-instance",
+      "covered_probes": 11,
+      "total_probes": 14,
+      "missed_coordinates": [
+        [
+          0.2361,
+          0.7563
+        ],
+        [
+          0.3444,
+          0.7672
+        ],
+        [
+          0.3333,
+          0.8453
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "semantic-fast",
+      "covered_probes": 14,
+      "total_probes": 14,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "semantic-balanced",
+      "covered_probes": 13,
+      "total_probes": 14,
+      "missed_coordinates": [
+        [
+          0.3444,
+          0.7672
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "semantic-accurate",
+      "covered_probes": 14,
+      "total_probes": 14,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "yolo26n-seg",
+      "covered_probes": 13,
+      "total_probes": 14,
+      "missed_coordinates": [
+        [
+          0.3444,
+          0.7672
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "candidate": "yolo11n-seg",
+      "covered_probes": 13,
+      "total_probes": 14,
+      "missed_coordinates": [
+        [
+          0.3444,
+          0.7672
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "human-r2",
+      "covered_probes": 5,
+      "total_probes": 5,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "human-r3",
+      "covered_probes": 5,
+      "total_probes": 5,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "person-instance",
+      "covered_probes": 4,
+      "total_probes": 5,
+      "missed_coordinates": [
+        [
+          0.88,
+          0.1
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "semantic-fast",
+      "covered_probes": 5,
+      "total_probes": 5,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "semantic-balanced",
+      "covered_probes": 4,
+      "total_probes": 5,
+      "missed_coordinates": [
+        [
+          0.88,
+          0.1
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "semantic-accurate",
+      "covered_probes": 4,
+      "total_probes": 5,
+      "missed_coordinates": [
+        [
+          0.88,
+          0.1
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "yolo26n-seg",
+      "covered_probes": 4,
+      "total_probes": 5,
+      "missed_coordinates": [
+        [
+          0.88,
+          0.1
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0029.png",
+      "candidate": "yolo11n-seg",
+      "covered_probes": 4,
+      "total_probes": 5,
+      "missed_coordinates": [
+        [
+          0.88,
+          0.1
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "human-r2",
+      "covered_probes": 0,
+      "total_probes": 9,
+      "missed_coordinates": [
+        [
+          0.4,
+          0.1
+        ],
+        [
+          0.5,
+          0.13
+        ],
+        [
+          0.45,
+          0.3
+        ],
+        [
+          0.4,
+          0.4333
+        ],
+        [
+          0.5,
+          0.4633
+        ],
+        [
+          0.45,
+          0.6333
+        ],
+        [
+          0.4,
+          0.7667
+        ],
+        [
+          0.5,
+          0.7967
+        ],
+        [
+          0.45,
+          0.9667
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "human-r3",
+      "covered_probes": 9,
+      "total_probes": 9,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "person-instance",
+      "covered_probes": 7,
+      "total_probes": 9,
+      "missed_coordinates": [
+        [
+          0.4,
+          0.1
+        ],
+        [
+          0.4,
+          0.7667
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "semantic-fast",
+      "covered_probes": 9,
+      "total_probes": 9,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "semantic-balanced",
+      "covered_probes": 8,
+      "total_probes": 9,
+      "missed_coordinates": [
+        [
+          0.4,
+          0.7667
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "semantic-accurate",
+      "covered_probes": 8,
+      "total_probes": 9,
+      "missed_coordinates": [
+        [
+          0.4,
+          0.7667
+        ]
+      ],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "yolo26n-seg",
+      "covered_probes": 9,
+      "total_probes": 9,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "candidate": "yolo11n-seg",
+      "covered_probes": 9,
+      "total_probes": 9,
+      "missed_coordinates": [],
+      "scope": "pooled mask/box visible-body interior probes; ownership and boundary coverage unmeasured"
+    }
+  ]
+}
