@@ -1,0 +1,5102 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "done_end_card_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ينتهي الفيديو بخاتمة نقي، ويمكنك إيقافها من «الإعدادات»."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This video ends with the Naqi card. You can turn it off in Settings."
+          }
+        }
+      }
+    },
+    "settings_end_card_desc": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أضف شعار نقي لثانيتين في نهاية الفيديو."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a 2-second Naqi card at the end of the video."
+          }
+        }
+      }
+    },
+    "settings_end_card_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "خاتمة نقي"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Naqi end card"
+          }
+        }
+      }
+    },
+    "licenses_ffmpeg_terms": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يستخدم استيراد WebM الإصدار المصغّر من FFmpegKit وFFmpeg بترخيص LGPL-3.0. نص الترخيص مرفق بالتطبيق، وتتوفر تفاصيل الحزمة عبر الرابط أدناه."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WebM import uses the LGPL-3.0 FFmpegKit min build and FFmpeg. License text is bundled with the app. Package details are available below."
+          }
+        }
+      }
+    },
+    "licenses_ffmpeg_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FFmpegKit / FFmpeg"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "FFmpegKit / FFmpeg"
+          }
+        }
+      }
+    },
+    "settings_server_desc": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الفيديوهات التي مدتها 10 دقائق فأكثر تُرسل إلى سيرفر نقي ليزيل الموسيقى ويحدد الأشخاص لتغبيش الجسم بسرعة أكبر بكثير، ثم تُحذف فورًا. إذا تعذّر السيرفر يقوم جهازك بذلك."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videos of 10 minutes or more are sent to Naqi's server, which removes music and finds people for body blur far faster, then deletes them. If the server is unavailable, your device does it."
+          }
+        }
+      }
+    },
+    "settings_server_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استخدام السيرفر للفيديوهات الطويلة"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the server for long videos"
+          }
+        }
+      }
+    },
+    "stage_converting": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تحويل WebM"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Converting WebM"
+          }
+        }
+      }
+    },
+    "" : {
+
+    },
+    "settings_appearance_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المظهر"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appearance"
+          }
+        }
+      }
+    },
+    "settings_language_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اللغة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
+          }
+        }
+      }
+    },
+    "theme_system" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النظام"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System"
+          }
+        }
+      }
+    },
+    "theme_light" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فاتح"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        }
+      }
+    },
+    "theme_dark" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "داكن"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        }
+      }
+    },
+    "preset_whatsapp_status" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حالة واتساب"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WhatsApp Status"
+          }
+        }
+      }
+    },
+    "preset_x_free" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "X"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "X"
+          }
+        }
+      }
+    },
+    "preset_instagram_story" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ستوري إنستغرام"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instagram Story"
+          }
+        }
+      }
+    },
+    "preset_instagram_reels" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ريلز إنستغرام"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instagram Reels"
+          }
+        }
+      }
+    },
+    "preset_tiktok" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تيك توك"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TikTok"
+          }
+        }
+      }
+    },
+    "preset_snapchat_story" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ستوري سناب شات"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snapchat Story"
+          }
+        }
+      }
+    },
+    "preset_telegram" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تيليجرام"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telegram"
+          }
+        }
+      }
+    },
+    "preset_messenger" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ماسنجر"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Messenger"
+          }
+        }
+      }
+    },
+    "preset_custom" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مخصص"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom"
+          }
+        }
+      }
+    },
+    "publish_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جهّز للنشر"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepare to post"
+          }
+        }
+      }
+    },
+    "publish_custom_max" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أقصى مدة للجزء: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Longest part: %@"
+          }
+        }
+      }
+    },
+    "publish_needs_split" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الفيديو أطول من %@، لذلك سيُقسَّم إلى أجزاء عند أقرب إطار مفتاحي."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Longer than %@, so it will be split into parts, cut at the nearest keyframe."
+          }
+        }
+      }
+    },
+    "publish_as_is" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المدة مناسبة، سيُشارَك الفيديو كما هو."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fits as is. It will be shared without changes."
+          }
+        }
+      }
+    },
+    "publish_split" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جهّز الأجزاء"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prepare parts"
+          }
+        }
+      }
+    },
+    "publish_preparing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تجهيز الأجزاء…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing parts…"
+          }
+        }
+      }
+    },
+    "publish_part_duration" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الجزء %1$lld · %2$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Part %1$lld · %2$@"
+          }
+        }
+      }
+    },
+    "publish_share_all" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شارك الكل"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share all"
+          }
+        }
+      }
+    },
+    "publish_share_range" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شارك %1$lld–%2$lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share %1$lld–%2$lld"
+          }
+        }
+      }
+    },
+    "publish_delete_parts" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "احذف الأجزاء"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete parts"
+          }
+        }
+      }
+    },
+    "publish_parts_saved" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأجزاء محفوظة في الملفات › Naqi › Parts."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parts are saved in Files › Naqi › Parts."
+          }
+        }
+      }
+    },
+    "publish_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر تجهيز الأجزاء"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t prepare the parts"
+          }
+        }
+      }
+    },
+    "publish_one_by_one" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شارك الأجزاء واحدًا تلو الآخر بالترتيب."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share the parts one at a time, in order."
+          }
+        }
+      }
+    },
+    "jobs_saved_meta" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم الحفظ · %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved · %@"
+          }
+        }
+      }
+    },
+    "jobs_original_still_here" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأصلي ما زال على جهازك"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The original is still on your device"
+          }
+        }
+      }
+    },
+    "about_eyebrow_licenses" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تراخيص الطرف الثالث"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Third-party licences"
+          }
+        }
+      }
+    },
+    "about_eyebrow_privacy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الخصوصية"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy"
+          }
+        }
+      }
+    },
+    "about_eyebrow_updates" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التحديثات"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updates"
+          }
+        }
+      }
+    },
+    "about_eyebrow_feedback" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التواصل"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact"
+          }
+        }
+      }
+    },
+    "about_feedback_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أرسل ملاحظة أو اقتراحًا"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send feedback or a suggestion"
+          }
+        }
+      }
+    },
+    "about_feedback_copied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يوجد تطبيق بريد مُعدّ. نُسخ العنوان: %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No mail app is set up. Address copied: %@"
+          }
+        }
+      }
+    },
+    "about_feedback_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يفتح تطبيق البريد برسالة جاهزة إلى المطوّر."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens Mail with a message to the developer, ready to write."
+          }
+        }
+      }
+    },
+    "about_feedback_subject" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ملاحظات على نقي"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi feedback"
+          }
+        }
+      }
+    },
+    "about_license" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حقوق النشر © ٢٠٢٦ هيثم عسولي. جميع الحقوق محفوظة. للاستخدام الشخصي غير التجاري فقط؛ لا يُسمح بإعادة التوزيع."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copyright © 2026 Haitham Assoli. All rights reserved. Personal, non-commercial use only; redistribution is not permitted."
+          }
+        }
+      }
+    },
+    "about_notices_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اطّلع على الشروط وروابط المصادر لكل مكوّن مضمن في نقي."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read the terms and source links for every component bundled with Naqi."
+          }
+        }
+      }
+    },
+    "about_notices_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "البرمجيات والنماذج المضمّنة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bundled software and models"
+          }
+        }
+      }
+    },
+    "share_app" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مشاركة التطبيق"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share Naqi"
+          }
+        }
+      }
+    },
+    "share_app_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جرّب تطبيق نقي لفلترة الفيديو:"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try Naqi, the halal video filter:"
+          }
+        }
+      }
+    },
+    "about_open" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عن التطبيق والتراخيص"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About & licenses"
+          }
+        }
+      }
+    },
+    "about_privacy_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يجمع نقي أي بيانات، ولا يستخدم أدوات تحليل أو إعلان، ولا يتطلب حساباً. تعمل الفلترة على هذا الجهاز وتعمل في وضع الطيران. تُستخدم الشبكة فقط عندما تلصق أو تشارك رابطاً: يجلب نقي ذلك الفيديو عبر yt-dlp ويتحقق أسبوعياً من GitHub من أداة تنزيل جديدة. والفيديو الذي تختاره يُفتح للقراءة فقط ولا يُعدَّل أبداً."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi collects no data, uses no analytics or advertising SDKs and needs no account. Filtering runs on this device and works in Airplane Mode. Network is used only when you paste or share a link: Naqi fetches that video with yt-dlp and checks GitHub weekly for a new downloader. The video you pick is opened read-only and is never modified."
+          }
+        }
+      }
+    },
+    "about_privacy_body_share" : {
+      "comment" : "Privacy card while the paste-link field is hidden. Same as about_privacy_body minus paste.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يجمع نقي أي بيانات، ولا يستخدم أدوات تحليل أو إعلان، ولا يتطلب حساباً. تعمل الفلترة على هذا الجهاز وتعمل في وضع الطيران. تُستخدم الشبكة فقط عندما تشارك رابطاً: يجلب نقي ذلك الفيديو عبر yt-dlp ويتحقق أسبوعياً من GitHub من أداة تنزيل جديدة. والفيديو الذي تختاره يُفتح للقراءة فقط ولا يُعدَّل أبداً."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi collects no data, uses no analytics or advertising SDKs and needs no account. Filtering runs on this device and works in Airplane Mode. Network is used only when you share a link: Naqi fetches that video with yt-dlp and checks GitHub weekly for a new downloader. The video you pick is opened read-only and is never modified."
+          }
+        }
+      }
+    },
+    "about_privacy_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا شيء يغادر هذا الجهاز"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing leaves this device"
+          }
+        }
+      }
+    },
+    "about_releases_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُنشر النسخ الجديدة هناك. نقي لا يحدّث نفسه."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New versions are published here. Naqi does not update itself."
+          }
+        }
+      }
+    },
+    "about_releases_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإصدارات على GitHub"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Releases on GitHub"
+          }
+        }
+      }
+    },
+    "about_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عن نقي"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About Naqi"
+          }
+        }
+      }
+    },
+    "about_version" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإصدار %1$@ ‏(%2$d)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %1$@ (%2$d)"
+          }
+        }
+      }
+    },
+    "action_back" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رجوع"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        }
+      }
+    },
+    "action_cancel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إلغاء"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "action_continue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متابعة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue"
+          }
+        }
+      }
+    },
+    "action_delete" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حذف"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        }
+      }
+    },
+    "action_delete_original" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حذف الأصلي"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete original"
+          }
+        }
+      }
+    },
+    "action_discard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تجاهل"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard"
+          }
+        }
+      }
+    },
+    "action_done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "action_keep" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إبقاء"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep"
+          }
+        }
+      }
+    },
+    "action_more" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المزيد"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More"
+          }
+        }
+      }
+    },
+    "action_open" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فتح"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open"
+          }
+        }
+      }
+    },
+    "action_open_in_photos" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فتح في تطبيق الصور"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Photos"
+          }
+        }
+      }
+    },
+    "action_open_settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فتح الإعدادات"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        }
+      }
+    },
+    "action_play" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تشغيل"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play"
+          }
+        }
+      }
+    },
+    "action_preview" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "معاينة ١٥ ثانية"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview 15 seconds"
+          }
+        }
+      }
+    },
+    "action_resume" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استئناف"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resume"
+          }
+        }
+      }
+    },
+    "action_save" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حفظ"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        }
+      }
+    },
+    "action_share" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مشاركة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share"
+          }
+        }
+      }
+    },
+    "action_show_in_finder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار في Finder"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show in Finder"
+          }
+        }
+      }
+    },
+    "action_start" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بدء"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        }
+      }
+    },
+    "app_name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نقي"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi"
+          }
+        }
+      }
+    },
+    "CoreML EP" : {
+      "comment" : "A label for the CoreML Engine process.",
+      "isCommentAutoGenerated" : true
+    },
+    "diag_compute" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "وحدة التنفيذ"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compute"
+          }
+        }
+      }
+    },
+    "diag_cores" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأنوية"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cores"
+          }
+        }
+      }
+    },
+    "diag_memory" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الذاكرة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memory"
+          }
+        }
+      }
+    },
+    "diag_not_run" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يُشغَّل بعد."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not run yet."
+          }
+        }
+      }
+    },
+    "diag_run" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تشغيل اختبار النماذج"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run smoke test"
+          }
+        }
+      }
+    },
+    "dlg_cancel_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيُحذف ما أُنجز حتى الآن ولا يمكن استرجاعه."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The work done so far will be deleted and can't be recovered."
+          }
+        }
+      }
+    },
+    "dlg_cancel_confirm" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إلغاء المهمة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel job"
+          }
+        }
+      }
+    },
+    "dlg_cancel_keep" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متابعة الفلترة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep filtering"
+          }
+        }
+      }
+    },
+    "dlg_cancel_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إلغاء هذه المهمة؟"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel this job?"
+          }
+        }
+      }
+    },
+    "dlg_delete_original_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تبقى النسخة المُفلترة (%1$@) في مكتبة الصور. أمّا الفيديو الأصلي فسيُحذف من هذا الجهاز ولا يمكن استرجاعه."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The filtered copy (%1$@) stays in your photo library. The original video will be removed from this device and can't be recovered."
+          }
+        }
+      }
+    },
+    "dlg_delete_original_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر حذف الملف الأصلي — احذفه من المعرض بدلًا من ذلك."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't delete the original — remove it from your gallery instead."
+          }
+        }
+      }
+    },
+    "dlg_delete_original_fallback_name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هذا الفيديو"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "this video"
+          }
+        }
+      }
+    },
+    "dlg_delete_original_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حذف الملف الأصلي؟"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete the original?"
+          }
+        }
+      }
+    },
+    "dlg_long_job_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُقدَّر مدة هذا الفيديو بنحو ‏%1$@ على الأقل. أبقِ التطبيق مفتوحًا لأسرع نتيجة. وإذا أوقف iOS المهمة، فسيستأنفها نقي عندما يكون الهاتف قيد الشحن وفي وضع الخمول."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video is estimated at ~%1$@ at least. Keep Naqi open for the fastest result. If iOS pauses the job, Naqi will resume it when your phone is charging and idle."
+          }
+        }
+      }
+    },
+    "dlg_long_job_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ستستغرق هذه العملية وقتًا طويلًا"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This will take a while"
+          }
+        }
+      }
+    },
+    "dlg_original_deleted" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم حذف الملف الأصلي"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original deleted"
+          }
+        }
+      }
+    },
+    "dlg_original_kept" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم الإبقاء على الملف الأصلي"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original kept"
+          }
+        }
+      }
+    },
+    "done_copy_delete" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "احذف النسخة الآن"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete copy now"
+          }
+        }
+      }
+    },
+    "done_copy_note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توجد نسخة من هذا الفيديو داخل نقي أيضًا (%@). تُحذف تلقائيًا بعد 7 أيام، ويبقى الفيديو في الصور."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A copy of this video is also kept in Naqi (%@). It's deleted automatically after 7 days; the video stays in Photos."
+          }
+        }
+      }
+    },
+    "done_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "dur_h_min" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d ساعة و%2$d دقيقة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d h %2$d min"
+          }
+        }
+      }
+    },
+    "dur_min" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d دقيقة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d min"
+          }
+        }
+      }
+    },
+    "dur_under_min" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أقل من دقيقة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "under a minute"
+          }
+        }
+      }
+    },
+    "err_drm" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هذا الفيديو محمي ضد النسخ (DRM)، لذا لا يمكن فلترته."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video is copy-protected (DRM), so it can't be filtered."
+          }
+        }
+      }
+    },
+    "err_generic" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشلت الفلترة."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtering failed."
+          }
+        }
+      }
+    },
+    "err_import_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر فتح هذا الملف. جرّب ملفًا آخر."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open that file. Try a different one."
+          }
+        }
+      }
+    },
+    "err_interrupted" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقّف نقي عندما انتقل إلى الخلفية. استأنف ليكمل من حيث توقّف."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi stopped when it left the foreground. Resume to pick up where it left off."
+          }
+        }
+      }
+    },
+    "err_low_space" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد مساحة خالية كافية. تحتاج الفلترة إلى مساحة لنسخة مؤقتة إضافةً إلى نحو ٢ غيغابايت."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough free space. Filtering needs room for a temporary copy plus about 2 GB."
+          }
+        }
+      }
+    },
+    "err_low_space_gb" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحتاج هذه العملية إلى نحو ‏%1$.1f غيغابايت خالية، ولا يتوفّر سوى ‏%2$.1f غيغابايت."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This needs about %1$.1f GB free, but only %2$.1f GB is available."
+          }
+        }
+      }
+    },
+    "err_no_audio" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يحتوي هذا الفيديو على مسار صوتي، فلا توجد موسيقى لإزالتها."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video has no audio track, so there's no music to remove."
+          }
+        }
+      }
+    },
+    "err_no_video" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يحتوي هذا الملف على مسار فيديو."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file has no video track."
+          }
+        }
+      }
+    },
+    "err_out_of_space" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نفدت مساحة التخزين في الجهاز أثناء حفظ النسخة المُفلترة."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The device ran out of space while saving the filtered copy."
+          }
+        }
+      }
+    },
+    "err_photos_denied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يستطيع نقي الحفظ في مكتبة الصور. اسمح بالوصول من الإعدادات، أو اختر مجلّدًا بدلًا من ذلك."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi can't save to your photo library. Allow access in Settings, or choose a folder instead."
+          }
+        }
+      }
+    },
+    "err_unreadable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر فتح هذا الملف. قد يكون تالفًا أو بصيغة لا يدعمها هذا الجهاز."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file couldn't be opened. It may be damaged or in a format this device doesn't support."
+          }
+        }
+      }
+    },
+    "err_unsupported_codec" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يستخدم هذا الفيديو ترميزًا لا يستطيع هذا الجهاز فكّه."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video uses a codec this device can't decode."
+          }
+        }
+      }
+    },
+    "jobs_clear_finished" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مسح المكتملة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear finished"
+          }
+        }
+      }
+    },
+    "jobs_download_of" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ من %2$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ of %2$@"
+          }
+        }
+      }
+    },
+    "jobs_download_speed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@/ث"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@/s"
+          }
+        }
+      }
+    },
+    "jobs_eta_remaining" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتبقّى نحو ‏%1$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~%1$@ remaining"
+          }
+        }
+      }
+    },
+    "jobs_library" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المكتبة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Library"
+          }
+        }
+      }
+    },
+    "jobs_library_empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُحفظ مقاطع الفيديو المُفلترة في مكتبة الصور."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtered videos are saved to your photo library."
+          }
+        }
+      }
+    },
+    "jobs_new_job" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فلترة فيديو آخر"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filter another video"
+          }
+        }
+      }
+    },
+    "jobs_none_running" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد مهمة قيد التنفيذ."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No job running."
+          }
+        }
+      }
+    },
+    "jobs_progress_percent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d٪"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d%%"
+          }
+        }
+      }
+    },
+    "jobs_resume_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم الاحتفاظ بالأجزاء المكتملة من هذه المهمة. الاستئناف يكمل من حيث توقّفت."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The finished parts of this job were kept. Resuming picks up where it stopped."
+          }
+        }
+      }
+    },
+    "jobs_row_a11y" : {
+      "comment" : "VoiceOver label for a queue row. First argument is the file name, second is the status.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@، %2$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "jobs_saved_app" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حُفظت في مجلّد نقي."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved in Naqi's own folder."
+          }
+        }
+      }
+    },
+    "jobs_saved_folder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حُفظت في %1$@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved to %1$@."
+          }
+        }
+      }
+    },
+    "jobs_saved_label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم الحفظ"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved"
+          }
+        }
+      }
+    },
+    "jobs_saved_photos" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حُفظت في مكتبة الصور."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved to your photo library."
+          }
+        }
+      }
+    },
+    "jobs_size_gb" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$.1f غيغابايت"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$.1f GB"
+          }
+        }
+      }
+    },
+    "jobs_size_mb" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$.0f ميغابايت"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$.0f MB"
+          }
+        }
+      }
+    },
+    "jobs_stage_starting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ البدء…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starting…"
+          }
+        }
+      }
+    },
+    "jobs_status_cancelled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أُلغيت"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelled"
+          }
+        }
+      }
+    },
+    "jobs_status_queued" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "في قائمة الانتظار"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Queued"
+          }
+        }
+      }
+    },
+    "jobs_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النشاط"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activity"
+          }
+        }
+      }
+    },
+    "la_open_to_continue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح نقي للاستئناف"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Naqi to resume"
+          }
+        }
+      }
+    },
+    "licenses_demucs_terms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يصف المصدر Demucs بأنه مرخّص بموجب MIT. النموذج المضمّن تصدير ONNX/fp32 من نقطة تحقق htdemucs المنشورة، ولا يذكر المصدر شروطاً منفصلة لنقطة التحقق."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upstream labels Demucs as MIT. The bundled model is an ONNX/fp32 export of its released htdemucs checkpoint; upstream states no separate checkpoint terms."
+          }
+        }
+      }
+    },
+    "licenses_demucs_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HTDemucs"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HTDemucs"
+          }
+        }
+      }
+    },
+    "licenses_insight_face_terms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الكود بترخيص MIT؛ أما أوزان النموذج فللبحث غير التجاري فقط. يتطلب الاستخدام التجاري ترخيصاً منفصلاً."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code: MIT. Model weights: non-commercial research use only. Commercial use requires a separate licence."
+          }
+        }
+      }
+    },
+    "licenses_insight_face_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "InsightFace genderage، buffalo_l"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "InsightFace genderage, buffalo_l"
+          }
+        }
+      }
+    },
+    "licenses_intro" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يظل كل مكوّن خاضعاً لشروط مصدره. ولا يحل ترخيص نقي محل تلك الشروط."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each component remains governed by its upstream terms. Naqi’s licence does not replace them."
+          }
+        }
+      }
+    },
+    "licenses_nsfw_terms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ترخيص MIT، باستثناء المواد التي يحدد المصدر لها شروطاً أخرى. نموذج ONNX المضمّن مشتق من الإصدار 1.2.0."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MIT, except material upstream separately identifies under other terms. The bundled ONNX model is derived from release 1.2.0."
+          }
+        }
+      }
+    },
+    "licenses_nsfw_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nsfw_model، MobileNetV2 1.4"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nsfw_model, MobileNetV2 1.4"
+          }
+        }
+      }
+    },
+    "licenses_onnx_terms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ترخيص MIT. ويشمل إشعارات الطرف الثالث التي تنشرها Microsoft."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MIT. Includes the third-party notices published by Microsoft."
+          }
+        }
+      }
+    },
+    "licenses_onnx_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ONNX Runtime 1.24.2"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ONNX Runtime 1.24.2"
+          }
+        }
+      }
+    },
+    "licenses_person_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ultralytics YOLO11n-seg"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ultralytics YOLO11n-seg"
+          }
+        }
+      }
+    },
+    "licenses_person_terms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نموذج كشف الأشخاص بترخيص AGPL-3.0. راجع ترخيص Ultralytics المرتبط وإشعارات المستودع لهذه الأوزان المحددة."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Person detection model: AGPL-3.0. See the linked Ultralytics licence and the repository notices for this pinned checkpoint."
+          }
+        }
+      }
+    },
+    "licenses_personal_only" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هذه النسخة للاستخدام الشخصي والبحثي غير التجاري فقط، ولا يجوز إعادة توزيعها."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This build is for personal, non-commercial research use only and must not be redistributed."
+          }
+        }
+      }
+    },
+    "licenses_source" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عرض الشروط لدى المصدر"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View upstream terms"
+          }
+        }
+      }
+    },
+    "licenses_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تراخيص الطرف الثالث"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Third-party licences"
+          }
+        }
+      }
+    },
+    "licenses_yamnet_terms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الكود بترخيص Apache 2.0. نموذج ONNX المضمّن مشتق من أوزان YAMNet المنشورة، ولا يذكر المصدر شروطاً منفصلة للأوزان."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code: Apache 2.0. The bundled ONNX model is derived from the published YAMNet weights; upstream states no separate weight terms."
+          }
+        }
+      }
+    },
+    "licenses_yamnet_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TensorFlow YAMNet"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TensorFlow YAMNet"
+          }
+        }
+      }
+    },
+    "notif_done_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‏%1$@ جاهز."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ is ready."
+          }
+        }
+      }
+    },
+    "notif_done_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انتهت الفلترة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtering done"
+          }
+        }
+      }
+    },
+    "notif_failed_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقّفت الفلترة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtering stopped"
+          }
+        }
+      }
+    },
+    "onb_blur_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر مَن تحجب وأسلوب الحجب."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose whom to cover and how."
+          }
+        }
+      }
+    },
+    "onb_blur_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التمويه"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blurring"
+          }
+        }
+      }
+    },
+    "onb_feat_blur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حجب الوجوه أو الأجسام تلقائيًا"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cover faces or bodies automatically"
+          }
+        }
+      }
+    },
+    "onb_feat_music" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إزالة الموسيقى مع إبقاء الأصوات"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove music, keep the voices"
+          }
+        }
+      }
+    },
+    "onb_feat_private" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "كل شيء يبقى على جهازك"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everything stays on your device"
+          }
+        }
+      }
+    },
+    "onb_get_started" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ابدأ الآن"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get started"
+          }
+        }
+      }
+    },
+    "onb_music_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يقلّل نقي أصوات الآلات ويُبقي الصوت البشري، بما فيه الكلام والغناء."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi suppresses instruments while preserving human voices, including speech and singing."
+          }
+        }
+      }
+    },
+    "onb_music_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الموسيقى"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Music"
+          }
+        }
+      }
+    },
+    "onb_ready_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر فيديو ونقي يتكفّل بالباقي. يمكنك تغيير هذه الخيارات من الإعدادات في أي وقت."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a video and Naqi does the rest. You can change these choices anytime in Settings."
+          }
+        }
+      }
+    },
+    "onb_ready_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "كل شيء جاهز"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're all set"
+          }
+        }
+      }
+    },
+    "onb_welcome_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يصفّي نقي فيديوهاتك كما تحب، ببضع لمسات."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi filters your videos the way you want, in a few taps."
+          }
+        }
+      }
+    },
+    "onb_welcome_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نقِّ أي فيديو"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clean up any video"
+          }
+        }
+      }
+    },
+    "opt_blur_amount_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مدى قوّة التمويه على الوجوه والمشاهد المحجوبة."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How heavy the blur is on faces and censored scenes."
+          }
+        }
+      }
+    },
+    "opt_blur_amount_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "شدّة التمويه"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blur amount"
+          }
+        }
+      }
+    },
+    "opt_blur_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "القيم الأعلى تُموّه الوجوه بقوّة أكبر."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Higher values blur faces more heavily."
+          }
+        }
+      }
+    },
+    "opt_censor_style_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تمويه المنطقة أو تغطيتها بلون كامل."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blur the area, or cover it with a solid color."
+          }
+        }
+      }
+    },
+    "opt_censor_style_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أسلوب الحجب"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Censor style"
+          }
+        }
+      }
+    },
+    "opt_dest_audio_only" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هذا الملف بلا فيديو، ولا تقبله مكتبة الصور. اختر مجلّدًا."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file has no video, so the photo library can't take it. Choose a folder."
+          }
+        }
+      }
+    },
+    "opt_dest_folder_chosen" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يُحفظ في ‏%1$@."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving into %1$@."
+          }
+        }
+      }
+    },
+    "opt_dest_folder_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر مجلّدًا يُحفظ فيه."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a folder to save into."
+          }
+        }
+      }
+    },
+    "opt_dest_folder_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مجلّد"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folder"
+          }
+        }
+      }
+    },
+    "opt_dest_photos_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُضاف النسخة المفلترة إلى تطبيق الصور."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The filtered copy is added to Photos."
+          }
+        }
+      }
+    },
+    "opt_dest_photos_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مكتبة الصور"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo library"
+          }
+        }
+      }
+    },
+    "opt_eta_floor" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المدة المتوقّعة على هذا الجهاز: ‏%1$@ على الأقل."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimated at least %1$@ on this device."
+          }
+        }
+      }
+    },
+    "opt_grayscale_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يسحب الألوان أيضًا من المناطق المحجوبة."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also drains the color out of censored areas."
+          }
+        }
+      }
+    },
+    "opt_grayscale_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تدرّج الرمادي"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grayscale"
+          }
+        }
+      }
+    },
+    "opt_job_running" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هناك مهمة قيد التنفيذ بالفعل. انتظر حتى تنتهي أو ألغِها أوّلًا."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A job is already running. Wait for it to finish, or cancel it first."
+          }
+        }
+      }
+    },
+    "opt_keep_vocals_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يُبقي الكلام والغناء والتلاوة مع تقليل الآلات. قد تتغيّر بعض تفاصيل الصوت."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preserves speech, singing and recitation while suppressing instruments. Some vocal details may change."
+          }
+        }
+      }
+    },
+    "opt_keep_vocals_other_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يُبقي مزيدًا من أصوات المحيط والمؤثرات، وقد يُبقي أصوات آلات موسيقية."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keeps more ambience and sound effects, and may also retain musical instruments."
+          }
+        }
+      }
+    },
+    "opt_keep_vocals_other_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأصوات البشرية + المؤثرات"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voices + sounds"
+          }
+        }
+      }
+    },
+    "opt_keep_vocals_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأصوات البشرية فقط"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voices only"
+          }
+        }
+      }
+    },
+    "opt_nsfw_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يستخدم نموذج NSFW لحجب الصورة كاملة عندما يُصنَّف المشهد على أنه مخالف."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses the NSFW model to cover the whole frame when a scene is flagged."
+          }
+        }
+      }
+    },
+    "opt_nsfw_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حجب المشاهد المخالفة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Censor flagged scenes"
+          }
+        }
+      }
+    },
+    "opt_preview_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُفلتر أول ١٥ ثانية لترى النتيجة قبل تشغيل الفيديو كاملًا."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filter the first 15 seconds to check how it looks before running the whole video."
+          }
+        }
+      }
+    },
+    "opt_preview_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "معاينة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview"
+          }
+        }
+      }
+    },
+    "opt_face_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الوجه فقط"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Face only"
+          }
+        }
+      }
+    },
+    "opt_face_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "معالجة أسرع. يحجب الوجوه ويُبقي الأجسام ظاهرة."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faster processing. Covers faces and leaves bodies visible."
+          }
+        }
+      }
+    },
+    "opt_body_precise_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الجسم بدقة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Precise body"
+          }
+        }
+      }
+    },
+    "opt_body_precise_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الفلترة أبطأ لأن نموذجًا إضافيًا يبحث عن الأجسام. يحجب الوجه وحدود الجسم فقط ويُبقي الخلفية واضحة. يُحجب من لم يتضح تصنيفه؛ وقد تُحجب الصورة كاملة عند تعذّر تحديد الجسم."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtering is slower because an extra model looks for bodies. Covers faces and only the body's outline, keeping the background clear. Unknown people are covered; the whole picture may be covered when a body cannot be identified."
+          }
+        }
+      }
+    },
+    "opt_person_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الجسم كاملًا"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Whole body"
+          }
+        }
+      }
+    },
+    "opt_person_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الفلترة أبطأ لأن نموذجًا إضافيًا يبحث عن الأجسام. يحجب الوجه والجسم بمستطيل يشمل ما حوله. يُحجب من لم يتضح تصنيفه؛ وقد تُحجب الصورة كاملة عند تعذّر تحديد الجسم."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtering is slower because an extra model looks for bodies. Covers faces and bodies with a rectangle that includes what is around them. Unknown people are covered; the whole picture may be covered when a body cannot be identified."
+          }
+        }
+      }
+    },
+    "opt_section_censor_faces" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حجب الأشخاص"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Censor people"
+          }
+        }
+      }
+    },
+    "opt_section_remove_music" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إزالة الموسيقى"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove music"
+          }
+        }
+      }
+    },
+    "opt_section_save_to" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "وجهة الحفظ"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save to"
+          }
+        }
+      }
+    },
+    "opt_slider_value" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d"
+          }
+        }
+      }
+    },
+    "opt_solid_black" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أسود"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Black"
+          }
+        }
+      }
+    },
+    "opt_solid_gray" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رمادي"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gray"
+          }
+        }
+      }
+    },
+    "opt_solid_green" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أخضر"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Green"
+          }
+        }
+      }
+    },
+    "opt_solid_navy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "كحلي"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navy"
+          }
+        }
+      }
+    },
+    "opt_solid_white" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أبيض"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "White"
+          }
+        }
+      }
+    },
+    "opt_strictness_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مدى سهولة حجب المشهد كاملًا. حجب الوجوه مستقل عن هذا الإعداد."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How eagerly whole scenes are censored. Face coverage is independent of this setting."
+          }
+        }
+      }
+    },
+    "opt_strictness_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "القيم الأعلى تحجب مشاهد أكثر."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Higher values censor more scenes."
+          }
+        }
+      }
+    },
+    "opt_strictness_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الصرامة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strictness"
+          }
+        }
+      }
+    },
+    "opt_style_blur" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تمويه"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blur"
+          }
+        }
+      }
+    },
+    "opt_style_solid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لون"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solid"
+          }
+        }
+      }
+    },
+    "opt_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الخيارات"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Options"
+          }
+        }
+      }
+    },
+    "opt_who_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أيّ الأشخاص يُحجبون. حجب المشاهد خيار مستقل."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Which people get covered. Scene censoring is controlled separately."
+          }
+        }
+      }
+    },
+    "opt_who_everyone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الجميع"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Everyone"
+          }
+        }
+      }
+    },
+    "opt_who_men" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الرجال"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Men"
+          }
+        }
+      }
+    },
+    "opt_who_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مَن يُحجب"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Who"
+          }
+        }
+      }
+    },
+    "opt_who_women" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النساء"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Women"
+          }
+        }
+      }
+    },
+    "opt_whole_frame_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحجب الصورة كاملة طوال ظهور شخص من الفئة المختارة."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Covers the entire picture while a selected person is on screen."
+          }
+        }
+      }
+    },
+    "opt_whole_frame_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حجب الشاشة كاملة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cover the whole frame"
+          }
+        }
+      }
+    },
+    "pick_diag_eps" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "موفّرات التنفيذ: %1$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EPs: %1$@"
+          }
+        }
+      }
+    },
+    "pick_diag_model_line" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ · %3$@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ · %3$@"
+          }
+        }
+      }
+    },
+    "pick_diag_running" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ اختبار النماذج…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Running model smoke…"
+          }
+        }
+      }
+    },
+    "pick_diag_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بيئة التشغيل على الجهاز"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device runtime"
+          }
+        }
+      }
+    },
+    "pick_drop_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أو أفلِت فيديو هنا."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Or drop a video here."
+          }
+        }
+      }
+    },
+    "pick_eyebrow_choose" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر ما تريد فلترته"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose what to filter"
+          }
+        }
+      }
+    },
+    "pick_op_faces_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · والمشاهد المُخالفة."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · and flagged scenes."
+          }
+        }
+      }
+    },
+    "pick_op_faces_desc_off" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحجب الوجوه أو الأجسام والمشاهد المُخالفة."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cover faces or bodies and flagged scenes."
+          }
+        }
+      }
+    },
+    "pick_op_faces_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حجب الأشخاص"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Censor people"
+          }
+        }
+      }
+    },
+    "pick_op_music_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُزيل الموسيقى التصويرية وتُبقي الحوار."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strip the soundtrack, keep dialogue."
+          }
+        }
+      }
+    },
+    "pick_op_music_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إزالة الموسيقى"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove music"
+          }
+        }
+      }
+    },
+    "pick_reassurance" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يُمسّ الملف الأصلي أبدًا."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original file is never changed."
+          }
+        }
+      }
+    },
+    "pick_resume_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‏%1$@ توقّف قبل أن يكتمل."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ stopped before it finished."
+          }
+        }
+      }
+    },
+    "pick_resume_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مهمة لم تكتمل"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unfinished job"
+          }
+        }
+      }
+    },
+    "pick_seal_on_device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "على الجهاز"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On-device"
+          }
+        }
+      }
+    },
+    "pick_seal_private" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "خصوصية تامة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private"
+          }
+        }
+      }
+    },
+    "pick_source_files" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الاختيار من الملفات"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose from Files"
+          }
+        }
+      }
+    },
+    "pick_source_photos" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مكتبة الصور"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo library"
+          }
+        }
+      }
+    },
+    "pick_tagline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تتم الفلترة على جهازك.\nلا تغادر مقاطعك هاتفك أبدًا."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtering happens on your device.\nYour videos never leave your phone."
+          }
+        }
+      }
+    },
+    "pick_video_change" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انقر للتغيير"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to change"
+          }
+        }
+      }
+    },
+    "pick_video_formats" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MP4 · MOV · WebM · MP3 · M4A · WAV"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MP4 · MOV · WebM · MP3 · M4A · WAV"
+          }
+        }
+      }
+    },
+    "pick_video_none" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر فيديو أو ملفًا صوتيًا"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a video or audio file"
+          }
+        }
+      }
+    },
+    "pick_video_selected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم اختيار الملف"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File selected"
+          }
+        }
+      }
+    },
+    "pick_wordmark_ar" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نقي"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نقي"
+          }
+        }
+      }
+    },
+    "pick_wordmark_latin" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Naqi"
+          }
+        }
+      }
+    },
+    "preview_building" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ إنشاء المعاينة…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Building preview…"
+          }
+        }
+      }
+    },
+    "preview_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر إنشاء المعاينة."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't build the preview."
+          }
+        }
+      }
+    },
+    "progress_background_resume" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إذا أوقف iOS المهمة، فسيستأنفها نقي عندما يكون الهاتف قيد الشحن وفي وضع الخمول."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If iOS pauses the job, Naqi will resume it when your phone is charging and idle."
+          }
+        }
+      }
+    },
+    "progress_bar_label" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تقدّم الفلترة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtering progress"
+          }
+        }
+      }
+    },
+    "progress_keep_open" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أبقِ نقي مفتوحًا والهاتف موصولًا بالشاحن."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Naqi open and the phone plugged in."
+          }
+        }
+      }
+    },
+    "progress_more_queued" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "في قائمة الانتظار: ‏%1$d"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$d more in the queue"
+          }
+        }
+      }
+    },
+    "progress_paused_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متوقّفة مؤقتًا"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused"
+          }
+        }
+      }
+    },
+    "progress_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ الفلترة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filtering"
+          }
+        }
+      }
+    },
+    "settings_defaults_note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هذه هي الإعدادات الافتراضية لمقاطع الفيديو الجديدة، بما فيها المقاطع التي تُشاركها إلى نقي."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These are the defaults for new videos, including ones shared into Naqi."
+          }
+        }
+      }
+    },
+    "settings_storage_copies" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نسخ من فيديوهات محفوظة في الصور"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copies of videos in Photos"
+          }
+        }
+      }
+    },
+    "settings_storage_copies_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تبقى الفيديوهات في الصور، وتُحذف النسخ تلقائيًا بعد 7 أيام."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The videos stay in Photos. Copies are deleted automatically after 7 days."
+          }
+        }
+      }
+    },
+    "settings_storage_only" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ملفات موجودة في نقي فقط"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Files only in Naqi"
+          }
+        }
+      }
+    },
+    "settings_storage_only_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد نسخة أخرى منها. احذفها من مجلد نقي إذا لم تعد تحتاجها."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No other copy exists. Delete them from Naqi's folder when you no longer need them."
+          }
+        }
+      }
+    },
+    "settings_storage_temp" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ملفات مؤقتة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temporary files"
+          }
+        }
+      }
+    },
+    "settings_storage_temp_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أعمال غير مكتملة وتنزيلات. يمكن حذفها عندما لا يُفلتر أي فيديو."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unfinished work and downloads. Can be deleted when no video is being filtered."
+          }
+        }
+      }
+    },
+    "settings_storage_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التخزين"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Storage"
+          }
+        }
+      }
+    },
+    "settings_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإعدادات"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        }
+      }
+    },
+    "stage_analyzing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المرحلة ١ — التحليل"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pass 1 — analyzing"
+          }
+        }
+      }
+    },
+    "stage_muxing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اللمسات الأخيرة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finishing up"
+          }
+        }
+      }
+    },
+    "stage_preparing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تجهيز الصوت"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing audio"
+          }
+        }
+      }
+    },
+    "stage_rendering" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المرحلة ٢ — المعالجة"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pass 2 — rendering"
+          }
+        }
+      }
+    },
+    "stage_separating" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إزالة الموسيقى"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removing music"
+          }
+        }
+      }
+    },
+    "pick_link_hint" : {
+      "comment" : "Placeholder on the pick-screen link field.",
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "أو الصق رابط فيديو"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Or paste a video link"
+              }
+            }
+      }
+    },
+    "pick_link_action" : {
+      "comment" : "Accessibility label of the trailing download button.",
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "تنزيل الرابط"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Download link"
+              }
+            }
+      }
+    },
+    "share_untitled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "فيديو مُشارَك"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Shared video"
+              }
+            }
+      }
+    },
+    "opt_performance_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "سرعة المعالجة" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Processing speed" } }
+      }
+    },
+    "opt_performance_current" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "الجودة الحالية" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Current quality" } }
+      }
+    },
+    "opt_performance_fast" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "سريع" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Fast" } }
+      }
+    },
+    "opt_performance_current_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "يحافظ على دقة الفيديو الأصلية." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Keeps the original video resolution." } }
+      }
+    },
+    "opt_performance_fast_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : { "stringUnit" : { "state" : "translated", "value" : "يُنهي الفيديو أسرع بدقة تصل إلى 720 بكسل للضلع الأقصر. إزالة الموسيقى لا تتغير." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Finishes video faster with a short side up to 720 pixels. Music removal is unchanged." } }
+      }
+    },
+    "share_eyebrow_quality" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "الجودة"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Quality"
+              }
+            }
+      }
+    },
+    "share_eyebrow_filters" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "الفلاتر"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Filters"
+              }
+            }
+      }
+    },
+    "share_quality_best" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "الأفضل"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Best"
+              }
+            }
+      }
+    },
+    "share_quality_1080" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "1080p"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "1080p"
+              }
+            }
+      }
+    },
+    "share_quality_720" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "720p"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "720p"
+              }
+            }
+      }
+    },
+    "share_quality_480" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "480p"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "480p"
+              }
+            }
+      }
+    },
+    "share_quality_audio" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "الصوت فقط"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Audio only"
+              }
+            }
+      }
+    },
+    "action_download" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "تنزيل"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Download"
+              }
+            }
+      }
+    },
+    "action_filter" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "تصفية"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Filter"
+              }
+            }
+      }
+    },
+    "share_no_url" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "هذا لا يبدو رابط فيديو."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "That doesn’t look like a video link."
+              }
+            }
+      }
+    },
+    "share_already_queued" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "موجود في القائمة مسبقاً."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Already in the queue."
+              }
+            }
+      }
+    },
+    "stage_downloading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "جارٍ التنزيل"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Downloading"
+              }
+            }
+      }
+    },
+    "err_download_unsupported" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "لا يستطيع نقي التنزيل من هذا الرابط. قد لا يكون الموقع مدعوماً، أو الفيديو خاصاً."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Naqi can’t download from this link. The site may not be supported, or the video may be private."
+              }
+            }
+      }
+    },
+    "err_download_network" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "فشل التنزيل. تحقق من الاتصال وحاول مرة أخرى."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Download failed. Check your connection and try again."
+              }
+            }
+      }
+    },
+    "err_download_generic" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "فشل التنزيل."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Download failed."
+              }
+            }
+      }
+    },
+    "err_download_unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "هذا الفيديو غير متاح. قد يكون محذوفًا أو خاصًا أو للأعضاء فقط أو مقيّدًا بالعمر."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "This video is unavailable. It may be removed, private, members-only or age-restricted."
+              }
+            }
+      }
+    },
+    "err_download_geo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "هذا الفيديو غير متاح في بلدك."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "This video isn't available in your country."
+              }
+            }
+      }
+    },
+    "err_download_rate_limited" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "الموقع يحدّ من التنزيلات حاليًا. أعد المحاولة بعد بضع دقائق."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "The site is limiting downloads right now. Try again in a few minutes."
+              }
+            }
+      }
+    },
+    "err_download_forbidden" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "رفض الموقع التنزيل. أعد المحاولة بعد بضع دقائق."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "The site refused the download. Try again in a few minutes."
+              }
+            }
+      }
+    },
+    "err_download_extractor" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "غيّر هذا الموقع طريقة تقديم الفيديوهات. حدّث نقي أو أعد المحاولة لاحقًا."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "This site changed how it serves videos. Update Naqi or try again later."
+              }
+            }
+      }
+    },
+    "about_eyebrow_downloader" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "أداة التنزيل"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Downloader"
+              }
+            }
+      }
+    },
+    "about_ytdlp_version" : {
+      "comment" : "Installed yt-dlp version. %1$@ is a tag like 2026.08.19.",
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "yt-dlp %1$@"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "yt-dlp %1$@"
+              }
+            }
+      }
+    },
+    "about_ytdlp_unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "لم يُحدَّث بعد"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "not updated yet"
+              }
+            }
+      }
+    },
+    "about_ytdlp_desc" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "تغيّر المواقع طريقة تقديم الفيديو كل بضعة أسابيع. يتحقق نقي من أداة تنزيل جديدة مرة في الأسبوع؛ حدّث هنا إذا توقف رابط عن العمل."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Sites change how they serve video every few weeks. Naqi checks for a new downloader once a week; update here if a link stops working."
+              }
+            }
+      }
+    },
+    "about_update" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "تحقق من التحديث"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Check for update"
+              }
+            }
+      }
+    },
+    "about_updating" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "جارٍ التحديث…"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Updating…"
+              }
+            }
+      }
+    },
+    "about_update_ok" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "أداة التنزيل محدّثة."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Downloader is up to date."
+              }
+            }
+      }
+    },
+    "about_update_failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "تعذّر التحديث. تحقق من الاتصال وحاول مرة أخرى."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "Couldn’t update. Check your connection and try again."
+              }
+            }
+      }
+    },
+    "licenses_ytdlp_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "yt-dlp"
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "yt-dlp"
+              }
+            }
+      }
+    },
+    "licenses_ytdlp_terms" : {
+      "extractionState" : "manual",
+      "localizations" : {
+            "ar" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "يجلب المنزّل إصدار yt-dlp الحالي من GitHub ويشغّله محلياً. yt-dlp مرخّص Unlicense (ملك عام)."
+              }
+            },
+            "en" : {
+              "stringUnit" : {
+                "state" : "translated",
+                "value" : "The downloader fetches the current yt-dlp release from GitHub and runs it locally. yt-dlp is Unlicense (public domain)."
+              }
+            }
+      }
+    }
+  },
+  "version" : "1.1"
+}

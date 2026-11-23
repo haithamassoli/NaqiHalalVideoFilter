@@ -1,0 +1,56 @@
+[
+  {
+    "candidate": "scnet-small",
+    "file": "qa-assets/modelbench/audio/scnet-small.th",
+    "bytes": 42434545,
+    "sha256": "f8aff3bc8dd816aad392800d9d69519add719a2fbd22550af6f8cb2138d25ff5",
+    "url": "https://drive.google.com/file/d/1CdEIIqsoRfHn1SJ7rccPfyYioW3BlXcW/view",
+    "reference_code": "https://github.com/starrytong/SCNet/tree/5d95bf96b19c3eede63248d171efeca8e3abb948",
+    "license": "MIT code; checkpoint licensing not separately audited"
+  },
+  {
+    "candidate": "kim2",
+    "file": "qa-assets/modelbench/audio/UVR/models/MDXNet/Kim_Vocal_2.onnx",
+    "bytes": 66759214,
+    "sha256": "ce74ef3b6a6024ce44211a07be9cf8bc6d87728cc852a68ab34eb8e58cde9c8b",
+    "url": "https://huggingface.co/Politrees/UVR_resources/resolve/83719e1e624d07842f914d856722af6f463e88cb/models/MDXNet/Kim_Vocal_2.onnx",
+    "reference_code": "https://github.com/Anjok07/ultimatevocalremovergui",
+    "license": "Mirror declares MIT; not separately audited",
+    "config": {
+      "compensate": 1.009,
+      "mdx_dim_f_set": 3072,
+      "mdx_dim_t_set": 8,
+      "mdx_n_fft_scale_set": 7680,
+      "primary_stem": "Vocals"
+    },
+    "config_key_tail_md5": "970b3f9492014d18fefeedfe4773cb42",
+    "config_source": "https://raw.githubusercontent.com/TRvlvr/application_data/main/mdx_model_data/model_data_new.json"
+  },
+  {
+    "candidate": "vocft",
+    "file": "qa-assets/modelbench/audio/UVR/models/MDXNet/UVR-MDX-NET-Voc_FT.onnx",
+    "bytes": 66762490,
+    "sha256": "534b2070fcc7df514b13ef660dc8cbb328679c2374d04354a5c42bb14ecce111",
+    "url": "https://huggingface.co/Politrees/UVR_resources/resolve/83719e1e624d07842f914d856722af6f463e88cb/models/MDXNet/UVR-MDX-NET-Voc_FT.onnx",
+    "reference_code": "https://github.com/Anjok07/ultimatevocalremovergui",
+    "license": "Mirror declares MIT; not separately audited",
+    "config": {
+      "compensate": 1.021,
+      "mdx_dim_f_set": 3072,
+      "mdx_dim_t_set": 8,
+      "mdx_n_fft_scale_set": 7680,
+      "primary_stem": "Vocals"
+    },
+    "config_key_tail_md5": "77d07b2667ddf05b9e3175941b4454a0",
+    "config_source": "https://raw.githubusercontent.com/TRvlvr/application_data/main/mdx_model_data/model_data_new.json"
+  },
+  {
+    "candidate": "roformer-kim",
+    "file": "qa-assets/modelbench/audio/Roformer/MelBandRoformer.ckpt",
+    "bytes": 913106900,
+    "sha256": "87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e",
+    "url": "https://huggingface.co/KimberleyJSN/melbandroformer/resolve/ac9b0614ab3cd7f77219e18ba494dfd93956c348/MelBandRoformer.ckpt",
+    "reference_code": "https://github.com/KimberleyJensen/Mel-Band-Roformer-Vocal-Model/tree/25f44ffb55ee3c301281bba21b2d6d311cb69ae2",
+    "license": "Author model repository declares MIT"
+  }
+]

@@ -1,0 +1,72 @@
+{
+  "review_media_outside_git": true,
+  "model_source_current_sha256": "ddca0153d55a4e66f86224981ce7e7177aa4c1a56e84a3c3950eafc490f7378b",
+  "classifier_min_votes": 2,
+  "files": [
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/-dQJ3djthDc_005300_final_policies.jpg",
+      "sha256": "0aafe3d84b7f1265bcbcd2838238469ec8bdd2b2d85b1487c88b5d9f5f58a32d",
+      "classification_min_votes": 2,
+      "scope": "actual final scene-off source/women/men/everyone comparison"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/-dQJ3djthDc_005750_final_policies.jpg",
+      "sha256": "b44de878aa084e496d3f20e23ba176267363e2013f32acafed35cdd7433a4acf",
+      "classification_min_votes": 2,
+      "scope": "actual final scene-off source/women/men/everyone comparison"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/-dQJ3djthDc_036500_final_policies.jpg",
+      "sha256": "1e74b472a03147fd2d923bd55002bff30c8b92a96ebf20a2fe35a3994198c26a",
+      "classification_min_votes": 2,
+      "scope": "actual final scene-off source/women/men/everyone comparison"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_008500_final_policies.jpg",
+      "sha256": "9fff43382023b9c8d0820860000451042efbbba052d6c0ccb56e936646b08da8",
+      "classification_min_votes": 2,
+      "scope": "actual final scene-off source/women/men/everyone comparison"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_017500_final_policies.jpg",
+      "sha256": "cdba1afd1bffb9824d58eacb45969d6edd17d97a8d1617ee65ffc020c6c1084c",
+      "classification_min_votes": 2,
+      "scope": "actual final scene-off source/women/men/everyone comparison"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_018500_final_policies.jpg",
+      "sha256": "909737950165125ef355e31c3e48fd29a9d0057f90f41d1ef8ff36ffac956dff",
+      "classification_min_votes": 2,
+      "scope": "actual final scene-off source/women/men/everyone comparison"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_028500_final_policies.jpg",
+      "sha256": "399327e1ff6c392d8c1a52628d4acd2bd638e0fd7b0acff10cf2f2357adb2628",
+      "classification_min_votes": 2,
+      "scope": "actual final scene-off source/women/men/everyone comparison"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_052500_final_policies.jpg",
+      "sha256": "269c9a41d8d9765ccb2702423bd802fd76fda3c11b6651d2cc93398229a12dcc",
+      "classification_min_votes": 2,
+      "scope": "actual final scene-off source/women/men/everyone comparison"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/short1_6000_source.png",
+      "sha256": "bb1ea0016c45b1d025871861c960fc770c759db55d54b1c30c7a0fe7d4bc5d88",
+      "scope": "visible moving-hand miss, source versus pre-guard scene-off output; final render log retains same14uncoveredframes"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/short1_6000_output.png",
+      "sha256": "99d26dc64c013106a1b0f0c6bef295af1e8a053d95491cb96a7196f995ca8795",
+      "scope": "visible moving-hand miss, source versus pre-guard scene-off output; final render log retains same14uncoveredframes"
+    }
+  ],
+  "source_image_review": "initial18Shorts+4audio-onlysong frames; final8policycomparison sheets; source6.0s hand proof",
+  "limits": [
+    "Only sparse manual interiors and selected timestamps are annotated",
+    "MEN over-censors unknownpartial/collage bodies",
+    "Tinycamera8.5 and movinghand5.867\u20136.3 remainvisible",
+    "No physical-phone performance/thermal claim"
+  ]
+}

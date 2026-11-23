@@ -1,0 +1,36 @@
+{
+  "annotation_type": "sparse visible-body interior pixel probes",
+  "reviewer": "assistant visual inspection of the original supplied video frames",
+  "coordinate_system": "upright normalized top-left; source frames 360x640",
+  "scope": "Diagnostic cases selected during review. These are not dense ground-truth masks or an unbiased recall sample; a covered probe does not prove complete coverage.",
+  "presence_scope": "Coarse manually reviewed boxes for the principal on-screen appearances only. Background passersby are not fully annotated. IoU>=0.3 is a matching diagnostic, not COCO AP; unmatched positive-scene detections are not assumed false positives.",
+  "presence_cases": [
+    {"video":"-dQJ3djthDc","frame":"0001.png","boxes":[[0.0,0.08,1.0,0.93]],"description":"One principal close presenter; face visible."},
+    {"video":"-dQJ3djthDc","frame":"0037.png","boxes":[[0.0,0.0,1.0,0.90]],"description":"One presenter with close hands and partly occluded face."},
+    {"video":"rX6wXhLqOIQ","frame":"0001.png","boxes":[[0.0,0.16,1.0,1.0]],"description":"One principal indoor presenter."},
+    {"video":"rX6wXhLqOIQ","frame":"0009.png","boxes":[[0.42,0.581,0.587,0.694]],"description":"One small on-screen person in the camera display; physical body absent. Classification must abstain at this face size."},
+    {"video":"rX6wXhLqOIQ","frame":"0017.png","boxes":[[0.05,0.29,0.78,1.0]],"description":"One principal side/rear presenter. Small background passers not annotated."},
+    {"video":"rX6wXhLqOIQ","frame":"0018.png","boxes":[[0.183,0.3625,0.681,1.0]],"description":"One principal rear-view presenter with invisible face. Small background passers not annotated."},
+    {"video":"rX6wXhLqOIQ","frame":"0021.png","boxes":[[0.256,0.373,0.633,1.0]],"description":"One principal full-body presenter."},
+    {"video":"rX6wXhLqOIQ","frame":"0029.png","boxes":[[0.03,0.0,1.0,1.0]],"description":"Partial torso, legs and hand; no face."},
+    {"video":"rX6wXhLqOIQ","frame":"0037.png","boxes":[],"description":"Architecture in three edited panels; no visible humans."},
+    {"video":"rX6wXhLqOIQ","frame":"0053.png","boxes":[[0.29,0.03,0.71,0.333],[0.29,0.36,0.71,0.667],[0.29,0.70,0.71,1.0]],"description":"Three on-screen appearances of the same presenter in edited panels."}
+  ],
+  "cases": [
+    {
+      "video": "-dQJ3djthDc", "frame": "0037.png", "timestamp_s": 36.5,
+      "description": "Occluded face, close foreground hands, red/gray shirt. All visible body parts belong to the presenter.",
+      "body_probes": [[0.20,0.13],[0.24,0.25],[0.89,0.15],[0.72,0.22],[0.18,0.65],[0.39,0.47],[0.27,0.70],[0.57,0.61],[0.56,0.82],[0.58,0.85],[0.92,0.58],[0.2361,0.7563],[0.3444,0.7672],[0.3333,0.8453]]
+    },
+    {
+      "video": "rX6wXhLqOIQ", "frame": "0029.png", "timestamp_s": 28.5,
+      "description": "Face absent; sleeve, hand, waist and trousers. Native instance labels split this single partial body.",
+      "body_probes": [[0.45,0.15],[0.88,0.10],[0.24,0.58],[0.85,0.78],[0.18,0.81]]
+    },
+    {
+      "video": "rX6wXhLqOIQ", "frame": "0053.png", "timestamp_s": 52.5,
+      "description": "Three edited panels of the same presenter. All three on-screen appearances require coverage; labels do not mean three persistent physical identities.",
+      "body_probes": [[0.40,0.10],[0.50,0.13],[0.45,0.30],[0.40,0.4333],[0.50,0.4633],[0.45,0.6333],[0.40,0.7667],[0.50,0.7967],[0.45,0.9667]]
+    }
+  ]
+}

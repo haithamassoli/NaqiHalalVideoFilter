@@ -1,0 +1,22 @@
+[
+  {
+    "hands": [],
+    "image": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/short1_6000_source.png",
+    "runtime": "Apple Vision VNDetectHumanHandPoseRequest",
+    "revision": "default",
+    "maximum_hand_count": 2,
+    "platform": "native M3 macOS27.0.1",
+    "input_sha256": "bb1ea0016c45b1d025871861c960fc770c759db55d54b1c30c7a0fe7d4bc5d88",
+    "scope": "one-frame diagnostic; zero observations does not mean no human hand is visible"
+  },
+  {
+    "hands": [],
+    "image": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_008500_source.png",
+    "runtime": "Apple Vision VNDetectHumanHandPoseRequest",
+    "revision": "default",
+    "maximum_hand_count": 2,
+    "platform": "native M3 macOS27.0.1",
+    "input_sha256": "e2fa92c17ba2111d79b3d506d62dde85c33948f39869679c5e60ceec7b6a2d7c",
+    "scope": "one-frame diagnostic; zero observations does not mean no human hand is visible"
+  }
+]

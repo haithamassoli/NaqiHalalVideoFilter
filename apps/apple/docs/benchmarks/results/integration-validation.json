@@ -1,0 +1,33 @@
+{
+  "checks": [
+    {
+      "check": "ios_simulator_tests",
+      "status": "passed",
+      "log": "/Users/goldentik/Documents/naqi/build.noindex/DD-person-ios/final-tests.log",
+      "log_sha256": "9c2247c24680cfa36351787e146953183ca959f946689aed03e83ae3d5187dba"
+    },
+    {
+      "check": "ios_device_sdk_build",
+      "status": "passed",
+      "log": "/Users/goldentik/Documents/naqi/build.noindex/DD-person-device/build.log",
+      "log_sha256": "ebfbcf3f99f00312e11ebe9e90634ff75ce480680264d06ac36c05da46ad7ce7"
+    },
+    {
+      "check": "macos_regression_tests",
+      "status": "passed",
+      "log": "/Users/goldentik/Documents/naqi/build.noindex/DD-person-mac/regression-final.log",
+      "log_sha256": "b0435cda5b02b2c9143eb01398b1bb9652719356ffb6c383845f76d0513aab40"
+    }
+  ],
+  "ios_simulator": "iPhone 18 Pro Max / iOS27, not physical",
+  "new_ios_tests": 11,
+  "existing_macos_tests": 61,
+  "known_exclusion": "Existing RenderTests.segmentedConcat2997 has two known issues and Xcode27 teardown hang; excluded final regression invocation, source test unchanged",
+  "physical_iphone_available": false,
+  "media_weights_binaries_committed": false,
+  "benchmark_scope": "Full actual media stages on M3; publication/UI management excluded",
+  "remaining_coverage_failures": [
+    "Short1 moving hand 5.867–6.300 seconds",
+    "Short2 tiny person on camera display at 8.5 seconds"
+  ]
+}

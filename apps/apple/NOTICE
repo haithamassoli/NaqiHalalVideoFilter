@@ -1,0 +1,75 @@
+Naqi: third-party notices
+Copyright (c) 2026 Haitham Assoli
+
+Naqi-authored material is governed by LICENSE. That license does not replace
+or grant rights to the components and model artifacts below.
+
+ONNX Runtime Swift Package Manager 1.24.2
+  Bundled component: ONNX Runtime Objective-C/C runtime and Swift package.
+  Terms: MIT License. The runtime also carries upstream third-party notices.
+  Source: https://github.com/microsoft/onnxruntime-swift-package-manager/tree/1.24.2
+  License: https://github.com/microsoft/onnxruntime-swift-package-manager/blob/1.24.2/LICENSE
+  Runtime notices: https://github.com/microsoft/onnxruntime/blob/v1.24.2/ThirdPartyNotices.txt
+
+Demucs / htdemucs
+  Bundled artifact: naqi/Resources/Models/htdemucs_s26_f32.onnx
+  Origin: a deterministic fp16-to-fp32 conversion of the released htdemucs
+  ONNX checkpoint with a fixed 2.6-second input segment.
+  Terms stated upstream: the Demucs project is released under the MIT License.
+  Upstream does not state separate terms for the released checkpoint; confirm
+  the checkpoint and training-data terms before any redistribution.
+  Source: https://github.com/facebookresearch/demucs
+  License: https://github.com/facebookresearch/demucs/blob/main/LICENSE
+
+nsfw_model, MobileNetV2 1.4-224
+  Bundled artifact: naqi/Resources/Models/nsfw_mnv2_140_f32_static.onnx
+  Origin: converted from GantMan/nsfw_model release 1.2.0 with batch fixed to 1.
+  Terms: MIT License except where upstream separately identifies third-party
+  copyrighted material under different terms.
+  Source: https://github.com/GantMan/nsfw_model
+  License: https://github.com/GantMan/nsfw_model/blob/master/LICENSE.md
+
+InsightFace buffalo_l, genderage
+  Bundled artifact: naqi/Resources/Models/genderage_static.onnx
+  Origin: the genderage model from InsightFace's buffalo_l model pack with
+  batch fixed to 1.
+  Terms: InsightFace source code is MIT, but its pretrained model weights are
+  available for non-commercial research purposes only. Commercial use needs a
+  separate licence from InsightFace. Do not redistribute this model based on
+  Naqi's licence.
+  Source and model terms: https://github.com/deepinsight/insightface/tree/master/model_zoo
+  Code license: https://github.com/deepinsight/insightface/blob/master/LICENSE
+
+TensorFlow Models / YAMNet
+  Bundled artifact: naqi/Resources/Models/yamnet.onnx
+  Origin: an ONNX conversion of the pretrained YAMNet weights published by the
+  TensorFlow Models project.
+  Terms stated upstream: YAMNet code is Apache License 2.0. The upstream README
+  publishes the pretrained weight download but states no separate terms for
+  those weights; confirm their terms before any redistribution.
+  Source: https://github.com/tensorflow/models/tree/master/research/audioset/yamnet
+  Code license: https://github.com/tensorflow/models/blob/master/LICENSE
+  Weight source: https://storage.googleapis.com/audioset/yamnet.h5
+
+Ultralytics YOLO11n-seg / Core ML export
+  Bundled artifact: naqi/Resources/Models/yolo11n_seg.mlmodelc
+  Origin: yolo11n-seg.pt from Ultralytics assets v8.4.0, exported with
+  Ultralytics 8.4.29, PyTorch 2.7.0 and coremltools 9.0 as MLProgram FP16,
+  RGB 640x640, half=True, nms=False, dynamic=False; compiled for iOS 18.
+  The generated model and upstream export code state AGPL-3.0 terms.
+  Ultralytics also offers a separate enterprise license. Naqi's license does
+  not replace these terms. The Python export runtime is not shipped in the app.
+  Weight source: https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11n-seg.pt
+  Weight SHA-256: 55ed65c56c91713d23e8402371c6c49a6fd84f257f7dce452e8d70e41dcbe152
+  Code source: https://github.com/ultralytics/ultralytics/tree/v8.4.29
+  License: https://github.com/ultralytics/ultralytics/blob/v8.4.29/LICENSE
+  Export and executable-graph/weight hashes: scripts/fetch-person-model.py
+
+yt-dlp
+  Fetched at runtime from GitHub Releases into Application Support (not bundled).
+  Terms: Unlicense (public domain equivalent).
+  Source: https://github.com/yt-dlp/yt-dlp
+  License: https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE
+
+Apple system frameworks are supplied by Apple as part of the platform and are
+not relicensed by this notice.

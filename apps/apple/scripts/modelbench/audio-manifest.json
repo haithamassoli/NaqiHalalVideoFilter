@@ -1,0 +1,169 @@
+{
+  "rate": 44100,
+  "purpose": "Small screening controls, not representative corpus or listening-study claim",
+  "source_stems": "PyTorch hybrid_demucs tutorial original 150\u2013155 s isolated reference segments; treated as supplied reference stems, not as a new annotated corpus",
+  "provenance": [
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/reference-originals/english.wav",
+      "url": "https://download.pytorch.org/torchaudio/tutorial-assets/Lab41-SRI-VOiCES-src-sp0307-ch127535-sg0042.wav",
+      "sha256": "c65fcd726d6b08c82c1e5dc7558f863cd8d483e3ed2f4a7bcf271dc1865ada14"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/reference-originals/recitation.mp3",
+      "url": "https://everyayah.com/data/Alafasy_128kbps/001001.mp3",
+      "sha256": "8808f3fc313d9df87b6090ee9efc8c11859da58b0100ad92621c5ee9a93d7280"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/reference-originals/vocals.wav",
+      "url": "https://download.pytorch.org/torchaudio/tutorial-assets/hdemucs_vocals_segment.wav",
+      "sha256": "11bd5e7ae81a3984c8e7e9e56cb3ea9116bb874d9893b040d71657e47ff7d8b8"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/reference-originals/drums.wav",
+      "url": "https://download.pytorch.org/torchaudio/tutorial-assets/hdemucs_drums_segment.wav",
+      "sha256": "c600f7732fb7cb2b08d582156f99886a21ba068c6b397a412c1a9f26613f3de9"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/reference-originals/bass.wav",
+      "url": "https://download.pytorch.org/torchaudio/tutorial-assets/hdemucs_bass_segment.wav",
+      "sha256": "d262ddfd87869f464a1d417f9db66ff409ac60ff71078c885df35f9af4ee7c83"
+    },
+    {
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/reference-originals/other.wav",
+      "url": "https://download.pytorch.org/torchaudio/tutorial-assets/hdemucs_other_segment.wav",
+      "sha256": "739b76a7c1e0cee3dd34a627ba3cdd98392070088ea7c1c0fb82d407795d0d85"
+    }
+  ],
+  "items": [
+    {
+      "name": "english-clean",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/english-clean.wav",
+      "sha256": "3e652ebd734e704e5ebeeadf27e77a2bd147c285e59d1be288a00680ba1f1bbd",
+      "frames": 149940,
+      "seconds": 3.4,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "english",
+      "instruments": false
+    },
+    {
+      "name": "english-instrumental",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/english-instrumental.wav",
+      "sha256": "22b6a367bf6f085e5529edb43481024124854682d36c6dff2821b0a660eb4760",
+      "frames": 149940,
+      "seconds": 3.4,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "instrumental",
+      "instruments": true
+    },
+    {
+      "name": "english-mix0db",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/english-mix0db.wav",
+      "sha256": "f54cb399fa5d596677fc7ed5aa22fc84d9e9593d24eb47eb571fa25eea502618",
+      "frames": 149940,
+      "seconds": 3.4,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "english",
+      "instruments": true,
+      "reference": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/english-clean.wav",
+      "instrumental": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/english-instrumental.wav",
+      "vocal_to_music_rms_db": 0
+    },
+    {
+      "name": "recitation-clean",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/recitation-clean.wav",
+      "sha256": "aaade7d151d9759b9aaa2bad4d70235659005c41da08e1ead33ea064629b7805",
+      "frames": 265972,
+      "seconds": 6.0311111111111115,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "recitation",
+      "instruments": false
+    },
+    {
+      "name": "recitation-instrumental",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/recitation-instrumental.wav",
+      "sha256": "136f4fdb6d9468ecb37af3e516c41b3b9270f9e7b2734adc9cac5619a4abe915",
+      "frames": 265972,
+      "seconds": 6.0311111111111115,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "instrumental",
+      "instruments": true
+    },
+    {
+      "name": "recitation-mix0db",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/recitation-mix0db.wav",
+      "sha256": "846f6669137cd1ad990cfa690fd431b95a5fe94f14a1eca965953c9c27654de1",
+      "frames": 265972,
+      "seconds": 6.0311111111111115,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "recitation",
+      "instruments": true,
+      "reference": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/recitation-clean.wav",
+      "instrumental": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/recitation-instrumental.wav",
+      "vocal_to_music_rms_db": 0
+    },
+    {
+      "name": "singing-clean",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/singing-clean.wav",
+      "sha256": "1c648d8d472a57a3e9383233c6a62d888c2f843e4b57fd66cfe1d0a25d51f257",
+      "frames": 220500,
+      "seconds": 5.0,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "singing",
+      "instruments": false
+    },
+    {
+      "name": "singing-instrumental",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/singing-instrumental.wav",
+      "sha256": "84ee9d502a6b5ff66b3f9a9ac73ad0816be702e8014d53fa3e1e659d02201f7d",
+      "frames": 220500,
+      "seconds": 5.0,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "instrumental",
+      "instruments": true
+    },
+    {
+      "name": "singing-mix0db",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/singing-mix0db.wav",
+      "sha256": "1cf83f73d6d8bb566c8a188362604da7adc7e733976c429837ec0d7568d712d7",
+      "frames": 220500,
+      "seconds": 5.0,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "singing",
+      "instruments": true,
+      "reference": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/singing-clean.wav",
+      "instrumental": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/singing-instrumental.wav",
+      "vocal_to_music_rms_db": 0
+    },
+    {
+      "name": "silence",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/silence.wav",
+      "sha256": "13dfa2baa291539ae8ee43f20ee39fd3bc6343f8cf7273249875fd819d08862d",
+      "frames": 44100,
+      "seconds": 1.0,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "silence",
+      "instruments": false
+    },
+    {
+      "name": "partial",
+      "file": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/audio/controls/partial.wav",
+      "sha256": "4423e448f6b6c0c2dc97e69c3a83f0dc62ab166f20e40533a3ed9c3e84ffd152",
+      "frames": 137,
+      "seconds": 0.0031065759637188208,
+      "sample_rate": 44100,
+      "channels": 2,
+      "kind": "short-silence",
+      "instruments": false
+    }
+  ]
+}

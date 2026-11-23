@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- An app extension is scanned as its own binary, so it needs its own
+	     manifest even though the containing app already ships one. This
+	     extension collects nothing, tracks nothing and has no networking: it
+	     copies the shared video into the App Group inbox and writes a manifest
+	     beside it.
+
+	     Declared because the symbol is IN THIS BINARY, not because the code
+	     path is hot: `NaqiShared/AppGroup.swift` compiles into all three
+	     targets and calls `UserDefaults(suiteName:)`. ShareViewController
+	     itself never reads options — a shared-in video inherits the app's
+	     last-used settings — but the scanner works on symbols, and a missing
+	     required-reason declaration is an automatic rejection. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<!-- App Group suite shared with the containing app. -->
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -1,0 +1,107 @@
+{
+  "short1-final-person-gateoff.mp4": {
+    "classification_rule": "at least two agreeing votes; otherwise unknown",
+    "final_implementation": true,
+    "scene_gate": true,
+    "valid_export": true
+  },
+  "short1-final-person-sceneoff-everyone.mp4": {
+    "classification_rule": "at least two agreeing votes; otherwise unknown",
+    "final_implementation": true,
+    "scene_gate": false,
+    "valid_export": true
+  },
+  "short1-final-person-sceneoff-men.mp4": {
+    "classification_rule": "at least two agreeing votes; otherwise unknown",
+    "final_implementation": true,
+    "scene_gate": false,
+    "valid_export": true
+  },
+  "short1-final-person-sceneoff-women.mp4": {
+    "classification_rule": "at least two agreeing votes; otherwise unknown",
+    "final_implementation": true,
+    "scene_gate": false,
+    "valid_export": true
+  },
+  "short1-new-face-gateon.mp4": {
+    "decoded_movie_timestamps_verified_exact": true,
+    "measurement_state": "initial cold smoke; verifier used raw media PTS before edit-list mapping fix",
+    "performance_row_recorded": false
+  },
+  "short1-new-person-gateoff-pool.mp4": {
+    "classification_rule": "before requiring two agreeing votes",
+    "final_implementation": false,
+    "valid_export": true
+  },
+  "short1-new-person-gateoff.mp4": {
+    "classification_rule": "before requiring two agreeing votes",
+    "final_implementation": false,
+    "final_performance_table": false,
+    "measurement_state": "before PersonDetector autoreleasepool fix",
+    "valid_export": true
+  },
+  "short1-old-face-gateon.mp4": {
+    "fair_cached_comparison": false,
+    "htdemucs_model_load_ms": 26223,
+    "measurement_state": "first observed Core ML compile"
+  },
+  "short1-person-sceneoff-everyone.mp4": {
+    "classification_rule": "before requiring two agreeing votes",
+    "final_implementation": false,
+    "valid_export": true
+  },
+  "short1-person-sceneoff-men.mp4": {
+    "classification_rule": "before requiring two agreeing votes",
+    "final_implementation": false,
+    "valid_export": true
+  },
+  "short1-person-sceneoff-women.mp4": {
+    "classification_rule": "before requiring two agreeing votes",
+    "final_implementation": false,
+    "valid_export": true
+  },
+  "short2-final-person-gateoff.mp4": {
+    "classification_rule": "at least two agreeing votes; otherwise unknown",
+    "final_implementation": true,
+    "scene_gate": true,
+    "valid_export": true
+  },
+  "short2-final-person-sceneoff-everyone.mp4": {
+    "classification_rule": "at least two agreeing votes; otherwise unknown",
+    "final_implementation": true,
+    "scene_gate": false,
+    "valid_export": true
+  },
+  "short2-final-person-sceneoff-men.mp4": {
+    "classification_rule": "at least two agreeing votes; otherwise unknown",
+    "final_implementation": true,
+    "scene_gate": false,
+    "valid_export": true
+  },
+  "short2-final-person-sceneoff-women.mp4": {
+    "classification_rule": "at least two agreeing votes; otherwise unknown",
+    "final_implementation": true,
+    "scene_gate": false,
+    "valid_export": true
+  },
+  "short2-new-person-gateoff-pool.mp4": {
+    "classification_rule": "before requiring two agreeing votes",
+    "final_implementation": false,
+    "valid_export": true
+  },
+  "short2-person-sceneoff-everyone.mp4": {
+    "classification_rule": "before requiring two agreeing votes",
+    "final_implementation": false,
+    "valid_export": true
+  },
+  "short2-person-sceneoff-men.mp4": {
+    "classification_rule": "before requiring two agreeing votes",
+    "final_implementation": false,
+    "valid_export": true
+  },
+  "short2-person-sceneoff-women.mp4": {
+    "classification_rule": "before requiring two agreeing votes",
+    "final_implementation": false,
+    "valid_export": true
+  }
+}

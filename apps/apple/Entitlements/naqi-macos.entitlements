@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- A sandboxed macOS app cannot even ask for Photos without this; iOS grants
+	     it from the usage strings alone, which is why it was only missing here. -->
+	<key>com.apple.security.personal-information.photos-library</key>
+	<true/>
+	<!-- The "choose a folder instead" fallback and picking a source video. -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<!-- No app-group here on purpose: the share extension and widget are
+	     iOS-only, so nothing shares the container on macOS, and adding the group
+	     would force a provisioning profile that enumerates registered Macs.
+	     AppGroup.container/defaults already return nil safely without it. -->
+	<!-- Link download: GitHub (yt-dlp updates) and the sites the user pastes. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- yt-dlp_macos is a PyInstaller binary we download, not a signed helper. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+</dict>
+</plist>

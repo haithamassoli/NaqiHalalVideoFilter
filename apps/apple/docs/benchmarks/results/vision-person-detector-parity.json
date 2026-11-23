@@ -1,0 +1,499 @@
+{
+  "scope": "production PersonDetector RGB letterbox+headdecode, four image controls plus two at four rotations; not a full-video coverage guarantee",
+  "rows": [
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0001.png",
+      "rotation": 0,
+      "native_boxes": [
+        [
+          0.625,
+          70.5,
+          345.375,
+          573.5
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.001736111111111111,
+          0.11015625,
+          0.959375,
+          0.89609375
+        ]
+      ],
+      "matched_iou": [
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "input_sha256": "f3af223866366de3efbd15814acb8e12b3adef6791ea5b2bcef65376f98e1ec5"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0001.png",
+      "rotation": 90,
+      "native_boxes": [
+        [
+          0.625,
+          70.5,
+          345.375,
+          573.5
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.001736111111111111,
+          0.11015625,
+          0.959375,
+          0.89609375
+        ]
+      ],
+      "matched_iou": [
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "input_sha256": "f3af223866366de3efbd15814acb8e12b3adef6791ea5b2bcef65376f98e1ec5"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0001.png",
+      "rotation": 180,
+      "native_boxes": [
+        [
+          0.625,
+          70.5,
+          345.375,
+          573.5
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.001736111111111111,
+          0.11015625,
+          0.959375,
+          0.89609375
+        ]
+      ],
+      "matched_iou": [
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "input_sha256": "f3af223866366de3efbd15814acb8e12b3adef6791ea5b2bcef65376f98e1ec5"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0001.png",
+      "rotation": 270,
+      "native_boxes": [
+        [
+          0.625,
+          70.5,
+          345.375,
+          573.5
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.001736111111111111,
+          0.11015625,
+          0.959375,
+          0.89609375
+        ]
+      ],
+      "matched_iou": [
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "input_sha256": "f3af223866366de3efbd15814acb8e12b3adef6791ea5b2bcef65376f98e1ec5"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "rotation": 0,
+      "native_boxes": [
+        [
+          102.625,
+          239.8125,
+          254.375,
+          422.6875
+        ],
+        [
+          106.5625,
+          455.1875,
+          254.4375,
+          636.8125
+        ],
+        [
+          103.9375,
+          29.6875,
+          256.5625,
+          209.0625
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.28506944444444443,
+          0.37470703125,
+          0.7065972222222222,
+          0.66044921875
+        ],
+        [
+          0.2960069444444444,
+          0.71123046875,
+          0.7067708333333333,
+          0.99501953125
+        ],
+        [
+          0.2887152777777778,
+          0.04638671875,
+          0.7126736111111112,
+          0.32666015625
+        ]
+      ],
+      "matched_iou": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "input_sha256": "84b16ac0b1af78c2465da4492e9de5638d0d3132f9392e847c91f58fb739b0e1"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "rotation": 90,
+      "native_boxes": [
+        [
+          102.625,
+          239.8125,
+          254.375,
+          422.6875
+        ],
+        [
+          106.5625,
+          455.1875,
+          254.4375,
+          636.8125
+        ],
+        [
+          103.9375,
+          29.6875,
+          256.5625,
+          209.0625
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.28506944444444443,
+          0.37470703125,
+          0.7065972222222222,
+          0.66044921875
+        ],
+        [
+          0.2960069444444444,
+          0.71123046875,
+          0.7067708333333333,
+          0.99501953125
+        ],
+        [
+          0.2887152777777778,
+          0.04638671875,
+          0.7126736111111112,
+          0.32666015625
+        ]
+      ],
+      "matched_iou": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "input_sha256": "84b16ac0b1af78c2465da4492e9de5638d0d3132f9392e847c91f58fb739b0e1"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "rotation": 180,
+      "native_boxes": [
+        [
+          102.625,
+          239.8125,
+          254.375,
+          422.6875
+        ],
+        [
+          106.5625,
+          455.1875,
+          254.4375,
+          636.8125
+        ],
+        [
+          103.9375,
+          29.6875,
+          256.5625,
+          209.0625
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.28506944444444443,
+          0.37470703125,
+          0.7065972222222222,
+          0.66044921875
+        ],
+        [
+          0.2960069444444444,
+          0.71123046875,
+          0.7067708333333333,
+          0.99501953125
+        ],
+        [
+          0.2887152777777778,
+          0.04638671875,
+          0.7126736111111112,
+          0.32666015625
+        ]
+      ],
+      "matched_iou": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "input_sha256": "84b16ac0b1af78c2465da4492e9de5638d0d3132f9392e847c91f58fb739b0e1"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "rotation": 270,
+      "native_boxes": [
+        [
+          102.625,
+          239.8125,
+          254.375,
+          422.6875
+        ],
+        [
+          106.5625,
+          455.1875,
+          254.4375,
+          636.8125
+        ],
+        [
+          103.9375,
+          29.6875,
+          256.5625,
+          209.0625
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.28506944444444443,
+          0.37470703125,
+          0.7065972222222222,
+          0.66044921875
+        ],
+        [
+          0.2960069444444444,
+          0.71123046875,
+          0.7067708333333333,
+          0.99501953125
+        ],
+        [
+          0.2887152777777778,
+          0.04638671875,
+          0.7126736111111112,
+          0.32666015625
+        ]
+      ],
+      "matched_iou": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "input_sha256": "84b16ac0b1af78c2465da4492e9de5638d0d3132f9392e847c91f58fb739b0e1"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0001.png",
+      "rotation": 0,
+      "native_boxes": [
+        [
+          0.625,
+          70.5,
+          345.375,
+          573.5
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.001736111111111111,
+          0.11015625,
+          0.959375,
+          0.89609375
+        ]
+      ],
+      "matched_iou": [
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "kind": "initial four source-image controls",
+      "input_sha256": "f3af223866366de3efbd15814acb8e12b3adef6791ea5b2bcef65376f98e1ec5"
+    },
+    {
+      "video": "-dQJ3djthDc",
+      "frame": "0037.png",
+      "rotation": 0,
+      "native_boxes": [
+        [
+          3.75,
+          5.5,
+          360,
+          638.5
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.010416666666666666,
+          0.00859375,
+          1.0,
+          0.99765625
+        ]
+      ],
+      "matched_iou": [
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "kind": "initial four source-image controls",
+      "input_sha256": "7865844b64f58b959550df6e39af619ffe2d869d2e2f37e7a2aca369c02822e0"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0018.png",
+      "rotation": 0,
+      "native_boxes": [
+        [
+          66.375,
+          231.5,
+          233.125,
+          639.5
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.184375,
+          0.36171875,
+          0.6475694444444444,
+          0.99921875
+        ]
+      ],
+      "matched_iou": [
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "kind": "initial four source-image controls",
+      "input_sha256": "122f8ead07d0a402e16cafcb655f851f4c58cb1cb766c38cdca32fadeecc5d29"
+    },
+    {
+      "video": "rX6wXhLqOIQ",
+      "frame": "0053.png",
+      "rotation": 0,
+      "native_boxes": [
+        [
+          102.625,
+          239.8125,
+          254.375,
+          422.6875
+        ],
+        [
+          106.5625,
+          455.1875,
+          254.4375,
+          636.8125
+        ],
+        [
+          103.9375,
+          29.6875,
+          256.5625,
+          209.0625
+        ]
+      ],
+      "reference_boxes": [
+        [
+          0.28506944444444443,
+          0.37470703125,
+          0.7065972222222222,
+          0.66044921875
+        ],
+        [
+          0.2960069444444444,
+          0.71123046875,
+          0.7067708333333333,
+          0.99501953125
+        ],
+        [
+          0.2887152777777778,
+          0.04638671875,
+          0.7126736111111112,
+          0.32666015625
+        ]
+      ],
+      "matched_iou": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "compute": "native CPU+GPU",
+      "kind": "initial four source-image controls",
+      "input_sha256": "84b16ac0b1af78c2465da4492e9de5638d0d3132f9392e847c91f58fb739b0e1"
+    }
+  ],
+  "command_scope": "Swift6 production PersonDetector.swift compiled with temporary SampledFrame/Models stubs; image pixels prepared via CIImage then native model. Original decoded NV12 video paths covered separately by integrationQA.",
+  "build_command": "swiftc -O -parse-as-library -swift-version 6 naqi/Analyze/PersonDetector.swift build.noindex/person-detector-check/harness.swift -o build.noindex/person-detector-check/harness",
+  "run_command": "build.noindex/person-detector-check/harness naqi/Resources/Models/yolo11n_seg.mlmodelc <360x640 PNG frames>",
+  "asset_provenance": {
+    "checkpoint_url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11n-seg.pt",
+    "checkpoint_sha256": "55ed65c56c91713d23e8402371c6c49a6fd84f257f7dce452e8d70e41dcbe152",
+    "canonical_graph_sha256": "63c21165eb51d3f6c308df1a71667e2faa55c7b6b3e00117129b50c1b019d446",
+    "coreml_weights_sha256": "8a574d6ee37d277a84103a5b50e6a25cf36defc08aaaefa999b0fc9583d05db7",
+    "export": {
+      "ultralytics": "8.4.29",
+      "torch": "2.7.0",
+      "coremltools": "9.0",
+      "numpy": "2.2.6",
+      "image": [
+        640,
+        640
+      ],
+      "half": true,
+      "nms": false,
+      "dynamic": false
+    },
+    "compiled_for": "iOS18",
+    "compiled_asset": "naqi/Resources/Models/yolo11n_seg.mlmodelc",
+    "compiled_files": [
+      {
+        "file": "analytics/coremldata.bin",
+        "sha256": "7b17191615ece78b47b8d60b5c6feabdaacfa52a1f032ce8a30aaa2a5938cf05"
+      },
+      {
+        "file": "coremldata.bin",
+        "sha256": "579c106a0ee2a61119ba95b68adbd9ff101b1aea69e84e5d7997a44f801ebe91"
+      },
+      {
+        "file": "metadata.json",
+        "sha256": "3225473900b4e377d5ae3b7d17cd5a914bff7b059c85fd485ef98afbffc8b165"
+      },
+      {
+        "file": "model.mil",
+        "sha256": "e49a77263834203479e9e3c986f35c3a00342abc2e2481c6b2830584ffc1c78b"
+      },
+      {
+        "file": "weights/weight.bin",
+        "sha256": "8a574d6ee37d277a84103a5b50e6a25cf36defc08aaaefa999b0fc9583d05db7"
+      }
+    ]
+  },
+  "source_sha256_before_frame_autoreleasepool": "e840213863245e42e18ebb1335a36654345e99331791cf9b5b572a4711aee114",
+  "post_memory_fix_scope": "Samegraph/preprocess/decoder; addedper-frameautoreleasepool. FullShort1EDLcomparisonbefore/afterfix identical in integrationQA; sourcehashinreviewprovenance."
+}

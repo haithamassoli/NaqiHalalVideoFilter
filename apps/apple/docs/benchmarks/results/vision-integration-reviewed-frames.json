@@ -1,0 +1,810 @@
+[
+  {
+    "video": "-dQJ3djthDc",
+    "timestamp_s": 0.5,
+    "active_tracks": [
+      {
+        "id": 1,
+        "classification": "female",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.011859375,
+          1,
+          0.99126565
+        ]
+      }
+    ],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/-dQJ3djthDc_000500_compare.jpg"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "timestamp_s": 5.3,
+    "active_tracks": [
+      {
+        "id": 1,
+        "classification": "female",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.073296875,
+          1,
+          0.9345156
+        ]
+      },
+      {
+        "id": 3,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.077875,
+          0.70749307,
+          0.91196877
+        ]
+      },
+      {
+        "id": 4,
+        "classification": "male",
+        "faceOnly": true,
+        "rect": [
+          0.207246,
+          0.2347196,
+          0.6184195,
+          0.4660047
+        ]
+      }
+    ],
+    "scene_full_frame": true,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/-dQJ3djthDc_005300_compare.jpg"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "timestamp_s": 5.5,
+    "active_tracks": [
+      {
+        "id": 4,
+        "classification": "male",
+        "faceOnly": true,
+        "rect": [
+          0.19534867,
+          0.23022461,
+          0.6290509,
+          0.50091547
+        ]
+      },
+      {
+        "id": 9,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.05971875,
+          1,
+          1
+        ]
+      }
+    ],
+    "scene_full_frame": true,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/-dQJ3djthDc_005500_compare.jpg"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "timestamp_s": 5.75,
+    "active_tracks": [
+      {
+        "id": 9,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.056203123,
+          1,
+          1
+        ]
+      },
+      {
+        "id": 10,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.06717187,
+          0.710125,
+          0.9836094
+        ]
+      },
+      {
+        "id": 11,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.075625,
+          0.47818056,
+          0.9571875
+        ]
+      },
+      {
+        "id": 12,
+        "classification": "male",
+        "faceOnly": true,
+        "rect": [
+          0.22618273,
+          0.23578897,
+          0.65424263,
+          0.47657266
+        ]
+      }
+    ],
+    "scene_full_frame": true,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/-dQJ3djthDc_005750_compare.jpg"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "timestamp_s": 8.5,
+    "active_tracks": [
+      {
+        "id": 20,
+        "classification": "female",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.07340625,
+          1,
+          1
+        ]
+      },
+      {
+        "id": 22,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.32608333,
+          0,
+          1,
+          0.53103125
+        ]
+      }
+    ],
+    "scene_full_frame": true,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/-dQJ3djthDc_008500_compare.jpg"
+  },
+  {
+    "video": "-dQJ3djthDc",
+    "timestamp_s": 36.5,
+    "active_tracks": [
+      {
+        "id": 50,
+        "classification": "female",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    ],
+    "scene_full_frame": true,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/-dQJ3djthDc_036500_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 0.5,
+    "active_tracks": [
+      {
+        "id": 1,
+        "classification": "female",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.17370312,
+          1,
+          1
+        ]
+      }
+    ],
+    "scene_full_frame": true,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_000500_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 8.5,
+    "active_tracks": [],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_008500_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 11.0,
+    "active_tracks": [
+      {
+        "id": 5,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.06990278,
+          0.5470918,
+          0.16204166,
+          0.75525194
+        ]
+      },
+      {
+        "id": 6,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.03322222,
+          0.18146876,
+          1,
+          1
+        ]
+      },
+      {
+        "id": 7,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.5113047,
+          1,
+          1
+        ]
+      }
+    ],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_011000_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 11.15,
+    "active_tracks": [
+      {
+        "id": 5,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.06990278,
+          0.5470918,
+          0.16204166,
+          0.75525194
+        ]
+      },
+      {
+        "id": 12,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.332125,
+          0.2339336,
+          0.742875,
+          0.3363789
+        ]
+      },
+      {
+        "id": 13,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.44096875,
+          1,
+          1
+        ]
+      },
+      {
+        "id": 14,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.49735937,
+          0.790875,
+          1
+        ]
+      },
+      {
+        "id": 15,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.21053125,
+          0.96208334,
+          1
+        ]
+      },
+      {
+        "id": 16,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.14769444,
+          0.153875,
+          1,
+          1
+        ]
+      },
+      {
+        "id": 17,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.118930556,
+          0.15103126,
+          0.96023613,
+          1
+        ]
+      },
+      {
+        "id": 18,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.017069444,
+          0.50197655,
+          0.78431946,
+          1
+        ]
+      },
+      {
+        "id": 19,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.47096094,
+          1,
+          1
+        ]
+      }
+    ],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_011150_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 17.5,
+    "active_tracks": [
+      {
+        "id": 39,
+        "classification": "female",
+        "faceOnly": false,
+        "rect": [
+          0.12629166,
+          0.28190625,
+          0.7264861,
+          1
+        ]
+      },
+      {
+        "id": 43,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.9379944,
+          0.40478358,
+          1,
+          0.49590296
+        ]
+      }
+    ],
+    "scene_full_frame": true,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_017500_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 18.5,
+    "active_tracks": [
+      {
+        "id": 49,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.7527335,
+          0.37412402,
+          0.82921094,
+          0.48837596
+        ]
+      },
+      {
+        "id": 48,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.30829862,
+          0.35426173,
+          0.5903125,
+          0.82386327
+        ]
+      }
+    ],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_018500_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 20.5,
+    "active_tracks": [
+      {
+        "id": 48,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.20761806,
+          0.30057812,
+          0.6868264,
+          1
+        ]
+      }
+    ],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_020500_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 28.5,
+    "active_tracks": [
+      {
+        "id": 90,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    ],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_028500_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 36.5,
+    "active_tracks": [],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_036500_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 38.5,
+    "active_tracks": [
+      {
+        "id": 145,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.11030382,
+          0.73139256,
+          0.15497395,
+          0.8061074
+        ]
+      },
+      {
+        "id": 152,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.006144531,
+          0.73552835,
+          0.056008246,
+          0.8050967
+        ]
+      },
+      {
+        "id": 153,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.9412813,
+          0.7258473,
+          0.9795731,
+          0.77965695
+        ]
+      },
+      {
+        "id": 149,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.07228819,
+          0.73224026,
+          0.12632291,
+          0.80525976
+        ]
+      },
+      {
+        "id": 143,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.049145833,
+          0.73050195,
+          0.08488195,
+          0.8023105
+        ]
+      },
+      {
+        "id": 157,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.19793966,
+          0.7298867,
+          0.231227,
+          0.79745704
+        ]
+      },
+      {
+        "id": 156,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.16823047,
+          0.7352705,
+          0.2109362,
+          0.8014482
+        ]
+      },
+      {
+        "id": 160,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.21367146,
+          0.7081325,
+          0.27787083,
+          0.8055452
+        ]
+      },
+      {
+        "id": 161,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.7957526,
+          0.7171172,
+          0.8389696,
+          0.8086641
+        ]
+      },
+      {
+        "id": 174,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.75025016,
+          0.71477735,
+          0.810903,
+          0.81334764
+        ]
+      },
+      {
+        "id": 175,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.12752691,
+          0.73221,
+          0.1662231,
+          0.80529004
+        ]
+      },
+      {
+        "id": 169,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.75801826,
+          0.71636033,
+          0.82114846,
+          0.8094209
+        ]
+      },
+      {
+        "id": 172,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.26121095,
+          0.72208494,
+          0.30615017,
+          0.80291504
+        ]
+      },
+      {
+        "id": 176,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.22998698,
+          0.7333838,
+          0.26792967,
+          0.7978662
+        ]
+      },
+      {
+        "id": 178,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.13957378,
+          0.73254,
+          0.17084289,
+          0.8057412
+        ]
+      },
+      {
+        "id": 177,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.67986286,
+          0.71727246,
+          0.7368038,
+          0.81554
+        ]
+      },
+      {
+        "id": 180,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.7078585,
+          0.7218164,
+          0.7421415,
+          0.8102148
+        ]
+      },
+      {
+        "id": 179,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.73641235,
+          0.7196484,
+          0.77747655,
+          0.8092578
+        ]
+      }
+    ],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_038500_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 48.5,
+    "active_tracks": [
+      {
+        "id": 421,
+        "classification": "unknown",
+        "faceOnly": true,
+        "rect": [
+          0.39327615,
+          0.46754587,
+          0.59628195,
+          0.5791898
+        ]
+      },
+      {
+        "id": 422,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.3525902,
+          1,
+          1
+        ]
+      },
+      {
+        "id": 424,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0,
+          0.50936717,
+          0.8956389,
+          1
+        ]
+      },
+      {
+        "id": 426,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.2855764,
+          0.44754884,
+          0.6158125,
+          0.6297949
+        ]
+      },
+      {
+        "id": 425,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.7712847,
+          0.53546876,
+          1,
+          1
+        ]
+      }
+    ],
+    "scene_full_frame": true,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_048500_compare.jpg"
+  },
+  {
+    "video": "rX6wXhLqOIQ",
+    "timestamp_s": 52.5,
+    "active_tracks": [
+      {
+        "id": 431,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.23774305,
+          0.012363281,
+          0.7608681,
+          0.35990235
+        ]
+      },
+      {
+        "id": 432,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.23448612,
+          0.34078124,
+          0.7571806,
+          0.694375
+        ]
+      },
+      {
+        "id": 433,
+        "classification": "unknown",
+        "faceOnly": false,
+        "rect": [
+          0.24580556,
+          0.6767578,
+          0.75558335,
+          1
+        ]
+      }
+    ],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/rX6wXhLqOIQ_052500_compare.jpg"
+  },
+  {
+    "video": "EnBXjdgQ9X0",
+    "timestamp_s": 0.5,
+    "active_tracks": [],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/EnBXjdgQ9X0_000500_compare.jpg"
+  },
+  {
+    "video": "EnBXjdgQ9X0",
+    "timestamp_s": 30.0,
+    "active_tracks": [],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/EnBXjdgQ9X0_030000_compare.jpg"
+  },
+  {
+    "video": "EnBXjdgQ9X0",
+    "timestamp_s": 90.0,
+    "active_tracks": [],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/EnBXjdgQ9X0_090000_compare.jpg"
+  },
+  {
+    "video": "EnBXjdgQ9X0",
+    "timestamp_s": 150.0,
+    "active_tracks": [],
+    "scene_full_frame": false,
+    "comparison": "/Users/goldentik/Documents/naqi/qa-assets/modelbench/integration/vision-review/EnBXjdgQ9X0_150000_compare.jpg"
+  }
+]

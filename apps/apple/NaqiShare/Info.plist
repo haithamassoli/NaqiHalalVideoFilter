@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.webmproject.webm</string>
+			<key>UTTypeDescription</key>
+			<string>WebM media</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.movie</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array><string>webm</string></array>
+				<key>public.mime-type</key>
+				<array><string>video/webm</string><string>audio/webm</string></array>
+			</dict>
+		</dict>
+	</array>
+	<!-- Thmanyah Sans (NaqiShared/Fonts, flattened into the bundle root). -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>thmanyahsans-Regular.otf</string>
+		<string>thmanyahsans-Medium.otf</string>
+		<string>thmanyahsans-Bold.otf</string>
+	</array>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<!-- Video and audio, and up to ten of them: "multiple shares run in
+			     order" is the share-in promise, and the app's queue is serial.
+
+			     A predicate rather than the NSExtensionActivationSupports*
+			     dictionary, because that dictionary has no audio key at all —
+			     Movie/Image/File/Text/WebURL/WebPage/Attachments is the whole
+			     list, and NSExtensionActivationSupportsFileWithMaxCount would
+			     put us in the share sheet for PDFs. The ">= 1 AND <= 10" pair
+			     keeps the cap the dictionary form gave for free.
+
+			     Never BETWEEN: NSPredicate evaluates it fine (so ExtensionTests
+			     passed), but the share sheet's own matcher rejects the
+			     WHOLE rule over it, so a Safari link, which only needs the
+			     URL branch, lost Naqi too. Checked on the iOS 26 simulator:
+			     BETWEEN hides Naqi, this form shows it.
+
+			     Silent-failure warning: a typo here does not fail the build and
+			     does not log — the extension simply never appears in the share
+			     sheet. `ExtensionTests.shareActivationRule` reads this exact
+			     string back out of the built .appex and evaluates it against a
+			     mock attachment graph, which is the only guard there is.
+
+			     Outer count is ">= 1", not "== 1": an app sharing [title, URL]
+			     can hand over one NSExtensionItem per activity item, both
+			     qualify, and "== 1" hid Naqi from that app's sheet. -->
+			<key>NSExtensionActivationRule</key>
+			<string>SUBQUERY (
+				extensionItems,
+				$item,
+				(
+					SUBQUERY (
+						$item.attachments,
+						$att,
+						ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.movie"
+						|| ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audio"
+						|| ANY $att.registeredTypeIdentifiers == "org.webmproject.webm"
+					).@count &gt;= 1
+					AND
+					SUBQUERY (
+						$item.attachments,
+						$att,
+						ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.movie"
+						|| ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audio"
+						|| ANY $att.registeredTypeIdentifiers == "org.webmproject.webm"
+					).@count &lt;= 10
+				)
+				OR
+				SUBQUERY (
+					$item.attachments,
+					$att,
+					ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.url"
+					|| ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.plain-text"
+				).@count &gt;= 1
+			).@count &gt;= 1</string>
+		</dict>
+		<!-- No NSExtensionMainStoryboard: an EMPTY one here is not the same as
+		     an absent one, and installd rejects the whole app for it with
+		     "does not define either" — which reads like the principal class is
+		     missing when it is present and correct. -->
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+	</dict>
+</dict>
+</plist>
