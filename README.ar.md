@@ -39,7 +39,7 @@
 | أندرويد | ملف APK من [إصدارات GitHub](https://github.com/haithamassoli/NaqiHalalVideoFilter/releases) (النسخة الكاملة)، ومتوفر أيضًا على [Google Play](https://play.google.com/store/apps/details?id=com.haithamassoli.naqi) | أندرويد 10 (API 29) فأحدث، ومعمارية arm64-v8a | [`apps/android`](apps/android) |
 | آيفون وآيباد | [App Store](https://apps.apple.com/app/id6798173054) (مجانًا) | iOS / iPadOS 18 فأحدث | [`apps/apple`](apps/apple) |
 | ماك | يُبنى من المصدر حاليًا، ونسخة موقّعة للتنزيل مخطط لها | macOS 15 فأحدث | [`apps/apple`](apps/apple) |
-| ويندوز | قيد التطوير | — | `apps/windows/` |
+| ويندوز | تجريبي قيد التطوير: يُبنى من المصدر، أو خذ ملف MSI أو الملف المضغوط المحمول غير الموقّعَين من مخرجات [سير عمل ويندوز](.github/workflows/windows.yml) | ويندوز 10 أو 11، x64 | [`apps/windows`](apps/windows) |
 
 نسخة APK على GitHub هي النسخة الكاملة لأندرويد. التنزيل بالرابط، والمشاركة إلى نقي، والمُحدِّث
 الذاتي تأتي فيها وحدها، لأن سياسات Google Play لا تسمح بها. أما الفلترة نفسها فهي واحدة في
@@ -54,11 +54,11 @@
   الطبول والباس لا يُبقيان أبدًا. ويتحقق نموذج YAMNet أولًا من وجود موسيقى، فتُتخطّى المقاطع
   الخالية منها.
 - **حجب الأشخاص** — يكتشف التطبيق الوجوه ويتتبّعها (ML Kit على أندرويد، وApple Vision على آيفون
-  وآيباد وماك)، ثم يصوّت نموذج `genderage` من InsightFace على كل مسار وجه اعتمادًا على 5 لقطات
+  وآيباد وماك، وYuNet على ويندوز)، ثم يصوّت نموذج `genderage` من InsightFace على كل مسار وجه اعتمادًا على 5 لقطات
   أمامية كحدّ أقصى. وأنت تختار **من** يُحجب: الجميع، أو النساء، أو الرجال. ويُحجب المسار على
   امتداده كاملًا، لا إطارًا بإطار.
 
-التغطية: **الوجه / الجسم / الجسم بدقة**، ويضيف أندرويد خيار **الشاشة**. الوجه هو الافتراضي. خيارا
+التغطية: **الوجه / الجسم / الجسم بدقة**، ويضيف أندرويد خيار **الشاشة**. ويقدّم ويندوز حاليًا الوجه والشاشة فقط. الوجه هو الافتراضي. خيارا
 الجسم يضيفان YOLO11n-seg بمعدل 10 إطارات في الثانية فتصبح الفلترة أبطأ: «الجسم» يحجب مستطيلًا حول
 الشخص وقد يشمل أجزاء من الخلفية، و«الجسم بدقة» يحجب حدود الشخص ويُبقي الخلفية ظاهرة.
 
@@ -110,7 +110,7 @@
 ```
 apps/android/   Android app (Kotlin, Gradle) with its scripts and design docs
 apps/apple/     iPhone, iPad and Mac app (Swift, Xcode), imported with its history
-apps/windows/   Windows app (in development)
+apps/windows/   Windows app (Kotlin, Compose Desktop; beta, in development)
 core/           pure-Kotlin logic shared by the Android and Windows apps (EDL, DSP, gates)
 models/         model export, conversion and quantization scripts, and model benchmarks
 server/         optional server for long videos (Modal)
@@ -131,6 +131,8 @@ docs/           cross-platform docs: model benchmarks and screenshots
 - **آيفون وآيباد وماك** — جهّز نماذج أندرويد أولًا، ثم نفّذ `cd apps/apple && ./scripts/fetch-models.sh`
   وافتح `naqi.xcodeproj` في Xcode. الخطوط ونموذج الأشخاص بصيغة Core ML يحتاجان خطوات إضافية. انظر
   [`apps/apple/README.ar.md`](apps/apple/README.ar.md).
+- **ويندوز** — بوجود JDK 21، نفّذ `cd apps/windows && ./gradlew :app:stageModels :app:run`. ويُبنى
+  ويعمل على macOS أيضًا. انظر [`apps/windows/README.ar.md`](apps/windows/README.ar.md).
 - **الموقع** — `cd web && pnpm install && pnpm dev`. انظر [`web/README.md`](web/README.md).
 
 ## الإصدارات

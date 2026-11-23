@@ -1,6 +1,6 @@
 # Windows app seams
 
-The contract between the packages under `app/src/main/kotlin/com/haithamassoli/naqi/desktop/`, so they can be written in parallel. The stub files hold the same signatures with `TODO()` bodies. Change a signature only together with this file and every caller.
+The contract between the packages under `app/src/main/kotlin/com/haithamassoli/naqi/desktop/`, so they could be written in parallel. Change a signature only together with this file and every caller.
 
 Port from `apps/android` (GPL-3.0, the reference). Never copy or port from `apps/apple`.
 
@@ -26,7 +26,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"  
 | `desktop.audio` | audio agent | `audio/MusicRemoval.kt` |
 | `desktop.vision` | vision agent | `vision/Vision.kt` |
 | `desktop.ui`, `desktop/Main.kt` | UI agent | `ui/App.kt`, `Main.kt` |
-| `desktop.pipeline` | integration, later | `pipeline/Pipeline.kt` |
+| `desktop.pipeline` | integration | `pipeline/Pipeline.kt` |
 | `desktop/Models.kt`, Gradle files, `scripts/`, this file | scaffold / integration | |
 
 Stay inside your package. Add files there as you like. If you need a new dependency or a change to a shared file, say so in your report instead of editing it.
@@ -112,7 +112,7 @@ object Censor {
 - NSFW: the pipeline calls `classify` on every second sampled frame (5 fps) and passes the result to `NsfwGate.fires(probs, ops.strictness)`.
 - Censor: port Android's `CensorEffect` to CPU RGB. Rects are normalized to the frame as given, which is STORED space at render time. If `solidColor != FilterOps.BLUR`, fill with that opaque ARGB colour (`FilterOps.SOLID_COLORS`). Otherwise blur at `blurAmount` (0..100) and desaturate when `grayscale` is set. `fullFrame` covers everything. There is no region cap, so Android's overflow spans do not apply.
 
-## pipeline (integration, later)
+## pipeline (integration)
 
 ```kotlin
 data class JobOptions(val input: File, val output: File, val ops: FilterOps)

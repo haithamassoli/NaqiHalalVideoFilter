@@ -38,7 +38,7 @@
 | Android | APK on [GitHub Releases](https://github.com/haithamassoli/NaqiHalalVideoFilter/releases) (full build); also on [Google Play](https://play.google.com/store/apps/details?id=com.haithamassoli.naqi) | Android 10 (API 29) or newer, arm64-v8a | [`apps/android`](apps/android) |
 | iPhone and iPad | [App Store](https://apps.apple.com/app/id6798173054) (free) | iOS / iPadOS 18 or newer | [`apps/apple`](apps/apple) |
 | Mac | Build from source for now; a signed download is planned | macOS 15 or newer | [`apps/apple`](apps/apple) |
-| Windows | In development | — | `apps/windows/` |
+| Windows | Beta, in development: build from source, or the unsigned MSI or portable zip from the [Windows workflow](.github/workflows/windows.yml)'s artifacts | Windows 10 or 11, x64 | [`apps/windows`](apps/windows) |
 
 The Android APK on GitHub is the full build. Download by link, sharing into Naqi and the in-app
 updater ship only there, because Google Play's policies do not allow them. The filtering is the same
@@ -53,11 +53,12 @@ Two independent operations, run alone or together:
   Drums and bass are never kept. A YAMNet gate checks for music first, so music-free stretches skip
   separation.
 - **Censor people** — the app finds and tracks faces (ML Kit on Android, Apple Vision on iPhone, iPad
-  and Mac), and an InsightFace `genderage` vote resolves each track from up to 5 frontal crops. You
+  and Mac, YuNet on Windows), and an InsightFace `genderage` vote resolves each track from up to 5 frontal crops. You
   pick **who** gets covered: everyone, women, or men. A track is censored for its whole span, not
   frame by frame.
 
-Coverage can be **Face / Body / Precise body**, and Android also offers **Frame**. Face is the
+Coverage can be **Face / Body / Precise body**, and Android also offers **Frame**. Windows offers
+Face and Frame for now. Face is the
 default. Both body options add YOLO11n-seg at 10 fps and are slower: Body covers a rectangle around
 the person, which can also blur background; Precise body covers the person's outline and keeps the
 background visible.
@@ -111,7 +112,7 @@ whole-frame mode on.
 ```
 apps/android/   Android app (Kotlin, Gradle) with its scripts and design docs
 apps/apple/     iPhone, iPad and Mac app (Swift, Xcode), imported with its history
-apps/windows/   Windows app (in development)
+apps/windows/   Windows app (Kotlin, Compose Desktop; beta, in development)
 core/           pure-Kotlin logic shared by the Android and Windows apps (EDL, DSP, gates)
 models/         model export, conversion and quantization scripts, and model benchmarks
 server/         optional server for long videos (Modal)
@@ -129,6 +130,8 @@ Each app's README has the full steps.
 - **iPhone, iPad and Mac** — fetch the Android models first, then `cd apps/apple &&
   ./scripts/fetch-models.sh` and open `naqi.xcodeproj` in Xcode. Fonts and the Core ML person model
   need extra steps. See [`apps/apple/README.md`](apps/apple/README.md).
+- **Windows** — JDK 21, then `cd apps/windows && ./gradlew :app:stageModels :app:run`. It builds and
+  runs on macOS too. See [`apps/windows/README.md`](apps/windows/README.md).
 - **Website** — `cd web && pnpm install && pnpm dev`. See [`web/README.md`](web/README.md).
 
 ## Releases

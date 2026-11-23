@@ -9,7 +9,8 @@ holds every app. Read the README of the directory you work in before changing it
 | --- | --- | --- |
 | `apps/android/` | Android app: Kotlin, Gradle, Compose; its docs in `apps/android/docs/` | GPL-3.0-or-later (root `LICENSE`) |
 | `apps/apple/` | iPhone, iPad and Mac app: Swift 6, Xcode; its docs in `apps/apple/docs/` | Naqi Personal Non-Commercial License (`apps/apple/LICENSE`) |
-| `apps/windows/` | Windows app (in development) | root licence unless it adds its own `LICENSE` |
+| `apps/windows/` | Windows app (beta): Kotlin/JVM 21, Compose Desktop, JavaCPP FFmpeg, ONNX Runtime on the CPU; package contract in `apps/windows/SEAMS.md` | GPL-3.0-or-later (root `LICENSE`) |
+| `core/` | pure-Kotlin logic shared by `apps/android` and `apps/windows` (EDL, NSFW gate, face-track rules, demucs chunking, DSP); both builds include it as `:core` | GPL-3.0-or-later |
 | `models/` | model export, conversion and quantization scripts; benchmarks in `models/bench/` | GPL-3.0-or-later |
 | `server/` | optional Modal server for videos of 10 minutes or more | GPL-3.0-or-later |
 | `web/` | Astro website; Vercel builds from `web/`, so it must stay there | GPL-3.0-or-later |
@@ -37,6 +38,18 @@ xcodebuild -project naqi.xcodeproj -scheme naqi -destination 'generic/platform=i
   -derivedDataPath build.noindex/agent CODE_SIGNING_ALLOWED=NO build
 xcodebuild test -project naqi.xcodeproj -scheme naqi -destination 'platform=macOS'  # naqiTests
 ```
+
+Windows, from `apps/windows` (JDK 21; runs on macOS too; the models come from Android's folder or
+the release APK, see `apps/windows/README.md`):
+
+```sh
+./gradlew :app:stageModels                      # gitignored ONNX models into apps/windows/models, sha256-checked
+./gradlew :app:compileKotlin :core:test :app:test   # the gate; model tests skip without the models
+./gradlew :app:run                              # the window; with --args="--input … --output …" the CLI
+```
+
+A change to `core/` must pass both Android's and Windows' tests. Windows is ported from
+`apps/android`; never port from `apps/apple` (different licence).
 
 Website, from `web`: `pnpm install && pnpm build`.
 

@@ -15,9 +15,11 @@ Every platform publishes its GitHub Releases in this repo. Installed Android bui
 gh release create v1.10.0 naqi-1.10.0.apk
 
 # Windows / Apple
-gh release create windows-v1.0.0 --latest=false Naqi-1.0.0-x64.msix
+gh release create windows-v0.1.0 --latest=false --prerelease Naqi-0.1.0.msi Naqi-0.1.0-portable.zip
 gh release create apple-v1.0.0   --latest=false Naqi-1.0.0.dmg
 ```
+
+The Windows files are the `naqi-windows-msi` and `naqi-windows-portable` artifacts of the Windows workflow run on the tagged commit (`.github/workflows/windows.yml`), after bumping `appVersion` in `apps/windows/app/build.gradle.kts`. They are unsigned while the app is in beta.
 
 If a desktop release goes out marked Latest by mistake, run `gh release edit v<newest android> --latest` to move the flag back.
 
