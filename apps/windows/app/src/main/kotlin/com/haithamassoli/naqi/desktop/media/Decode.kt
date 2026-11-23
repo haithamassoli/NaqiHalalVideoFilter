@@ -62,6 +62,56 @@ object VideoDecoder {
             } ?: throw IOException("no video stream in $input")
         }
     }
+
+    /**
+     * [sample], plus the SAME decoded picture at SOURCE resolution on every [sourceEvery]'th emitted frame
+     * (the first, then every [sourceEvery]'th after it; never when it is 0), for a consumer that samples
+     * source pixels itself, as Android's NSFW gate does (`FrameSampler.gatherGate`). [source] is converted
+     * unscaled, so each pixel is the decoder's own, and left in STORED orientation; [rotation] is the
+     * clockwise rotation to upright, the one [frame] already has applied. Both are valid only inside the call.
+     */
+    suspend fun sampleWithSource(
+        input: File,
+        fps: Float = 10f,
+        maxDim: Int = 640,
+        sourceEvery: Int,
+        onFrame: suspend (frame: RgbFrame, source: RgbFrame?, rotation: Int) -> Unit,
+    ): Unit = withContext(Dispatchers.IO) {
+        val slots = Slots(fps)
+        val toRgb = ToRgb(SWS_AREA)
+        val toSource = ToRgb(SWS_POINT) // same size in and out: a plain colour conversion
+        var upright = ByteArray(0)
+        var n = 0
+        toRgb.use {
+            toSource.use {
+                readStream(input, AVMEDIA_TYPE_VIDEO) { st, frame ->
+                    val ts = frame.best_effort_timestamp()
+                    if (ts == AV_NOPTS_VALUE) return@readStream
+                    val rel = ts - startPts(st)
+                    if (!slots.take(toUs(rel, st.time_base()))) return@readStream
+                    val ptsMs = toMs(rel, st.time_base())
+                    val (w, h) = analysisSize(frame.width(), frame.height(), maxDim)
+                    val stored = toRgb.convert(frame, w, h)
+                    val rotation = rotationOf(st)
+                    val out = if (rotation == 0) {
+                        RgbFrame(w, h, stored, ptsMs)
+                    } else {
+                        if (upright.size != stored.size) upright = ByteArray(stored.size)
+                        rotateRgb(stored, w, h, rotation, upright)
+                        val swap = rotation % 180 != 0
+                        RgbFrame(if (swap) h else w, if (swap) w else h, upright, ptsMs)
+                    }
+                    val source = if (sourceEvery > 0 && n % sourceEvery == 0) {
+                        RgbFrame(frame.width(), frame.height(), toSource.convert(frame, frame.width(), frame.height()), ptsMs)
+                    } else {
+                        null
+                    }
+                    n++
+                    onFrame(out, source, rotation)
+                } ?: throw IOException("no video stream in $input")
+            }
+        }
+    }
 }
 
 object AudioDecoder {
