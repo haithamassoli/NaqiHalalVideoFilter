@@ -43,7 +43,7 @@ class FaceAnalyzer(who: String, modelsDir: File = Models.dir()) : AutoCloseable 
 
     /** One UPRIGHT analysis frame from `VideoDecoder.sample`. Must not keep [frame] past the call. */
     fun onFrame(frame: RgbFrame) {
-        if (cuts.isCut(frame)) tracker.cut()
+        if (cuts.isCut(frame)) tracker.cut(frame.ptsMs)
         val faces = detector.detect(frame)
         tracker.onFrame(faces, frame.width, frame.height, frame.ptsMs, voter?.let { v -> { rect -> v.vote(frame, rect) } })
     }
