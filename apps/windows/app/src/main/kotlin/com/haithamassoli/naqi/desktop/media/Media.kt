@@ -1,10 +1,21 @@
 package com.haithamassoli.naqi.desktop.media
 
 import com.haithamassoli.naqi.analysis.VideoMeta
+import org.bytedeco.ffmpeg.avformat.AVStream
+import org.bytedeco.ffmpeg.global.avcodec.AV_PKT_DATA_DISPLAYMATRIX
+import org.bytedeco.ffmpeg.global.avcodec.av_packet_side_data_get
+import org.bytedeco.ffmpeg.global.avformat.avformat_close_input
+import org.bytedeco.ffmpeg.global.avutil.AVMEDIA_TYPE_VIDEO
+import org.bytedeco.ffmpeg.global.avutil.AV_NOPTS_VALUE
+import org.bytedeco.ffmpeg.global.avutil.av_display_rotation_get
+import org.bytedeco.javacpp.IntPointer
 import java.io.File
+import java.io.IOException
+import kotlin.math.roundToInt
 
-// Owner: the media agent (JavaCPP FFmpeg). The signatures below are the contract in apps/windows/SEAMS.md;
-// change one only together with that file and its callers.
+// Owner: the media agent (JavaCPP FFmpeg). The signatures in this package are the contract in
+// apps/windows/SEAMS.md; change one only together with that file and its callers.
+// VideoDecoder/AudioDecoder are in Decode.kt, AacWriter in AacWriter.kt, Renderer in Renderer.kt.
 
 /**
  * One decoded picture: packed RGB24 (R, G, B bytes), row-major, stride exactly `width * 3`.
@@ -16,47 +27,9 @@ import java.io.File
  */
 class RgbFrame(val width: Int, val height: Int, val rgb: ByteArray, val ptsMs: Long)
 
-object Probe {
-    /** Container metadata without decoding: stored size, rotation (clockwise degrees), duration, fps (30 if absent). */
-    fun probe(input: File): VideoMeta = TODO("media")
-}
-
-object VideoDecoder {
-    /**
-     * Decode the first video stream and call [onFrame] once per sample slot, Android's `FrameSampler` rule:
-     * slots are `1000 / fps` ms apart, anchored to the first decoded frame; a frame is emitted when its
-     * pts ≥ the next slot, after which the slot advances one interval, or to `pts + interval` after a gap.
-     * Frames are UPRIGHT (rotation applied) and scaled so the longer side is at most [maxDim] (never up).
-     * Suspends while [onFrame] runs, so the consumer sets the pace; cancellable.
-     */
-    suspend fun sample(
-        input: File,
-        fps: Float = 10f,
-        maxDim: Int = 640,
-        onFrame: suspend (RgbFrame) -> Unit,
-    ): Unit = TODO("media")
-}
-
-object AudioDecoder {
-    /**
-     * Decode the first audio stream to 44 100 Hz stereo float, interleaved L R L R, nominally in [-1, 1],
-     * and hand it over in batches of [frames] sample frames (`interleaved.size >= frames * 2`; the array may
-     * be reused after the call returns). Starts at the stream's first sample. Returns false, without calling
-     * [onPcm], when the file has no audio stream. Cancellable.
-     */
-    suspend fun decode(input: File, onPcm: suspend (interleaved: FloatArray, frames: Int) -> Unit): Boolean =
-        TODO("media")
-}
-
-/** Writes 44.1 kHz stereo float PCM as AAC-LC 192 kbps into an .m4a, in the order given. */
-class AacWriter(output: File) : AutoCloseable {
-    fun write(interleaved: FloatArray, frames: Int): Unit = TODO("media")
-    override fun close(): Unit = TODO("media")
-}
-
 /** What the output's audio is. */
 sealed interface AudioOut {
-    /** The source's audio stream, stream-copied. */
+    /** The source's audio stream, stream-copied (or AAC-transcoded when MP4 cannot carry its codec). */
     data object Keep : AudioOut
     /** This .m4a (from [AacWriter]) instead, stream-copied and placed at the source audio's start time. */
     data class Replace(val m4a: File) : AudioOut
@@ -64,23 +37,39 @@ sealed interface AudioOut {
     data object Drop : AudioOut
 }
 
-object Renderer {
-    /**
-     * Write [output] as MP4. With [edit] null the video stream is copied untouched; otherwise every frame is
-     * decoded full size in STORED orientation (no rotation applied), passed to [edit] to change in place, and
-     * encoded with libx264 (yuv420p) keeping that frame's original pts. The rotation metadata is carried to
-     * the output either way, so it plays upright.
-     *
-     * [input] is opened read-only. [output] must not be [input] (the same file by canonical path → throws
-     * IllegalArgumentException); it is written to a temp file in its own directory and atomically renamed
-     * over [output] only when complete, so a failure or cancel leaves no partial file and no damaged
-     * original. [onProgress] gets 0..100.
-     */
-    suspend fun render(
-        input: File,
-        output: File,
-        audio: AudioOut,
-        edit: ((RgbFrame) -> Unit)?,
-        onProgress: (Int) -> Unit,
-    ): Unit = TODO("media")
+object Probe {
+    /** Container metadata without decoding: stored size, rotation (clockwise degrees), duration, fps (30 if absent). */
+    fun probe(input: File): VideoMeta {
+        val fmt = openInput(input)
+        try {
+            val st = bestStream(fmt, AVMEDIA_TYPE_VIDEO) ?: throw IOException("no video stream in $input")
+            val par = st.codecpar()
+            // Container duration first, as Android's MediaMetadataRetriever; the stream's is the fallback.
+            val durationMs = when {
+                fmt.duration() != AV_NOPTS_VALUE && fmt.duration() > 0 -> fmt.duration() / 1000
+                st.duration() != AV_NOPTS_VALUE && st.duration() > 0 -> toMs(st.duration(), st.time_base())
+                else -> 0L
+            }
+            val rate = st.avg_frame_rate()
+            val fps = if (rate.num() > 0 && rate.den() > 0) rate.num().toFloat() / rate.den() else 30f
+            return VideoMeta(par.width(), par.height(), rotationOf(st), durationMs, fps)
+        } finally {
+            avformat_close_input(fmt)
+        }
+    }
+}
+
+/**
+ * Clockwise display rotation (0/90/180/270), the same convention as Android's KEY_ROTATION. FFmpeg's
+ * display matrix angle is counter-clockwise, hence the sign flip. Anything that is not a quarter turn
+ * (a hand-authored matrix) degrades to 0, as Android's sampler does, rather than failing the job.
+ */
+internal fun rotationOf(st: AVStream): Int {
+    val par = st.codecpar()
+    val sd = av_packet_side_data_get(par.coded_side_data(), par.nb_coded_side_data(), AV_PKT_DATA_DISPLAYMATRIX)
+    if (sd == null || sd.isNull || sd.size() < 36) return 0
+    val ccw = av_display_rotation_get(IntPointer(sd.data()))
+    if (ccw.isNaN()) return 0
+    val cw = ((-ccw.roundToInt()) % 360 + 360) % 360
+    return if (cw % 90 == 0) cw else 0
 }
