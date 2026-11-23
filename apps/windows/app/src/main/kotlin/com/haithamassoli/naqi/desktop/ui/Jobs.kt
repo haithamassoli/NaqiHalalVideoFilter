@@ -11,6 +11,7 @@ import com.haithamassoli.naqi.desktop.pipeline.Stage
 import com.haithamassoli.naqi.model.FilterOps
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -18,6 +19,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.yield
 import java.io.File
 
 /** `Pipeline::run`'s shape. A function type, not an interface: the UI test hands App() a fake one. */
@@ -59,9 +61,13 @@ class JobQueue(private val scope: CoroutineScope, private val runJob: RunJob) {
     fun submit(options: JobOptions): JobItem {
         val item = JobItem(options)
         items.add(0, item)
-        item.job = scope.launch {
+        // UNDISPATCHED: the coroutine joins the Mutex's queue right here on the submitting thread, so jobs run
+        // in submission order. Launched normally, two jobs submitted back to back race to the lock on
+        // Default's threads and can swap. The yield() then moves the work off the submitter's (UI) thread.
+        item.job = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 turn.withLock {
+                    yield()
                     item.state = JobState.RUNNING
                     val started = System.nanoTime()
                     runJob(options) { stage, p ->
