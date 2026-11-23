@@ -54,6 +54,8 @@ object Probe {
 
 object VideoDecoder {
     suspend fun sample(input: File, fps: Float = 10f, maxDim: Int = 640, onFrame: suspend (RgbFrame) -> Unit)
+    suspend fun sampleWithSource(input: File, fps: Float = 10f, maxDim: Int = 640, sourceEvery: Int,
+                                 onFrame: suspend (frame: RgbFrame, source: RgbFrame?, rotation: Int) -> Unit)
 }
 
 object AudioDecoder {
@@ -67,15 +69,21 @@ class AacWriter(output: File) : AutoCloseable {   // AAC-LC 192 kbps, 44.1 kHz s
 
 sealed interface AudioOut { data object Keep; data class Replace(val m4a: File); data object Drop }
 
+object OverwriteOutput : CoroutineContext.Element   // in the caller's context: render may replace an existing output
+
 object Renderer {
     suspend fun render(input: File, output: File, audio: AudioOut, edit: ((RgbFrame) -> Unit)?, onProgress: (Int) -> Unit)
 }
 ```
 
 - `sample` follows Android's `FrameSampler` slot rule. Slots are `1000 / fps` ms apart, anchored to the first decoded frame. A frame is emitted when its pts is at or past the next slot. The slot then advances one interval, or to `pts + interval` if that would leave it at or behind the frame. Frames are UPRIGHT and scaled so the longer side is at most `maxDim`, never upscaled.
+- `sampleWithSource` is `sample` plus, on the first emitted frame and every `sourceEvery`'th after it (never when 0), the same decoded picture unscaled, in STORED orientation, with `rotation` (clockwise to upright). That is what `NsfwClassifier.classify(source, rotation)` takes, as Android's NSFW gate samples source pixels. The pipeline's analysis pass uses it with `sourceEvery = 2` (5 fps NSFW).
 - `AudioDecoder.decode` resamples to the PCM format above and starts at the audio stream's first sample. `Renderer` places a `Replace` track at the source audio's start time, so A/V sync survives.
+- The PCM follows the stream's clock: a timestamp gap is filled with silence, and a small overlap (the frame still ends past the audio so far) is trimmed. A clock discontinuity is rebased instead, with the frame appended whole and no silence. That covers any backward jump past the frame's end, and in an `AVFMT_TS_DISCONT` format (MPEG-TS etc.) a forward jump over 10 s, which is ffmpeg's `-dts_delta_threshold`. MP4/MKV timestamps are trusted, so their gaps are filled at any size. No decoded sample is dropped beyond a genuine overlap.
 - `render` with `edit == null` stream-copies the video. Otherwise it decodes full-size STORED frames, calls `edit` to change each one in place, and encodes it with libx264 (yuv420p), keeping each frame's original pts. Rotation metadata is carried over either way. Output is MP4.
-- Safety: `input` is opened read-only. If `output` has the same canonical path as `input`, it throws `IllegalArgumentException`. Output is written to a temp file in `output`'s directory and atomically renamed only on success. A failure or a cancel leaves no partial file.
+- Safety: `input` is opened read-only. If `output` has the same canonical path as `input`, it throws `IllegalArgumentException`. Output is written to a temp file in `output`'s directory and published only on success. A failure or a cancel before publishing leaves no partial file.
+- An existing `output` is never replaced unless the caller's coroutine context holds `OverwriteOutput` (the CLI's `--overwrite`; the UI never sets it). Without it, `render` throws `FileAlreadyExistsException` up front, or at publish time if the file appeared meanwhile. The publish is no-clobber on every OS: a hard link from `output` to the temp file, which fails atomically if the name is taken, then the temp is removed. Volumes without hard links (FAT32, exFAT) fall back to a no-replace move, which is atomic on Windows only. With `OverwriteOutput` it is an atomic rename over the old file.
+- Publishing is the commit point. `onProgress(100)` comes only once `output` is in place, and from then on a cancel no longer fails the job: `render` returns normally. A cancel before then leaves nothing.
 
 ## audio (music removal)
 
@@ -108,7 +116,8 @@ object Censor {
 }
 ```
 
-- Faces: YuNet (`Models.YUNET`, opencv_zoo 2023mar, MIT) replaces ML Kit. Tracks are associated by IoU, because YuNet has no tracking id. `BodyTracker.overlap(a, b)` in core is an IoU. The semantics come from Android's `FaceTracker` and core's `FaceTrackerLogic.kt`. Samples are the raw upright rects, and eviction uses `isStale`. Vote with genderage (`Models.GENDERAGE`, input [1,3,96,96], a 1.5x square crop) up to `VOTE_CAP` per track, and only on crops of at least `MIN_FACE_PX` upright px. Build each finished track's span with `edlFor(track, who)`, which pads the rects and applies the verdict, so a tie or an abstention censors. `who` is `FilterOps.censorWho`. Under `EVERYONE`, skip the genderage model entirely.
+- Faces: YuNet (`Models.YUNET`, opencv_zoo 2023mar, MIT) replaces ML Kit. Tracks are associated by IoU, because YuNet has no tracking id (`vision/FaceTracks.kt`: IoU >= 0.3, side ratio <= 1.5x, last seen within 500 ms, one-to-one). `BodyTracker.overlap(a, b)` in core is an IoU. The semantics come from Android's `FaceTracker` and core's `FaceTrackerLogic.kt`. Samples are the raw upright rects, and eviction uses `isStale`. Vote with genderage (`Models.GENDERAGE`, input [1,3,96,96], a 1.5x square crop) up to `VOTE_CAP` per track, and only on crops of at least `MIN_FACE_PX` upright px. Build each finished track's span with `edlFor(track, who)`, which pads the rects and applies the verdict, so a tie or an abstention censors. `who` is `FilterOps.censorWho`. Under `EVERYONE`, skip the genderage model entirely.
+- Two rules are Windows-only, because a wrong IoU merge fails open (one person's spare covers another). First, a shot cut (`SceneCuts`, Android's 16x16 grid test) ends every live track. The closing track's span is extended to the cut and the new shot's track starts at the cut minus the usual 50 ms lead-in (each only when within 500 ms), so a detection missed at the cut leaves no frame bare. Second, while a track is spared, every face matched to it must read (at least `MIN_FACE_PX`) and vote for the spare. One that votes against, abstains or is too small censors the whole track. The whole track rather than that one detection, because it is the simple rule and covering is the safe side: a spare that a face cannot confirm may be a wrong merge.
 - NSFW: the pipeline calls `classify` on every second sampled frame (5 fps) and passes the result to `NsfwGate.fires(probs, ops.strictness)`.
 - Censor: port Android's `CensorEffect` to CPU RGB. Rects are normalized to the frame as given, which is STORED space at render time. If `solidColor != FilterOps.BLUR`, fill with that opaque ARGB colour (`FilterOps.SOLID_COLORS`). Otherwise blur at `blurAmount` (0..100) and desaturate when `grayscale` is set. `fullFrame` covers everything. There is no region cap, so Android's overflow spans do not apply.
 
