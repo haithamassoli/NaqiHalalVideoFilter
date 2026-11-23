@@ -4,5 +4,5 @@ dist/
 public/models/
 .venv*/
 # Generated test videos and their outputs (scripts/make-fixture.sh, E2E runs).
-fixtures/out/
+fixtures/
 test/fixtures/out/

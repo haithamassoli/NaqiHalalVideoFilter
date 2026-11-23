@@ -89,6 +89,11 @@ and checks the result against Musicless' tested hash. Never commit the models.
 
 A missing model stops the job that needs it with a message that names it.
 
+**End-to-end test clip.** `./scripts/make-fixture.sh` (needs `ffmpeg`; uses macOS `say` for the voice when
+it is there) writes `fixtures/fixture.mp4` (gitignored): 15 s, 1280x720, H.264 + AAC, music throughout,
+speech from 5 s, and a public-domain NASA portrait from 3 s to 10 s. Open the app with `?e2e=1` to get a
+download link instead of the save dialog, which browser automation cannot answer.
+
 ## Models and licences
 
 The app is GPL-3.0-or-later, like the rest of the repository outside `apps/apple`. It uses:
