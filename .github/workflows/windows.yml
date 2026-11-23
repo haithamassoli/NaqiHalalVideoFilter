@@ -1,4 +1,5 @@
-# Tests, the MSI and the portable zip for apps/windows, built on Windows.
+# Tests, the MSI and the portable zip for apps/windows, built on Windows. release-windows.yml calls it to build
+# what it publishes.
 name: Windows
 
 on:
@@ -9,6 +10,7 @@ on:
       - core/** # shared Kotlin, included by settings.gradle.kts
       - apps/android/gradle/libs.versions.toml # the version catalog apps/windows reads
       - .github/workflows/windows.yml
+      - .github/scripts/gpl-sources*.sh # checks apps/windows/NOTICE
       - LICENSE # bundled next to apps/windows/NOTICE
   pull_request:
     paths:
@@ -16,7 +18,9 @@ on:
       - core/**
       - apps/android/gradle/libs.versions.toml
       - .github/workflows/windows.yml
+      - .github/scripts/gpl-sources*.sh
       - LICENSE # bundled next to apps/windows/NOTICE
+  workflow_call:
 
 permissions:
   contents: read
@@ -68,6 +72,9 @@ jobs:
       # (gradle.properties also lists the Macs').
       - name: Stage and verify ONNX models
         run: ./gradlew -Pjavacpp.platform=windows-x86_64 :app:stageModels
+
+      - name: NOTICE links the pinned GPL sources of the bundled FFmpeg
+        run: ../../.github/scripts/gpl-sources.test.sh
 
       - name: Tests
         run: ./gradlew -Pjavacpp.platform=windows-x86_64 :core:test :app:test

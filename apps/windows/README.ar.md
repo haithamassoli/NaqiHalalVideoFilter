@@ -27,8 +27,8 @@
 [`core/`](../../core).
 
 **الحالة: تجريبي قيد التطوير.** لا يوجد إصدار موقّع بعد. ابنِه من المصدر، أو خذ ملف MSI أو الملف
-المضغوط المحمول غير الموقّعَين من مخرجات [سير عمل ويندوز](../../.github/workflows/windows.yml) على
-GitHub Actions.
+المضغوط المحمول غير الموقّعَين من إصدار تجريبي `windows-v…` في صفحة إصدارات المستودع، أو من مخرجات
+[سير عمل ويندوز](../../.github/workflows/windows.yml) على GitHub Actions.
 
 ## ما يعمل الآن
 
@@ -133,6 +133,18 @@ Naqi --input <video> --output <file.mp4> [--music vocals|vocals+other]
 SmartScreen من أن الناشر غير معروف. اختر **More info** (مزيد من المعلومات)، ثم **Run anyway** (تشغيل
 على أي حال). ولا تفعل ذلك إلا مع ملف نزّلته من GitHub Actions أو إصدارات هذا المستودع نفسه. أما
 الملف المضغوط المحمول فلا يحتاج تثبيتًا: فكّ ضغطه وشغّل `Naqi.exe`.
+
+## النشر
+
+لا تُنشر إصدارات ويندوز إلا عبر [سير عمل Release Windows](../../.github/workflows/release-windows.yml)،
+ولا تُنشر يدويًا بالأمر `gh release create` أبدًا. ارفع `appVersion` في `app/build.gradle.kts` على
+`main`، ثم شغّل سير العمل من `main`: `gh workflow run release-windows.yml -f version=X.Y.Z` (أو
+Actions > Release Windows > Run workflow). يتوقف قبل البناء إن كان إصدار إضافي سيدفع أحدث إصدار
+أندرويد خارج أحدث 10 إصدارات، ثم يبني ويختبر على ويندوز، وينشر `windows-vX.Y.Z` إصدارًا تجريبيًا غير
+معلَّم بـ Latest. ويحمل الإصدار ملف MSI والملف المضغوط المحمول ومصدر نسخة FFmpeg المرخّصة بـ GPL
+المضمّنة (FFmpeg وx264 وx265 وسكربتات بناء JavaCPP Presets، مثبّتة بإصداراتها في
+[`gpl-sources.sh`](../../.github/scripts/gpl-sources.sh)، وإليها يشير `NOTICE`). وقواعد ذلك في
+[`docs/RELEASING.md`](../../docs/RELEASING.md).
 
 ## الأداء
 

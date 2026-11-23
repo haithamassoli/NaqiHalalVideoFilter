@@ -32,9 +32,12 @@ FFmpeg 8.1.2 — ffmpeg.org
   later, the same licence as Naqi (full text in LICENSE). Decodes and
   encodes every video.
 
-x264 — videolan.org/developers/x264.html
+x264 (commit b35605ace3ddf7c1a5d67a2eb553f034aef41d55, X264_BUILD 165) —
+  videolan.org/developers/x264.html
   GPL-2.0-or-later. Statically linked into that FFmpeg build (avcodec);
-  encodes the filtered video.
+  encodes the filtered video. The build script fetches x264's "stable"
+  branch; this is the commit that branch held when JavaCPP Presets 1.5.14
+  was built (unchanged from 2025-06-08 through the 2026-08-10 release).
 
 x265 3.4 — github.com/videolan/x265
   GPL-2.0-or-later. Statically linked into that FFmpeg build.
@@ -54,12 +57,21 @@ JavaCPP 1.5.14 and JavaCPP Presets — github.com/bytedeco/javacpp-presets
   The FFmpeg, x264 and x265 binaries above are distributed under the GPL, so
   their complete corresponding source is available to you:
 
-  Build scripts and patches (exact tag):
+  The Windows release page of this version carries the FFmpeg, x264 and
+  x265 tarballs and the build scripts below as files next to the installer.
+
+  Build scripts and patches (tag 1.5.14, which is commit d57d8a2…):
     https://github.com/bytedeco/javacpp-presets/tree/1.5.14/ffmpeg
-    https://github.com/bytedeco/javacpp-presets/blob/1.5.14/cppbuild.sh
-  Source tarballs the build script downloads:
+    https://github.com/bytedeco/javacpp-presets/tree/d57d8a28635211e174df378611cb1952f751c943/ffmpeg
+    https://github.com/bytedeco/javacpp-presets/blob/d57d8a28635211e174df378611cb1952f751c943/cppbuild.sh
+    https://github.com/bytedeco/javacpp-presets/archive/d57d8a28635211e174df378611cb1952f751c943.tar.gz
+  Source tarballs the build script downloads (sha256 in
+  .github/scripts/gpl-sources.sh of Naqi's repository):
+    FFmpeg 8.1.2 (tag n8.1.2, commit 38b88335f99e76ed89ff3c93f877fdefce736c13):
     https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.bz2
-    https://code.videolan.org/videolan/x264/-/archive/stable/x264-stable.tar.gz
+    x264 commit b35605ace3ddf7c1a5d67a2eb553f034aef41d55:
+    https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.gz
+    x265 3.4:
     https://github.com/videolan/x265/archive/3.4.tar.gz
     (every other library: the download lines of ffmpeg/cppbuild.sh above)
   Java sources of the bindings:

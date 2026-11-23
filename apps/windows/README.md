@@ -25,8 +25,8 @@ platforms are in the [main README](../../README.md). It is a port of the Android
 rules, music-removal chunking) is the same Kotlin, shared through [`core/`](../../core).
 
 **Status: beta, in development.** There is no signed release yet. Build it from source, or take the
-unsigned MSI or portable zip from the artifacts of the
-[Windows workflow](../../.github/workflows/windows.yml) run on GitHub Actions.
+unsigned MSI or portable zip from a `windows-v…` pre-release on the repository's Releases page, or from
+the artifacts of the [Windows workflow](../../.github/workflows/windows.yml) run on GitHub Actions.
 
 ## What works
 
@@ -120,6 +120,19 @@ The MSI installs per user, with no administrator prompt. The builds are **not si
 SmartScreen warns that the app is from an unknown publisher. Choose **More info**, then **Run anyway**.
 Only do that for a file you downloaded from this repository's own GitHub Actions or releases. The
 portable zip needs no installer: unzip it and run `Naqi.exe`.
+
+## Releasing
+
+Windows releases are published only by the
+[Release Windows workflow](../../.github/workflows/release-windows.yml), never with `gh release create`
+by hand. Bump `appVersion` in `app/build.gradle.kts` on `main`, then run it from `main`:
+`gh workflow run release-windows.yml -f version=X.Y.Z` (or Actions > Release Windows > Run workflow).
+It stops before building if one more release would push the newest Android release out of the 10
+newest, builds and tests on Windows, and publishes `windows-vX.Y.Z` as a pre-release that is not marked
+Latest. The release carries the MSI, the portable zip and the source of the bundled GPL FFmpeg build
+(FFmpeg, x264, x265 and the JavaCPP Presets build scripts, pinned in
+[`gpl-sources.sh`](../../.github/scripts/gpl-sources.sh), which `NOTICE` links). The rules behind it
+are in [`docs/RELEASING.md`](../../docs/RELEASING.md).
 
 ## Performance
 
