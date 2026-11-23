@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.haithamassoli.naqi.desktop.media.OverwriteOutput
 import com.haithamassoli.naqi.desktop.pipeline.JobOptions
 import com.haithamassoli.naqi.desktop.pipeline.Pipeline
 import com.haithamassoli.naqi.desktop.ui.App
@@ -21,6 +22,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.Locale
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.system.exitProcess
 
 /** With arguments, the headless CLI ([runCli]); without, the window. */
@@ -49,18 +51,28 @@ internal const val USAGE = """Usage: Naqi --input <video> --output <file.mp4> [o
   --style <style>[,<style>…]    blur[:<0-100>] (default blur:60) · fill:gray|black|white|navy|green
                                 · gray (grayscale blur) · whole (cover the whole frame while a face shows)
   --nsfw <0-100>                cover whole flagged scenes at this strictness
+  --overwrite                   replace --output if it exists (otherwise an existing file is refused)
 
 At least one of --music, --faces or --nsfw. Progress goes to stdout as "<STAGE> <percent>" lines.
 Exit status: 0 done, 1 the job failed, 2 bad arguments."""
 
 private val FILL_NAMES = listOf("gray", "black", "white", "navy", "green") // FilterOps.SOLID_COLORS order
 
+/** A parsed command line: the job, and whether it may replace an existing output. */
+internal data class CliJob(val options: JobOptions, val overwrite: Boolean)
+
 /** Arguments to a job. Every problem is an IllegalArgumentException whose message is shown with [USAGE]. */
-internal fun parseCli(args: List<String>): JobOptions {
+internal fun parseCli(args: List<String>): CliJob {
     val values = mutableMapOf<String, String>()
+    var overwrite = false
     var i = 0
     while (i < args.size) {
         val key = args[i]
+        if (key == "--overwrite") {
+            overwrite = true
+            i += 1
+            continue
+        }
         require(key in setOf("--input", "--output", "--music", "--faces", "--style", "--nsfw")) { "Unknown argument: $key" }
         require(i + 1 < args.size) { "$key needs a value" }
         require(key !in values) { "$key given twice" }
@@ -71,6 +83,7 @@ internal fun parseCli(args: List<String>): JobOptions {
     val output = File(requireNotNull(values["--output"]) { "--output is required" })
     require(input.isFile) { "No such file: $input" }
     require(!sameFile(input, output)) { "--output is the input file; the original is never overwritten" }
+    require(overwrite || !output.exists()) { "$output exists; give --overwrite to replace it" }
 
     var ops = FilterOps(censorNsfw = false)
     values["--music"]?.let {
@@ -109,7 +122,7 @@ internal fun parseCli(args: List<String>): JobOptions {
         }
     }
     require(ops.removeMusic || ops.censorFaces || ops.censorNsfw) { "Nothing to do: give --music, --faces or --nsfw" }
-    return JobOptions(input, output, ops)
+    return CliJob(JobOptions(input, output, ops), overwrite)
 }
 
 /** The scripted end-to-end entry: one job through the same Pipeline.run the window uses. */
@@ -118,7 +131,7 @@ internal fun runCli(args: List<String>): Int {
         println(USAGE)
         return 0
     }
-    val job = try {
+    val cli = try {
         parseCli(args)
     } catch (e: IllegalArgumentException) {
         System.err.println(e.message)
@@ -126,20 +139,25 @@ internal fun runCli(args: List<String>): Int {
         System.err.println(USAGE)
         return 2
     }
+    val job = cli.options
     return runBlocking {
         var last = ""
+        // Set once Pipeline.run has returned, i.e. the output is in place: a Ctrl+C landing after that still
+        // makes await() throw, but the job is done.
+        var done = false
         // Not a child of runBlocking: a failing job must reach the catch below, not cancel the whole block.
-        val run = CoroutineScope(Dispatchers.Default).async {
+        val run = CoroutineScope(Dispatchers.Default + (if (cli.overwrite) OverwriteOutput else EmptyCoroutineContext)).async {
             Pipeline.run(job) { stage, p ->
                 val line = "$stage $p"
                 if (line != last) { last = line; println(line) }
             }
+            done = true
         }
         // Ctrl+C: cancel, and give the renderer a moment to delete its temp file before the JVM goes.
         val hook = Thread { run.cancel(); runBlocking { withTimeoutOrNull(5_000) { run.join() } } }
         Runtime.getRuntime().addShutdownHook(hook)
         try {
-            run.await()
+            runCatching { run.await() }.onFailure { if (!done) throw it }
             println("DONE ${job.output.absolutePath}")
             0
         } catch (e: Throwable) { // not just Exception: a job that dies of an Error must still exit 1 with a message

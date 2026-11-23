@@ -21,14 +21,16 @@ internal fun chooseVideoDialog(title: String): File? {
     return dialog.files.firstOrNull()
 }
 
-/** Save dialog seeded with [suggested]; the result always ends in .mp4, the only container Renderer writes. */
+/**
+ * Save dialog seeded with [suggested]; the name as typed. The dialog's own "replace?" check saw that name, not
+ * the one with .mp4 added, so the caller turns it into the real output with [outputFor].
+ */
 internal fun chooseOutputDialog(title: String, suggested: File): File? {
     val dialog = FileDialog(null as Frame?, title, FileDialog.SAVE)
     dialog.directory = suggested.absoluteFile.parent
     dialog.file = suggested.name
     dialog.isVisible = true
-    val f = dialog.files.firstOrNull() ?: return null
-    return if (f.extension.equals("mp4", ignoreCase = true)) f else File(f.path + ".mp4")
+    return dialog.files.firstOrNull()
 }
 
 internal fun openFile(f: File) {

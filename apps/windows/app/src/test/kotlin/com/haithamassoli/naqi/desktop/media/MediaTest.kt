@@ -3,17 +3,23 @@ package com.haithamassoli.naqi.desktop.media
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.bytedeco.javacpp.Loader
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.file.FileAlreadyExistsException
 import java.security.MessageDigest
 import kotlin.math.abs
 import kotlin.math.sin
@@ -276,5 +282,87 @@ class MediaTest {
         }
         assertFalse(out.exists())
         assertArrayEquals(arrayOf("in.mp4"), tmp.root.list()!!.sortedArray())
+    }
+
+    @Test
+    fun anExistingOutputIsReplacedOnlyWhenAskedTo() = runBlocking {
+        val input = clip()
+        val out = tmp.root.resolve("out.mp4").apply { writeText("an earlier result") }
+        try {
+            Renderer.render(input, out, AudioOut.Keep, null) {}
+            fail("replaced an existing file")
+        } catch (_: FileAlreadyExistsException) {
+        }
+        assertEquals("an earlier result", out.readText())
+        withContext(OverwriteOutput) { Renderer.render(input, out, AudioOut.Keep, null) {} }
+        assertEquals(320, Probe.probe(out).width)
+        assertArrayEquals(arrayOf("in.mp4", "out.mp4"), tmp.root.list()!!.sortedArray())
+    }
+
+    @Test
+    fun aCancelBeforeTheRenameLeavesNothingAndOneAfterItIsDone() = runBlocking {
+        val input = clip()
+        val frames = framePtsMs(input).size
+        // The last frame comes out of the decoder's drain, after the final read: cancelling there must still
+        // leave no file (it used to be published anyway, with the job reported cancelled).
+        val out = tmp.root.resolve("out.mp4")
+        var seen = 0
+        val drain = async { Renderer.render(input, out, AudioOut.Keep, { if (++seen == frames) this.cancel() }) {} }
+        try {
+            drain.await()
+            fail("not cancelled")
+        } catch (_: CancellationException) {
+        }
+        assertFalse(out.exists())
+        assertArrayEquals(arrayOf("in.mp4"), tmp.root.list()!!.sortedArray())
+
+        // 100 comes once the output is in place: from there a cancel cannot undo the job, so render returns.
+        var returned = false
+        launch { Renderer.render(input, out, AudioOut.Keep, null) { if (it == 100) this.cancel() }; returned = true }.join()
+        assertTrue("render threw after publishing", returned)
+        assertEquals(320, Probe.probe(out).width)
+    }
+
+    @Test
+    fun swsGetsFourZeroedPlaneSlots() {
+        SwsPlanes().use { p ->
+            assertEquals(4L, p.data.capacity())
+            assertEquals(4L, p.stride.capacity())
+            for (i in 1L..3L) {
+                assertNull(p.data.get(i))
+                assertEquals(0, p.stride.get(i))
+            }
+        }
+    }
+
+    @Test
+    fun aTimestampGapInTheAudioSurvivesReencoding() = runBlocking {
+        // 1 s of tone, a 3 s hole in the timestamps, 1 s more; mu-law, which MP4 cannot carry, so Keep
+        // re-encodes it through AudioDecoder + AacWriter, the same path as music removal.
+        val src = tmp.root.resolve("gap.mkv")
+        ff("-f", "lavfi", "-i", "testsrc=size=160x120:rate=25:duration=5",
+            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100:duration=2",
+            "-filter:a", "asetpts=PTS+if(gte(T\\,1)\\,3/TB\\,0)", "-ac", "2",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "pcm_mulaw", src.path)
+        val packets = run(ffprobe, "-v", "error", "-select_streams", "a:0", "-show_entries", "packet=pts_time,duration_time",
+            "-of", "csv=p=0", src.path).lines().filter { it.isNotBlank() }
+            .map { l -> l.split(',').let { it[0].toDouble() to it[1].toDouble() } }
+        val resumeS = packets.zipWithNext().first { (a, b) -> b.first - a.first > 1.0 }.second.first
+        val endS = packets.last().let { it.first + it.second }
+        assertTrue("fixture has its gap: $resumeS", resumeS > 3.9)
+
+        val out = tmp.root.resolve("out.mp4")
+        Renderer.render(src, out, AudioOut.Keep, null) {}
+        val raw = tmp.root.resolve("out.raw")
+        ff("-i", out.path, "-map", "0:a", "-ac", "1", "-ar", "44100", "-f", "f32le", raw.path)
+        val pcm = ByteBuffer.wrap(raw.readBytes()).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
+        val samples = FloatArray(pcm.remaining()).also { pcm.get(it) }
+        val startS = startMs(out, "a") / 1000.0
+        // The tone resumes at the first sound after a second of silence.
+        fun sound(i: Int) = abs(samples[i]) > 0.01f
+        val resumeAt = (44_100 until samples.size).firstOrNull { i -> sound(i) && (1..44_100).none { sound(i - it) } } ?: -1
+        val aacFrameS = 1024 / 44_100.0
+        assertEquals(resumeS, startS + resumeAt / 44_100.0, aacFrameS)
+        assertEquals(endS, startS + samples.size / 44_100.0, aacFrameS)
     }
 }

@@ -82,7 +82,23 @@ class AppTest {
     }
 
     @Test
-    fun arabicIsTheArabicStrings() = runComposeUiTest {
+    fun aTypedNameWithoutExtensionNeverLandsOnAnExistingFile() = runComposeUiTest {
+        File(dir, "holiday.mp4").writeText("last year's")
+        val started = CompletableDeferred<JobOptions>()
+        val queue = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.Default)) { job, _ -> started.complete(job) }
+        setContent { App(queue, Strings.EN, chooseVideo = { video }, chooseOutput = { File(dir, "holiday") }) }
+        onNodeWithText("Pick a video").performClick()
+        onNodeWithText("Continue").performClick()
+        onNodeWithText("Change…").performScrollTo().performClick()
+        onNodeWithText("holiday-2.mp4").performScrollTo().assertExists()
+        onNodeWithText("Start").performClick()
+        waitUntil(timeoutMillis = 5_000) { started.isCompleted }
+        assertEquals(File(dir, "holiday-2.mp4"), started.getCompleted().output)
+        assertEquals("last year's", File(dir, "holiday.mp4").readText())
+    }
+
+    @Test
+    fun arabicIsTheArabicStrings()= runComposeUiTest {
         val queue = JobQueue(CoroutineScope(SupervisorJob() + Dispatchers.Default)) { _, _ -> }
         setContent { App(queue, Strings.forLocale(java.util.Locale.forLanguageTag("ar-SA")), chooseVideo = { video }) }
         onNodeWithText("نقي").assertExists()

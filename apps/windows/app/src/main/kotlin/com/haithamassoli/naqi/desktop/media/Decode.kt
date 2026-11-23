@@ -18,7 +18,6 @@ import org.bytedeco.ffmpeg.swscale.SwsContext
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.DoublePointer
 import org.bytedeco.javacpp.FloatPointer
-import org.bytedeco.javacpp.IntPointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
 import java.io.File
@@ -66,12 +65,20 @@ object VideoDecoder {
 
 object AudioDecoder {
     const val RATE = 44_100
+    private const val SNAP_SECONDS = 0.01
+    private const val SILENCE_CHUNK = 4096 // input samples per batch of inserted silence
 
     /**
      * Decode the first audio stream to 44 100 Hz stereo float, interleaved L R L R, nominally in [-1, 1],
      * and hand it over in batches of [frames] sample frames (`interleaved.size >= frames * 2`; the array may
      * be reused after the call returns). Starts at the stream's first sample. Returns false, without calling
      * [onPcm], when the file has no audio stream. Cancellable.
+     *
+     * The PCM is laid out on the stream's own clock, not concatenated: a frame whose timestamp is later than
+     * where the audio so far ends gets silence before it, and one that starts earlier (an overlap) loses the
+     * samples already covered. Sample k of the output is then `k / RATE` s after the first frame, which is
+     * what [Renderer] assumes when it puts an [AudioOut.Replace] track back. Drifts under [SNAP_SECONDS] are
+     * timestamp rounding and left alone.
      *
      * Mono is duplicated at full level into both channels, as Android's decoder does (swresample's own
      * mono upmix would put it 3 dB down). More than two channels go through swresample's downmix, which,
@@ -85,6 +92,7 @@ object AudioDecoder {
             val outPtr = PointerPointer<FloatPointer>(1L)
             var out = FloatArray(0)
             var stereo = FloatArray(0)
+            var silence: AVFrame? = null
 
             /** Resamples one batch (null = flush the tail) and hands it on; returns the frames produced. */
             suspend fun push(inData: PointerPointer<*>?, inFrames: Int, inRate: Int): Int {
@@ -114,8 +122,10 @@ object AudioDecoder {
             }
 
             var inRate = 0
+            var fed = 0L // input samples handed to the resampler since the first frame
+            var origin = AV_NOPTS_VALUE // the first frame's timestamp, in input samples
             try {
-                readStream(input, AVMEDIA_TYPE_AUDIO) { _, frame ->
+                readStream(input, AVMEDIA_TYPE_AUDIO) { st, frame ->
                     if (swr == null) {
                         inRate = frame.sample_rate()
                         val inLayout = AVChannelLayout()
@@ -135,13 +145,66 @@ object AudioDecoder {
                         swr = s
                         ffCheck(swr_init(s), "resampler")
                     }
-                    push(frame.extended_data(), frame.nb_samples(), inRate)
+                    var skip = 0
+                    val ts = frame.best_effort_timestamp()
+                    if (ts != AV_NOPTS_VALUE) {
+                        val at = av_rescale(ts, st.time_base().num().toLong() * inRate, st.time_base().den().toLong())
+                        if (origin == AV_NOPTS_VALUE) origin = at
+                        val drift = at - origin - fed // > 0: a gap before this frame; < 0: it overlaps what was fed
+                        if (drift > inRate * SNAP_SECONDS) {
+                            // Silence in the input's own format, through the resampler like any audio, so the
+                            // resampler's tail of the audio before the gap stays before it.
+                            val sil = silence ?: av_frame_alloc().also { f ->
+                                silence = f
+                                f.format(frame.format())
+                                f.sample_rate(inRate)
+                                ffCheck(av_channel_layout_copy(f.ch_layout(), frame.ch_layout()), "layout")
+                                f.nb_samples(SILENCE_CHUNK)
+                                ffCheck(av_frame_get_buffer(f, 0), "silence")
+                                av_samples_set_silence(f.extended_data(), 0, SILENCE_CHUNK, f.ch_layout().nb_channels(), f.format())
+                            }
+                            var left = drift
+                            while (left > 0) {
+                                kotlin.coroutines.coroutineContext.ensureActive()
+                                val k = minOf(left, SILENCE_CHUNK.toLong()).toInt()
+                                push(sil.extended_data(), k, inRate)
+                                left -= k
+                            }
+                            fed += drift
+                        } else if (drift < -inRate * SNAP_SECONDS) {
+                            skip = minOf(-drift, frame.nb_samples().toLong()).toInt()
+                        }
+                    }
+                    val n = frame.nb_samples() - skip
+                    if (n > 0) {
+                        if (skip == 0) {
+                            push(frame.extended_data(), n, inRate)
+                        } else {
+                            // The same planes, each starting `skip` samples in.
+                            val fmt = frame.format()
+                            val channels = frame.ch_layout().nb_channels()
+                            val planar = av_sample_fmt_is_planar(fmt) != 0
+                            val step = skip.toLong() * av_get_bytes_per_sample(fmt) * (if (planar) 1 else channels)
+                            val planes = if (planar) channels else 1
+                            val trimmed = PointerPointer<BytePointer>(planes.toLong())
+                            try {
+                                for (i in 0 until planes) {
+                                    trimmed.put(i.toLong(), BytePointer(frame.extended_data().get(i.toLong())).getPointer(step))
+                                }
+                                push(trimmed, n, inRate)
+                            } finally {
+                                trimmed.close()
+                            }
+                        }
+                        fed += n
+                    }
                 } ?: return@withContext false
                 // The resampler holds a few ms of tail; without this the output is short by its delay.
                 if (swr != null) while (push(null, 0, inRate) > 0) Unit
                 true
             } finally {
                 swr?.let { swr_free(it) }
+                silence?.let { av_frame_free(it) }
                 native.close()
                 outPtr.close()
             }
@@ -199,8 +262,7 @@ internal class ToRgb(private val flags: Int) : AutoCloseable {
     private var sws: SwsContext? = null
     private var key = emptyList<Int>()
     private var native = BytePointer(0L)
-    private val dstData = PointerPointer<BytePointer>(1L)
-    private val dstStride = IntPointer(1L)
+    private val dst = SwsPlanes()
     private var out = ByteArray(0)
 
     fun convert(f: AVFrame, w: Int, h: Int): ByteArray {
@@ -211,12 +273,11 @@ internal class ToRgb(private val flags: Int) : AutoCloseable {
                 ?.takeIf { !it.isNull } ?: throw IOException("no scaler for pixel format ${f.format()}")
             native.close()
             native = BytePointer(w.toLong() * h * 3)
-            dstData.put(0L, native)
-            dstStride.put(0L, w * 3) // 0L: a bare 0 picks the put(int...) overload
+            dst.set(native, w * 3)
             out = ByteArray(w * h * 3)
             key = k
         }
-        ffCheck(sws_scale(sws, f.data(), f.linesize(), 0, f.height(), dstData, dstStride), "to RGB")
+        ffCheck(sws_scale(sws, f.data(), f.linesize(), 0, f.height(), dst.data, dst.stride), "to RGB")
         native.get(out)
         return out
     }
@@ -225,8 +286,7 @@ internal class ToRgb(private val flags: Int) : AutoCloseable {
         sws?.let { sws_freeContext(it) }
         sws = null
         native.close()
-        dstData.close()
-        dstStride.close()
+        dst.close()
     }
 }
 

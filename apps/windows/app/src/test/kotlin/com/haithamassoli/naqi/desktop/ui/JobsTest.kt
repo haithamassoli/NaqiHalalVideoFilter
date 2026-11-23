@@ -53,6 +53,16 @@ class JobsTest {
     }
 
     @Test
+    fun aPickedOutputGetsItsExtensionBeforeTheClobberCheck() {
+        val dir = Files.createTempDirectory("naqi-out").toFile()
+        assertEquals(File(dir, "holiday.mp4"), outputFor(File(dir, "holiday")))
+        File(dir, "holiday.mp4").writeText("x")
+        assertEquals(File(dir, "holiday-2.mp4"), outputFor(File(dir, "holiday")))
+        assertEquals(File(dir, "holiday-2.mp4"), outputFor(File(dir, "holiday.mp4")))
+        assertEquals(File(dir, "holiday-3.mp4"), outputFor(File(dir, "holiday"), taken = listOf(File(dir, "holiday-2.mp4"))))
+    }
+
+    @Test
     fun jobsRunOneAtATimeInOrder() = runBlocking {
         val order = mutableListOf<String>()
         val release = CompletableDeferred<Unit>()
