@@ -22,7 +22,8 @@
 </p>
 
 <p align="center">
-  🤖 Also on Android: <a href="https://github.com/haithamassoli/NaqiHalalVideoFilter"><b>Naqi for Android</b></a>
+  Also on Android: <a href="../android"><b>Naqi for Android</b></a> ·
+  All platforms: <a href="../../README.md"><b>Naqi</b></a>
 </p>
 
 *Naqi (نقي) means "pure" in Arabic.*
@@ -73,9 +74,12 @@ MP4 working copy first. MKV is not supported.
 
 ## Privacy
 
-Imported files are processed locally. The network is used only to fetch media from a link you
-give it. Nothing is uploaded, and no account is required. The full privacy statement is in the app
-under About.
+Imported files are processed locally, and no account is required. The network is used to fetch
+media from a link you give it and, in builds configured with Naqi's server, for videos of 10 minutes
+or more: their audio or video is sent to the server in [`server/`](../../server), which processes it
+and then deletes it. That is on by default and can be turned off in Settings; shorter videos are
+never uploaded. The full privacy statement is in the app under About, and the one for all the apps
+is in the [root README](../../README.md#privacy).
 
 ## Install
 
@@ -90,16 +94,24 @@ Free on the App Store for iPhone and iPad. The Mac app is built from source (bel
 You need a Mac with Xcode and the iOS 18 / macOS 15 SDKs. The project uses Swift 6 and resolves
 ONNX Runtime and the FFmpegKit min build through Swift Package Manager.
 
-The models and fonts are gitignored. A fresh clone needs three things first:
+The models and fonts are gitignored. Run the commands below from `apps/apple`. A fresh clone needs
+three things first:
 
-1. **Models from the Android project.** Clone
-   [NaqiHalalVideoFilter](https://github.com/haithamassoli/NaqiHalalVideoFilter), fetch its models,
-   then point the script at the checkout:
+1. **Models from the Android app.** The ONNX models are staged from
+   [`apps/android`](../android), so fetch those first (see the
+   [Android README](../android/README.md#build-from-source)), then convert them for Apple:
 
    ```sh
    python3 -m pip install numpy onnx onnxruntime
-   NAQI_ANDROID_REPO=/path/to/NaqiHalalVideoFilter ./scripts/fetch-models.sh
+   ./scripts/fetch-models.sh
    ```
+
+   The script reads `../android/app/src/main/assets/models` by default. To use a different
+   checkout, set `NAQI_ANDROID_REPO=/path/to/checkout`.
+
+   It also needs `nsfw_mnv2_140_f32.onnx`, which the Android fetch script does not restore (the
+   Android app ships the INT8 build). Its regeneration steps are in
+   [`../android/docs/m0-spikes.md`](../android/docs/m0-spikes.md).
 
 2. **The Core ML person model.** The script verifies the pinned graph and weights before compiling:
 
@@ -114,7 +126,7 @@ The models and fonts are gitignored. A fresh clone needs three things first:
    `thmanyahsans-Bold.otf`.
 
 Then open `naqi.xcodeproj`, select the `naqi` scheme, and run on an iOS simulator or a Mac. From the
-terminal:
+terminal, in `apps/apple`:
 
 ```sh
 xcodebuild -project naqi.xcodeproj -scheme naqi \
@@ -138,7 +150,7 @@ regions.
 encoder. Censor-only jobs pass the audio through untouched; music-only jobs copy the original video
 samples with no re-encode.
 
-The architecture mirrors the Android app. More detail lives in
+The architecture mirrors the [Android app](../android). More detail lives in
 [`docs/prd-video-filter-apple.md`](docs/prd-video-filter-apple.md), and the
 [iOS integration report](docs/benchmarks/integration-ios.ar.md) has the full-video performance
 comparison and remaining coverage limits.
@@ -167,6 +179,7 @@ whole-frame mode on.
 
 ## Licence
 
-The Naqi-authored code is available for **personal, non-commercial use** under
-[`LICENSE`](LICENSE). Third-party code, fonts and model weights have their own terms, listed in
-[`NOTICE`](NOTICE).
+The Naqi-authored code in `apps/apple/` is available for **personal, non-commercial use** under the
+Naqi Personal Non-Commercial License in [`LICENSE`](LICENSE). It applies to this directory instead
+of the GPL-3.0 licence at the [repository root](../../LICENSE). Third-party code, fonts and model
+weights have their own terms, listed in [`NOTICE`](NOTICE).

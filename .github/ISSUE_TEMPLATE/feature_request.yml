@@ -2,6 +2,19 @@ name: Feature request
 description: Suggest something Naqi should do
 labels: [enhancement]
 body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Pick every platform this applies to.
+      multiple: true
+      options:
+        - Android
+        - iPhone-iPad
+        - Mac
+        - Windows
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
@@ -19,5 +32,5 @@ body:
     attributes:
       label: Please confirm
       options:
-        - label: I searched `docs/` — several ideas were already considered and rejected there, with reasons.
+        - label: I searched `docs/` and the app's own docs (`apps/android/docs/`, `apps/apple/docs/`) — several ideas were already considered and rejected there, with reasons.
           required: true

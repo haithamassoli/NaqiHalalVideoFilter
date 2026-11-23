@@ -21,7 +21,8 @@
 </p>
 
 <p align="center">
-  🤖 متوفر أيضًا على أندرويد: <a href="https://github.com/haithamassoli/NaqiHalalVideoFilter"><b>نقي لنظام أندرويد</b></a>
+  متوفر أيضًا على أندرويد: <a href="../android"><b>نقي لنظام أندرويد</b></a> ·
+  كل المنصّات: <a href="../../README.ar.md"><b>نقي</b></a>
 </p>
 
 <p align="center">
@@ -72,8 +73,11 @@
 
 ## الخصوصية
 
-تُعالَج الملفات المستوردة محليًا. لا يُستخدم الإنترنت إلا لتنزيل فيديو من رابط تعطيه أنت. لا يُرفع
-شيء، ولا يلزم حساب. تجد بيان الخصوصية كاملًا في شاشة «حول التطبيق».
+تُعالَج الملفات المستوردة محليًا، ولا يلزم حساب. يُستخدم الإنترنت لتنزيل فيديو من رابط تعطيه أنت،
+وفي النسخ المهيّأة بخادم نقي، للفيديوهات التي مدتها 10 دقائق فأكثر: يُرسَل صوتها أو الفيديو نفسه إلى
+الخادم الموجود في [`server/`](../../server)، فيعالجه ثم يحذفه. هذا الخيار مفعّل افتراضيًا ويمكن إيقافه
+من الإعدادات، أما الفيديوهات الأقصر فلا تُرفع أبدًا. تجد بيان الخصوصية كاملًا في شاشة «حول التطبيق»،
+وبيان التطبيقات كلها في [ملف README الرئيسي](../../README.ar.md#الخصوصية).
 
 ## التثبيت
 
@@ -88,16 +92,22 @@
 تحتاج إلى جهاز ماك عليه Xcode وحزم تطوير iOS 18 وmacOS 15. يستخدم المشروع Swift 6 ويجلب
 ONNX Runtime والإصدار المصغّر من FFmpegKit عبر Swift Package Manager.
 
-النماذج والخطوط مستثناة من Git، فالنسخة الجديدة تحتاج ثلاثة أشياء أولًا:
+النماذج والخطوط مستثناة من Git. نفّذ الأوامر التالية من داخل `apps/apple`. النسخة الجديدة تحتاج
+ثلاثة أشياء أولًا:
 
-1. **النماذج من مشروع أندرويد.** انسخ
-   [NaqiHalalVideoFilter](https://github.com/haithamassoli/NaqiHalalVideoFilter) وجهّز نماذجه،
-   ثم وجّه السكربت إلى مساره:
+1. **النماذج من تطبيق أندرويد.** تُجهَّز نماذج ONNX من [`apps/android`](../android)، فجهّزها أولًا
+   (انظر [ملف README لأندرويد](../android/README.ar.md#البناء-من-المصدر))، ثم حوّلها لـ Apple:
 
    ```sh
    python3 -m pip install numpy onnx onnxruntime
-   NAQI_ANDROID_REPO=/path/to/NaqiHalalVideoFilter ./scripts/fetch-models.sh
+   ./scripts/fetch-models.sh
    ```
+
+   يقرأ السكربت افتراضيًا من `../android/app/src/main/assets/models`. ولاستخدام نسخة أخرى من
+   المستودع، اضبط `NAQI_ANDROID_REPO=/path/to/checkout`.
+
+   ويحتاج أيضًا `nsfw_mnv2_140_f32.onnx`، وهو نموذج لا يستعيده سكربت أندرويد (تطبيق أندرويد يشحن
+   نسخة INT8). خطوات إعادة توليده في [`../android/docs/m0-spikes.md`](../android/docs/m0-spikes.md).
 
 2. **نموذج الأشخاص بصيغة Core ML.** يتحقق السكربت من بصمات الرسم الحسابي والأوزان قبل التجميع:
 
@@ -111,7 +121,7 @@ ONNX Runtime والإصدار المصغّر من FFmpegKit عبر Swift Package
    `NaqiShared/Fonts/`، بالأسماء `thmanyahsans-Regular.otf` و`thmanyahsans-Medium.otf`
    و`thmanyahsans-Bold.otf`.
 
-ثم افتح `naqi.xcodeproj`، واختر مخطط `naqi`، وشغّله على محاكي iOS أو جهاز ماك. ومن الطرفية:
+ثم افتح `naqi.xcodeproj`، واختر مخطط `naqi`، وشغّله على محاكي iOS أو جهاز ماك. ومن الطرفية، داخل `apps/apple`:
 
 ```sh
 xcodebuild -project naqi.xcodeproj -scheme naqi \
@@ -132,7 +142,7 @@ xcodebuild -project naqi.xcodeproj -scheme naqi \
 **المرحلة الثانية** تطبّق قائمة التحرير عبر Core Image وترمّز بـ AVAssetWriter على المرمّز العتادي.
 مهام الحجب وحده تمرّر الصوت كما هو، ومهام إزالة الموسيقى وحدها تنسخ عينات الفيديو الأصلية دون إعادة ترميز.
 
-البنية مطابقة لتطبيق أندرويد. التفاصيل في
+البنية مطابقة [لتطبيق أندرويد](../android). التفاصيل في
 [`docs/prd-video-filter-apple.md`](docs/prd-video-filter-apple.md)، ويتضمن
 [تقرير دمج iOS](docs/benchmarks/integration-ios.ar.md) مقارنة الأداء على الفيديوهات الكاملة
 وحدود التغطية المتبقية.
@@ -159,7 +169,9 @@ xcodebuild -project naqi.xcodeproj -scheme naqi \
 
 ## الترخيص
 
-تخضع الشيفرة التي كتبها مطوّر نقي [للترخيص](LICENSE) الذي يسمح **بالاستخدام الشخصي غير التجاري**.
+تخضع الشيفرة التي كتبها مطوّر نقي في `apps/apple/` لرخصة Naqi Personal Non-Commercial License
+الموجودة في [`LICENSE`](LICENSE)، وهي تسمح **بالاستخدام الشخصي غير التجاري**. وتسري على هذا المجلد بدل
+رخصة GPL-3.0 الموجودة في [جذر المستودع](../../LICENSE).
 وتخضع شيفرات الأطراف الثالثة والخطوط وأوزان النماذج لشروط مستقلة موضّحة في [`NOTICE`](NOTICE).
 
 </div>
