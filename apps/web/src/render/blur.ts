@@ -4,6 +4,8 @@
 // run at the smallest downscale in {1, 2, 4, 8} that keeps the low-res sigma <= 4; BT.709 grayscale on top
 // when asked; the one style that would change nothing (blur 0, no gray, no fill) becomes a light blur; and
 // a feather that ramps OUTWARD from each rect, so softening never uncovers a pixel the hard rect covered.
+// Precise body silhouettes follow Android's rasterizeMasks: each mask grown by one empty cell and sampled
+// bilinearly, so its edge ramps outward over one cell from the model's outline, never into it.
 //
 // The blur itself is the canvas `filter: blur()` (its radius is the Gaussian's standard deviation), on a
 // low-res copy whose edges are replicated outward first, so the frame edge blurs like GL_CLAMP_TO_EDGE
@@ -14,7 +16,7 @@
 
 import type { VideoSample } from 'mediabunny';
 import type { NRect } from '../core/contracts';
-import { fullFrameAt, masksAt, regionsAt, type Edl } from '../core/edl';
+import { fullFrameAt, maskAt, masksAt, regionsAt, type BodyMask, type Edl } from '../core/edl';
 import { BLUR, type FilterOps } from '../core/filterOps';
 
 /** Android's FilterWorker.MIN_EFFECTIVE_BLUR: 10 px of sigma at 1080p. */
@@ -50,14 +52,53 @@ export function blurPlan(amount: number, width: number, height: number): { scale
   return { scale, sigma: sigmaPx / scale };
 }
 
-/**
- * Every rect to cover at `tMs` (upright, normalized), or 'full' for the whole frame. Body silhouettes are
- * covered by their whole box until the silhouette renderer lands: the box holds the silhouette, so this
- * covers more, never less.
- */
-export function coverAt(edl: Edl, tMs: number): NRect[] | 'full' {
+/** What to cover at `tMs`: 'full' for the whole frame, else face/body rects and body silhouettes (upright). */
+export function coverAt(edl: Edl, tMs: number): 'full' | { regions: NRect[]; masks: BodyMask[] } {
   if (fullFrameAt(edl, tMs)) return 'full';
-  return [...regionsAt(edl, tMs), ...masksAt(edl, tMs).map((m) => m.rect)];
+  return { regions: regionsAt(edl, tMs), masks: masksAt(edl, tMs) };
+}
+
+/** A silhouette ready to sample: its cells grown by one with an empty border, and that grid's placement. */
+interface Grown {
+  grid: Float32Array;
+  gw: number;
+  gh: number;
+  /** Normalized top-left of the grown grid and one cell's size. */
+  gl: number;
+  gt: number;
+  cw: number;
+  ch: number;
+}
+
+/** Android's rasterizeMasks preparation: every set cell also sets its 8 neighbours in a grid one cell larger per side. */
+function grow(m: BodyMask): Grown | null {
+  const cw = (m.rect.right - m.rect.left) / m.width;
+  const ch = (m.rect.bottom - m.rect.top) / m.height;
+  if (!(cw > 0 && ch > 0)) return null;
+  const gw = m.width + 2;
+  const gh = m.height + 2;
+  const grid = new Float32Array(gw * gh);
+  for (let y = 0; y < m.height; y++) {
+    for (let x = 0; x < m.width; x++) {
+      if (!maskAt(m, x, y)) continue;
+      for (let dy = 0; dy <= 2; dy++) for (let dx = 0; dx <= 2; dx++) grid[(y + dy) * gw + x + dx] = 1;
+    }
+  }
+  return { grid, gw, gh, gl: m.rect.left - cw, gt: m.rect.top - ch, cw, ch };
+}
+
+/** The grown grid sampled bilinearly at upright normalized (u, v): 0 outside it. */
+function sampleGrown(g: Grown, u: number, v: number): number {
+  const gx = (u - g.gl) / g.cw - 0.5;
+  const gy = (v - g.gt) / g.ch - 0.5;
+  const ix = Math.floor(gx);
+  const iy = Math.floor(gy);
+  const fx = gx - ix;
+  const fy = gy - iy;
+  const at = (x: number, y: number) => (x >= 0 && x < g.gw && y >= 0 && y < g.gh ? g.grid[y * g.gw + x] : 0);
+  return (
+    at(ix, iy) * (1 - fx) * (1 - fy) + at(ix + 1, iy) * fx * (1 - fy) + at(ix, iy + 1) * (1 - fx) * fy + at(ix + 1, iy + 1) * fx * fy
+  );
 }
 
 /** A rect with its feather band, in normalized units: [left, top, right, bottom, featherX, featherY]. */
@@ -93,16 +134,24 @@ export interface CoverMask {
 }
 
 /**
- * The cover's alpha over a `w` x `h` frame: the largest of each rect's feathered mask (Censor.kt's maths).
- * Alpha rounds UP, so a pixel the feather touches at all is touched, and 1.0 is exactly 255.
+ * The cover's alpha over a `w` x `h` frame: the largest of each rect's feathered mask (Censor.kt's maths)
+ * and each silhouette's grown, bilinear mask. Alpha rounds UP, so a pixel the feather touches at all is
+ * touched, and 1.0 is exactly 255.
  */
-export function coverMask(regions: readonly NRect[], w: number, h: number): CoverMask | null {
+export function coverMask(regions: readonly NRect[], w: number, h: number, masks: readonly BodyMask[] = []): CoverMask | null {
   const rects = feathered(regions);
-  if (rects.length === 0) return null;
-  const x0 = clamp(Math.floor(Math.min(...rects.map((r) => r[0] - r[4])) * w), 0, w);
-  const y0 = clamp(Math.floor(Math.min(...rects.map((r) => r[1] - r[5])) * h), 0, h);
-  const x1 = clamp(Math.ceil(Math.max(...rects.map((r) => r[2] + r[4])) * w), 0, w);
-  const y1 = clamp(Math.ceil(Math.max(...rects.map((r) => r[3] + r[5])) * h), 0, h);
+  const grown = masks.map(grow).filter((g): g is Grown => g !== null);
+  // Each cover's reach as [left, top, right, bottom], normalized: a rect with its feather; a grown grid plus
+  // the half cell its bilinear ramp runs past the grid (Android clips it there; finishing it covers more).
+  const reach = [
+    ...rects.map((r) => [r[0] - r[4], r[1] - r[5], r[2] + r[4], r[3] + r[5]]),
+    ...grown.map((g) => [g.gl - g.cw / 2, g.gt - g.ch / 2, g.gl + (g.gw + 0.5) * g.cw, g.gt + (g.gh + 0.5) * g.ch]),
+  ];
+  if (reach.length === 0) return null;
+  const x0 = clamp(Math.floor(Math.min(...reach.map((r) => r[0])) * w), 0, w);
+  const y0 = clamp(Math.floor(Math.min(...reach.map((r) => r[1])) * h), 0, h);
+  const x1 = clamp(Math.ceil(Math.max(...reach.map((r) => r[2])) * w), 0, w);
+  const y1 = clamp(Math.ceil(Math.max(...reach.map((r) => r[3])) * h), 0, h);
   if (x0 >= x1 || y0 >= y1) return null;
   const width = x1 - x0;
   const height = y1 - y0;
@@ -117,6 +166,11 @@ export function coverMask(regions: readonly NRect[], w: number, h: number): Cove
           smoothstep(l - fx, l, u) * (1 - smoothstep(r, r + fx, u)) * smoothstep(t - fy, t, v) * (1 - smoothstep(b, b + fy, v));
         if (m > mask) mask = m;
         if (mask >= 1) break;
+      }
+      for (const g of grown) {
+        if (mask >= 1) break;
+        const m = sampleGrown(g, u, v);
+        if (m > mask) mask = m;
       }
       rgba[4 * ((y - y0) * width + (x - x0)) + 3] = Math.ceil(mask * 255);
     }
@@ -173,7 +227,7 @@ export class Censor {
     sample.draw(ctx, 0, 0, w, h);
     const cover = coverAt(edl, Math.round(sample.timestamp * 1000));
     if (cover === 'full') this.coverAll();
-    else this.coverRegions(cover);
+    else this.coverRegions(cover.regions, cover.masks);
     return this.canvas;
   }
 
@@ -189,9 +243,9 @@ export class Censor {
     ctx.drawImage(this.blurred, this.margin, this.margin, this.lowW, this.lowH, 0, 0, w, h);
   }
 
-  private coverRegions(regions: readonly NRect[]): void {
+  private coverRegions(regions: readonly NRect[], masks: readonly BodyMask[]): void {
     const { width: w, height: h } = this;
-    const mask = coverMask(regions, w, h);
+    const mask = coverMask(regions, w, h, masks);
     if (!mask) return;
     const win = this.win;
     if (win.width !== mask.width || win.height !== mask.height) {

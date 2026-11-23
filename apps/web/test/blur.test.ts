@@ -80,11 +80,38 @@ describe('coverAt', () => {
   it('covers the whole frame inside a censor interval', () => {
     expect(coverAt(edl, 1500)).toBe('full');
   });
-  it('covers face rects, and body silhouettes by their whole box', () => {
-    expect(coverAt(edl, 50)).toEqual([box, body, body]); // between two masked samples: both silhouettes
-    expect(coverAt(edl, 2500)).toEqual([box, body]); // held past the last sample: the track's box
+  it('covers face rects, and body silhouettes while they are observed', () => {
+    expect(coverAt(edl, 50)).toEqual({ regions: [box], masks: [mask, mask] }); // between two masked samples: both
+    expect(coverAt(edl, 2500)).toEqual({ regions: [box, body], masks: [] }); // held past the last sample: the box
   });
   it('covers nothing outside every span', () => {
-    expect(coverAt(edl, 3001)).toEqual([]);
+    expect(coverAt(edl, 3001)).toEqual({ regions: [], masks: [] });
+  });
+});
+
+describe('coverMask silhouettes', () => {
+  // A 4x4-cell mask over 0.2..0.6 of a 100-px frame (10-px cells) with only the top-left 2x2 cells set.
+  const rect = nrect(0.2, 0.2, 0.6, 0.6);
+  const mask = { rect, width: 4, height: 4, bits: new Uint8Array([0b00110011, 0]) };
+
+  it('covers set cells fully, ramps outward over one cell, and leaves the rest of the box clear', () => {
+    const m = coverMask([], 100, 100, [mask])!;
+    for (let y = 20; y < 40; y++) for (let x = 20; x < 40; x++) expect(alpha(m, x, y)).toBe(255);
+    expect(alpha(m, 15, 30)).toBe(255); // half a grown cell past the outline
+    expect(alpha(m, 10, 30)).toBeGreaterThan(0); // the outward ramp
+    expect(alpha(m, 10, 30)).toBeLessThan(255);
+    expect(alpha(m, 4, 30)).toBe(0); // past the ramp
+    expect(alpha(m, 55, 55)).toBe(0); // inside the box, outside the silhouette
+    expect(alpha(m, 55, 25)).toBe(0);
+  });
+
+  it('takes the larger of a rect and a silhouette', () => {
+    const m = coverMask([nrect(0.5, 0.5, 0.6, 0.6)], 100, 100, [mask])!;
+    expect(alpha(m, 25, 25)).toBe(255);
+    expect(alpha(m, 55, 55)).toBe(255);
+  });
+
+  it('ignores an empty mask rect', () => {
+    expect(coverMask([], 100, 100, [{ ...mask, rect: nrect(0.2, 0.2, 0.2, 0.6) }])).toBeNull();
   });
 });

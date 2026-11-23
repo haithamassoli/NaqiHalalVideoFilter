@@ -38,7 +38,19 @@
             Strictness <output id="strictnessOut"></output>
             <input id="strictness" type="range" min="0" max="100" step="1" />
           </label>
-          <label><input id="bodyBlur" type="checkbox" /> Bodies</label>
+          <label>
+            Bodies
+            <select id="body">
+              <option value="off">Off</option>
+              <option value="box">Box around each person</option>
+              <option value="precise">Outline of each person</option>
+            </select>
+          </label>
+          <p class="note" id="bodyNote">
+            Covers the whole person of each censored face. Needs a Faces choice and is slower: an extra model
+            (YOLO11n-seg, AGPL-3.0 licence) is downloaded only when this is on. Unknown people are covered, and
+            the whole picture is covered while a face has no body around it.
+          </p>
         </fieldset>
 
         <fieldset>

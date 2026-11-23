@@ -12,7 +12,7 @@ const removeMusic = $<HTMLInputElement>('removeMusic');
 const censorWho = $<HTMLSelectElement>('censorWho');
 const censorNsfw = $<HTMLInputElement>('censorNsfw');
 const strictness = $<HTMLInputElement>('strictness');
-const bodyBlur = $<HTMLInputElement>('bodyBlur');
+const body = $<HTMLSelectElement>('body');
 const effect = $<HTMLSelectElement>('effect');
 const amount = $<HTMLInputElement>('amount');
 const startBtn = $<HTMLButtonElement>('start');
@@ -28,13 +28,14 @@ removeMusic.checked = DEFAULT_OPS.removeMusic;
 censorWho.value = DEFAULT_WHO;
 censorNsfw.checked = DEFAULT_OPS.censorNsfw;
 strictness.valueAsNumber = DEFAULT_OPS.strictness;
-bodyBlur.checked = DEFAULT_OPS.bodyBlur;
+body.value = DEFAULT_OPS.bodyBlur ? (DEFAULT_OPS.bodyPrecise ? 'precise' : 'box') : 'off';
 amount.valueAsNumber = DEFAULT_OPS.blurAmount;
 
 const syncOutputs = () => {
   $('strictnessOut').textContent = strictness.value;
   $('amountOut').textContent = amount.value;
   strictness.disabled = !censorNsfw.checked;
+  body.disabled = censorWho.value === 'none'; // bodies follow the censored faces (Android's rule)
   amount.disabled = effect.value === 'solid';
 };
 form.addEventListener('input', syncOutputs);
@@ -48,7 +49,8 @@ function readOps(): FilterOps {
     censorWho: censorWho.value as CensorWho,
     censorNsfw: censorNsfw.checked,
     strictness: strictness.valueAsNumber,
-    bodyBlur: bodyBlur.checked,
+    bodyBlur: !body.disabled && body.value !== 'off',
+    bodyPrecise: !body.disabled && body.value === 'precise',
     blurAmount: amount.valueAsNumber,
     grayscale: style === 'grayscale',
     solidColor: style === 'solid' ? SOLID_COLORS[0] : BLUR,
@@ -95,7 +97,7 @@ form.addEventListener('submit', async (e) => {
   const file = fileIn.files?.[0];
   if (!file || worker) return;
   const ops = readOps();
-  if (!ops.removeMusic && ops.censorWho === 'none' && !ops.censorNsfw && !ops.bodyBlur) {
+  if (!ops.removeMusic && ops.censorWho === 'none' && !ops.censorNsfw) {
     show('Nothing to do: choose Remove music, faces to censor or NSFW scenes.');
     return;
   }

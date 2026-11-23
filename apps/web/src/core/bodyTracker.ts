@@ -32,7 +32,7 @@ const last = <T>(xs: T[]): T => xs[xs.length - 1];
 export interface BodyFrameOptions {
   sceneCut?: boolean;
   /** +1 male, -1 female, 0 abstain; omit when no vote is wanted. */
-  vote?: ((face: NRect) => number) | null;
+  vote?: ((face: NRect) => number | Promise<number>) | null;
   /** Parallels `people` in precise body mode. */
   masks?: (BodyMask | null)[];
 }
@@ -52,7 +52,18 @@ export class BodyTracker {
 
   constructor(private readonly who: string) {}
 
-  onFrame(people: NRect[], faces: NRect[], width: number, height: number, ptsMs: number, opts: BodyFrameOptions = {}): void {
+  /**
+   * Async only because the web's ONNX Runtime is: callers await each frame before the next, and a vote
+   * that throws rejects the whole frame (the caller stops the export).
+   */
+  async onFrame(
+    people: NRect[],
+    faces: NRect[],
+    width: number,
+    height: number,
+    ptsMs: number,
+    opts: BodyFrameOptions = {},
+  ): Promise<void> {
     const { sceneCut = false, vote = null, masks = [] } = opts;
     this.frameCount++;
     this.detectionCount += people.length;
@@ -81,7 +92,7 @@ export class BodyTracker {
     const old = [...this.live];
     const used = new Set<FaceTrack>();
     const scores = people.map((box) => old.map((t) => overlap(box, last(t.samples).rect)));
-    people.forEach((box, index) => {
+    for (const [index, box] of people.entries()) {
       // Stable sort, like Kotlin's sortedByDescending.
       const ranked = old.map((_, j) => j).sort((x, y) => scores[index][y] - scores[index][x]);
       const best = ranked.length > 0 ? ranked[0] : null;
@@ -109,21 +120,21 @@ export class BodyTracker {
       }
       used.add(track);
       track.samples.push({ ptsMs, rect: box, mask: masks[index] ?? null });
-      if (!vote || track.votesTried >= VOTE_CAP) return;
+      if (!vote || track.votesTried >= VOTE_CAP) continue;
       const associated = faces.filter(
         (face) => faceInside(face, box) && people.filter((p) => faceInside(face, p)).length === 1,
       );
-      if (associated.length !== 1) return;
+      if (associated.length !== 1) continue;
       const face = associated[0];
       const px = Math.trunc(Math.max(rectWidth(face) * width, rectHeight(face) * height));
-      if (px < MIN_FACE_PX || (track.votesTried > 0 && ptsMs - track.lastVoteMs < 100)) return;
+      if (px < MIN_FACE_PX || (track.votesTried > 0 && ptsMs - track.lastVoteMs < 100)) continue;
       track.classifiedPx = Math.max(track.classifiedPx, px);
       track.lastVoteMs = ptsMs;
       track.votesTried++;
-      const v = vote(face);
+      const v = await vote(face);
       if (v === 1) track.maleVotes++;
       else if (v === -1) track.femaleVotes++;
-    });
+    }
     // A replacement/ambiguous box already covers this location; retaining the old box would manufacture
     // competing candidates on the next frame.
     for (const track of old) {
