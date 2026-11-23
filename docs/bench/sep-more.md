@@ -1,7 +1,7 @@
 # More separator candidates — 2026-09-30 (owner request)
 
 Owner rule (2026-09-30): "remove music" removes **instruments** and keeps **speech and singing**, i.e. the vocals stem.
-Scripts: `scripts/bench/sep_light.py` (SEP-5 SCNet, SEP-6 DTTNet, SEP-9 Spleeter) and `scripts/bench/sep_roformer.py` (SEP-R3 Mel-Band RoFormer
+Scripts: `models/bench/sep_light.py` (SEP-5 SCNet, SEP-6 DTTNet, SEP-9 Spleeter) and `models/bench/sep_roformer.py` (SEP-R3 Mel-Band RoFormer
 Kim, SEP-R2 BS-RoFormer viperx `ep_317_sdr_12.9755`). Both export ONNX with STFT outside the graph, and ONNX-vs-torch parity is ≥ 90 dB for both RoFormers
 (`roformer_parity.json`, `sep_light_parity.json`). Moises-Light (arXiv 2510.06785) has no public weights, so it was skipped. The anvuew BS-RoFormer
 (21.8 s window) was too heavy to export on the Mac and was replaced by viperx (8 s).
@@ -10,7 +10,7 @@ Kim, SEP-R2 BS-RoFormer viperx `ep_317_sdr_12.9755`). Both export ONNX with STFT
 
 The agents' own `*_quality.json` compare a subset against the **full-set** SEP-0 mean. `every_4` is carefree-only, so those deltas are invalid.
 This table re-scores every arm on the same 8 mixes (per SNR bin: the first `night_owl` instrumental mix and the first `battle_hymn` sung mix), using
-`scripts/bench/sep_eval8.py` → `qa-assets/bench-out/sep/eval8_<arm>.json`.
+`models/bench/sep_eval8.py` → `qa-assets/bench-out/sep/eval8_<arm>.json`.
 
 Speech metrics use the **instrumental** mixes only. On sung mixes, the pseudo-stem lumps singing with instruments, so a model that keeps singing
 (which the owner wants) is penalised. Sung clips are therefore judged by ear.

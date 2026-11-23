@@ -32,8 +32,8 @@ graphs (verified bit-exact on several waveforms) with different serialized bytes
 prints a DIFFERENT sha256. The shipped file is the authority — if you re-export, update
 `NaqiModel.MUSIC_GATE.sha256` from the sha this prints, or `ModelDownloader` rejects the download.
 
-    python3 scripts/yamnet_export.py            # writes apps/android/app/src/main/assets/models/yamnet.onnx
-    python3 scripts/yamnet_export.py --keep     # also leave the intermediates in build/yamnet/
+    python3 models/yamnet_export.py            # writes apps/android/app/src/main/assets/models/yamnet.onnx
+    python3 models/yamnet_export.py --keep     # also leave the intermediates in build/yamnet/
 """
 
 import csv

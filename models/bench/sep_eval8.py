@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Score one separator arm on the same 8 mixes (plan §5.2 follow-up). Usage: .venv-bench/bin/python scripts/bench/sep_eval8.py <sep0|sep1|sep5|sep6|sep9|sepr2|sepr3>"""
+"""Score one separator arm on the same 8 mixes (plan §5.2 follow-up). Usage: .venv-bench/bin/python models/bench/sep_eval8.py <sep0|sep1|sep5|sep6|sep9|sepr2|sepr3>"""
 # Same 8 mixes for every arm: per SNR bin, first night_owl (instrumental) + first battle_hymn (sung).
 import sys, json, time
-sys.path.insert(0, 'scripts/bench')
+sys.path.insert(0, 'models/bench')
 from pathlib import Path
 import numpy as np, score_sep as S
 arm = sys.argv[1]

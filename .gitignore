@@ -4,11 +4,11 @@
 # Local QA video clips (synthesized from public-domain portraits; manifest in apps/android/docs/m0-spikes.md)
 /qa-assets/
 
-# Python bytecode from scripts/
+# Python bytecode from models/
 __pycache__/
 
 # Headless-Chrome scratch from branding/generate.js; the script recreates and deletes it.
 /branding/out/
 
-# Host benchmark venv (scripts/bench/)
+# Host benchmark venv (models/bench/)
 /.venv-bench/

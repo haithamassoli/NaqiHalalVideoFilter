@@ -17,7 +17,7 @@ import numpy as np
 import onnxruntime as ort
 from score_sep import cpu_session, REPO
 
-sys.path.insert(0, str(REPO / "scripts"))
+sys.path.insert(0, str(REPO / "models"))
 from export_person import decode  # noqa: E402
 
 

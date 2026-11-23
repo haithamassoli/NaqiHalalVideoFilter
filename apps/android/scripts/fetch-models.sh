@@ -9,9 +9,9 @@ mkdir -p "$DEST"
 # YOLO11n-seg is exported locally; it is not present in the historical APK below.
 if [ ! -s "$DEST/yolo11n-seg.onnx" ]; then
   if [ -x "$REPO/.venv-bench/bin/python" ]; then
-    "$REPO/.venv-bench/bin/python" "$REPO/scripts/export_person.py"
+    "$REPO/.venv-bench/bin/python" "$REPO/models/export_person.py"
   else
-    python3 "$REPO/scripts/export_person.py"
+    python3 "$REPO/models/export_person.py"
   fi
 fi
 

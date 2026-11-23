@@ -52,7 +52,7 @@ record actual Android analysis and exports. [Validation](../../qa-assets/bench-o
   fixed RGB `/255` letterboxed `[1,3,640,640]`; end-to-end output `[1,300,6]`, confidence floor 0.25.
 - Checkpoint SHA-256: `9b09cc8bf347f0fc8a5f7657480587f25db09b34bf33b0652110fb03a8ad4fef`.
 - ONNX SHA-256: `35519e399739f1d02821f6479f5a804c5da64b4f1dc20fa0db6f9822c4417265`.
-  `scripts/export_person.py` pins the checkpoint, checks the graph and artifact hash, and removes
+  `models/export_person.py` pins the checkpoint, checks the graph and artifact hash, and removes
   the export timestamp for reproducibility. Two exports reproduced the same hash.
 - Person detections on the two sample images matched PyTorch: 2/2 and 1/1 boxes; maximum coordinate/
   confidence difference `6.1035e-5`. This is export parity, not a detection-accuracy evaluation.
@@ -102,10 +102,10 @@ content, and no reference stems are available for this song.
 ## Reproduce
 
 ```sh
-.venv-bench/bin/python scripts/export_person.py
+.venv-bench/bin/python models/export_person.py
 apps/android/scripts/fetch-models.sh
 apps/android/gradlew -p apps/android :app:testDebugUnitTest :app:assembleDebug :app:assembleBenchmark
-.venv-bench/bin/python scripts/bench/score_body.py qa-assets/bench-out/body-shorts/rX6wXhLqOIQ/input.mp4 --out qa-assets/bench-out/body-shorts/rX6wXhLqOIQ
+.venv-bench/bin/python models/bench/score_body.py qa-assets/bench-out/body-shorts/rX6wXhLqOIQ/input.mp4 --out qa-assets/bench-out/body-shorts/rX6wXhLqOIQ
 ```
 
 The Android debug hook accepts `--ez body_blur true --es censor_who women --ez censor_nsfw false`

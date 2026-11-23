@@ -4,10 +4,10 @@
 Replicates MusicGate.kt + DemucsSeparator.separateChunk two-tier dilation on host
 ORT 1.27 CPU EP (app uses XNNPACK for YAMNet; python ORT has none — noted).
 
-    .venv-bench/bin/python scripts/bench/score_gate.py              # quality + report
-    .venv-bench/bin/python scripts/bench/score_gate.py --self-check
-    .venv-bench/bin/python scripts/bench/score_gate.py --cost        # idle-machine timings
-    .venv-bench/bin/python scripts/bench/score_gate.py --export-sed  # GATE-1 ONNX only
+    .venv-bench/bin/python models/bench/score_gate.py              # quality + report
+    .venv-bench/bin/python models/bench/score_gate.py --self-check
+    .venv-bench/bin/python models/bench/score_gate.py --cost        # idle-machine timings
+    .venv-bench/bin/python models/bench/score_gate.py --export-sed  # GATE-1 ONNX only
 """
 from __future__ import annotations
 
@@ -858,8 +858,8 @@ def write_report(blob: dict):
     a("")
     a("```")
     a(cmd)
-    a(".venv-bench/bin/python scripts/bench/score_gate.py --self-check")
-    a(".venv-bench/bin/python scripts/bench/score_gate.py --cost   # re-run on an idle machine")
+    a(".venv-bench/bin/python models/bench/score_gate.py --self-check")
+    a(".venv-bench/bin/python models/bench/score_gate.py --cost   # re-run on an idle machine")
     a("```")
     a("")
     a("## Class-map asserts")
@@ -954,8 +954,8 @@ def write_report(blob: dict):
     a("## How to rerun")
     a("")
     a("```")
-    a(".venv-bench/bin/python scripts/bench/score_gate.py")
-    a(".venv-bench/bin/python scripts/bench/score_gate.py --cost")
+    a(".venv-bench/bin/python models/bench/score_gate.py")
+    a(".venv-bench/bin/python models/bench/score_gate.py --cost")
     a("```")
     a("")
     a("Outputs: `qa-assets/bench-out/gate/` (per-chunk CSV, judge timeline, results.json).")

@@ -272,7 +272,7 @@ This is an owner decision (§12). It doesn't block SEP-1's evaluation for the de
 
 ### 5.2 T0 — host screen
 
-- **Harness:** `scripts/bench/score_sep.py`. It reproduces each model's exact STFT geometry, segment
+- **Harness:** `models/bench/score_sep.py`. It reproduces each model's exact STFT geometry, segment
   and overlap-add in numpy: 2.6 s / nfft 4096 / hop 1024 for htdemucs; 5.94 s / n_fft 6144 / dim_f 2048
   for SEP-1/2, **taken from UVR's `model_data_new.json`, not sherpa-onnx's metadata, which is wrong**.
   It runs on host ORT with the app's session options. No dB number without matching the geometry the app

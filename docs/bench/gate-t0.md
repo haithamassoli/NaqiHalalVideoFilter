@@ -21,15 +21,15 @@ Self-check covers resample length (`SEG` → 41600), last-frame flush starts `[0
 ## Commands
 
 ```
-.venv-bench/bin/python scripts/bench/score_gate.py --self-check
-.venv-bench/bin/python scripts/bench/score_gate.py
-.venv-bench/bin/python scripts/bench/score_gate.py --cost   # re-run on an idle machine
+.venv-bench/bin/python models/bench/score_gate.py --self-check
+.venv-bench/bin/python models/bench/score_gate.py
+.venv-bench/bin/python models/bench/score_gate.py --cost   # re-run on an idle machine
 ```
 
 Command that produced these numbers:
 
 ```
-.venv-bench/bin/python scripts/bench/score_gate.py
+.venv-bench/bin/python models/bench/score_gate.py
 ```
 
 ## Class-map asserts
@@ -143,8 +143,8 @@ Adopt a new gate (or GATE-0b) if missed-music ≤ GATE-0, false-mute = 0 s, and 
 ## How to rerun
 
 ```
-.venv-bench/bin/python scripts/bench/score_gate.py
-.venv-bench/bin/python scripts/bench/score_gate.py --cost
+.venv-bench/bin/python models/bench/score_gate.py
+.venv-bench/bin/python models/bench/score_gate.py --cost
 ```
 
 Outputs under `qa-assets/bench-out/gate/`: per-chunk CSVs, `judge_timeline.csv`, `results.json`.

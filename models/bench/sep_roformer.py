@@ -6,14 +6,14 @@ STFT/iSTFT stay outside the ONNX graph (spec-in / mask-out). Host ORT is CPU EP
 
 From repo root, with `.venv-bench`:
 
-  .venv-bench/bin/python scripts/bench/sep_roformer.py download
-  .venv-bench/bin/python scripts/bench/sep_roformer.py export
-  .venv-bench/bin/python scripts/bench/sep_roformer.py parity
-  .venv-bench/bin/python scripts/bench/sep_roformer.py song
-  .venv-bench/bin/python scripts/bench/sep_roformer.py quality
-  .venv-bench/bin/python scripts/bench/sep_roformer.py cost          # serial, one arm
-  .venv-bench/bin/python scripts/bench/sep_roformer.py device
-  .venv-bench/bin/python scripts/bench/sep_roformer.py all
+  .venv-bench/bin/python models/bench/sep_roformer.py download
+  .venv-bench/bin/python models/bench/sep_roformer.py export
+  .venv-bench/bin/python models/bench/sep_roformer.py parity
+  .venv-bench/bin/python models/bench/sep_roformer.py song
+  .venv-bench/bin/python models/bench/sep_roformer.py quality
+  .venv-bench/bin/python models/bench/sep_roformer.py cost          # serial, one arm
+  .venv-bench/bin/python models/bench/sep_roformer.py device
+  .venv-bench/bin/python models/bench/sep_roformer.py all
 """
 from __future__ import annotations
 

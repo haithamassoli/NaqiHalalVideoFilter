@@ -4,10 +4,10 @@
 Stand-in detector is OpenCV YuNet, not ML Kit. Cadence is 5 fps (app faces are 10 fps) on
 maxDim=640 frames. Host ORT has no XNNPACK — CPU EP, intra-op 1, spinning off (app: XNNPACK ×4).
 
-  .venv-bench/bin/python scripts/bench/score_gen.py extract
-  .venv-bench/bin/python scripts/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.0
-  .venv-bench/bin/python scripts/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.2
-  .venv-bench/bin/python scripts/bench/score_gen.py cost
+  .venv-bench/bin/python models/bench/score_gen.py extract
+  .venv-bench/bin/python models/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.0
+  .venv-bench/bin/python models/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.2
+  .venv-bench/bin/python models/bench/score_gen.py cost
 """
 
 from __future__ import annotations
@@ -1327,7 +1327,7 @@ def cmd_cost(args) -> None:
         "warmup": args.warmup,
         "arms": results,
         "command": " ".join(
-            [sys.executable, "scripts/bench/score_gen.py", "cost", "--n", str(args.n), "--warmup", str(args.warmup)]
+            [sys.executable, "models/bench/score_gen.py", "cost", "--n", str(args.n), "--warmup", str(args.warmup)]
         ),
     }
     (OUT / "cost.json").write_text(json.dumps(payload, indent=2) + "\n")

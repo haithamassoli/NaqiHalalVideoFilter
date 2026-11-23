@@ -518,7 +518,7 @@ class DemucsSeparator(
 
         /**
          * Segment geometry, fixed by the exported graph — change these only together with a matching
-         * `scripts/htdemucs_export.py` re-export, or inference reads garbage.
+         * `models/htdemucs_export.py` re-export, or inference reads garbage.
          *
          * htdemucs' checkpoint segment is 7.8 s, but peak working set scales with it and 7.8 s measured
          * 3.24 GB RSS on an S23 — 2× over the PRD's 1.5 GB budget, and an OOM-kill on a 6 GB target

@@ -6,10 +6,10 @@
 # and dumpsys thermalservice Thermal Status == 0), then runs B-micro (T1,
 # 5 min sustained per incumbent) and T2 autorun shapes ABC then CBA.
 #
-#   scripts/bench/device_run.sh            # T1, T2, write-up
-#   scripts/bench/device_run.sh --t1
-#   scripts/bench/device_run.sh --t2
-#   scripts/bench/device_run.sh --parse    # rebuild docs/bench/baseline-2026-10.md
+#   models/bench/device_run.sh            # T1, T2, write-up
+#   models/bench/device_run.sh --t1
+#   models/bench/device_run.sh --t2
+#   models/bench/device_run.sh --parse    # rebuild docs/bench/baseline-2026-10.md
 #
 # Does not change device settings (no battery-protection / airplane-mode
 # toggles). Leaves the benchmark APK installed.
@@ -907,7 +907,7 @@ a("")
 a("## Commands")
 a("")
 a("```")
-a("scripts/bench/device_run.sh")
+a("models/bench/device_run.sh")
 a("```")
 a("")
 if cmds:
@@ -1142,10 +1142,10 @@ a("")
 a("## How to rerun")
 a("")
 a("```")
-a("scripts/bench/device_run.sh                 # full T1+T2+write-up")
-a("scripts/bench/device_run.sh --t1            # micro only")
-a("scripts/bench/device_run.sh --t2            # e2e only")
-a("scripts/bench/device_run.sh --parse         # rebuild this file from qa-assets/bench-out/device/")
+a("models/bench/device_run.sh                 # full T1+T2+write-up")
+a("models/bench/device_run.sh --t1            # micro only")
+a("models/bench/device_run.sh --t2            # e2e only")
+a("models/bench/device_run.sh --parse         # rebuild this file from qa-assets/bench-out/device/")
 a("```")
 a("")
 a("Raw logs: `qa-assets/bench-out/device/{t1,t2,gate.log,driver.log}`.")

@@ -6,13 +6,13 @@ and UVR MDX / sherpa-onnx GTCRN inference. Host ORT is CPU EP (no XNNPACK on mac
 
 From repo root, with `.venv-bench`:
 
-  .venv-bench/bin/python scripts/bench/score_sep.py prepare
-  .venv-bench/bin/python scripts/bench/score_sep.py quality
-  .venv-bench/bin/python scripts/bench/score_sep.py vlog
-  .venv-bench/bin/python scripts/bench/score_sep.py cost          # serial, one arm at a time
-  .venv-bench/bin/python scripts/bench/score_sep.py quant         # SEP-1 INT8 if T0 rule holds
-  .venv-bench/bin/python scripts/bench/score_sep.py all           # prepare+quality+vlog
-  .venv-bench/bin/python scripts/bench/score_sep.py cost-worker --arm sep1 --wav input.wav --output vocals.wav
+  .venv-bench/bin/python models/bench/score_sep.py prepare
+  .venv-bench/bin/python models/bench/score_sep.py quality
+  .venv-bench/bin/python models/bench/score_sep.py vlog
+  .venv-bench/bin/python models/bench/score_sep.py cost          # serial, one arm at a time
+  .venv-bench/bin/python models/bench/score_sep.py quant         # SEP-1 INT8 if T0 rule holds
+  .venv-bench/bin/python models/bench/score_sep.py all           # prepare+quality+vlog
+  .venv-bench/bin/python models/bench/score_sep.py cost-worker --arm sep1 --wav input.wav --output vocals.wav
 """
 from __future__ import annotations
 
@@ -177,7 +177,7 @@ def reflect_pad_1d(x: np.ndarray, left: int, right: int) -> np.ndarray:
     return np.concatenate([x[left:0:-1], x, x[-2:-2 - right:-1]])
 
 
-# --- htdemucs STFT (scripts/stft_golden.py, production sizes) -----------------
+# --- htdemucs STFT (models/stft_golden.py, production sizes) -----------------
 
 def ht_forward(ch0: np.ndarray, ch1: np.ndarray, nfft=HT_NFFT, hop=HT_HOP, T=HT_SEG) -> np.ndarray:
     le = -(-T // hop)
@@ -569,7 +569,7 @@ def ffmpeg_wav(src: Path, dest: Path, sr: int, ch: int, start: float, dur: float
 def write_sources_md() -> None:
     ensure_dir(OUT)
     lines = [
-        "# Sources used by `scripts/bench/score_sep.py` (SEP T0)",
+        "# Sources used by `models/bench/score_sep.py` (SEP T0)",
         "",
         "## Speech",
         "",
@@ -897,7 +897,7 @@ def run_cost(arms: list[str]) -> dict:
     out = {"clip": str(clip), "contended": True, "anchor_htdemucs_ms_s": 152.3, "arms": {}}
     for name in arms:
         log(f"== cost {name} (subprocess) ==")
-        cmd = [str(PY), str(REPO / "scripts/bench/score_sep.py"), "cost-worker",
+        cmd = [str(PY), str(REPO / "models/bench/score_sep.py"), "cost-worker",
                "--arm", name, "--wav", str(clip), "--runs", str(COST_RUNS), "--warmup", "1"]
         try:
             p = subprocess.run(cmd, check=True, capture_output=True, text=True)

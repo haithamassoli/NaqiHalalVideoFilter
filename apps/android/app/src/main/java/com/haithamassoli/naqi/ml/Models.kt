@@ -36,7 +36,7 @@ enum class NaqiModel(
     /**
      * NSFW 5-class gate — GantMan nsfw_model MobileNetV2 1.4-224, converted to ONNX with the
      * input transposed to NCHW, then **statically quantized to INT8** (V3, `plan-v2` §5.3) by
-     * `scripts/nsfw_int8_quantize.py`: AveragePool[7,7] → GlobalAveragePool (bit-exact, max|Δ| 0),
+     * `models/nsfw_int8_quantize.py`: AveragePool[7,7] → GlobalAveragePool (bit-exact, max|Δ| 0),
      * `quant_pre_process`, then `quantize_static(QDQ, QInt8/QInt8, per_channel=True)` calibrated on 100
      * real frames. ORT fuses it to 75 nodes / 52 `QLinearConv` — real integer kernels, and XNNPACK
      * registers `QLinearConv`, so the fast path exists on-device.
@@ -87,7 +87,7 @@ enum class NaqiModel(
 
     /**
      * htdemucs, f16 weights — demucs.onnx export with STFT/iSTFT kept OUTSIDE the graph, re-exported
-     * at a **2.6 s** segment by `scripts/htdemucs_export.py` (the file name's `s26` is that number).
+     * at a **2.6 s** segment by `models/htdemucs_export.py` (the file name's `s26` is that number).
      * Geometry lives in [DemucsSeparator]: `SEG = 114_660 = int(2.6 × 44_100)`, `BINS = 2048`,
      * `LE = 112 = ceil(SEG / 1024)`.
      * Inputs: mix waveform [1,2,114660] f32 (2.6 s stereo @ 44.1 kHz, zero-padded to fit) and
@@ -111,7 +111,7 @@ enum class NaqiModel(
     /**
      * YAMNet — Google's Apache-2.0 AudioSet classifier (MobileNet-v1, 4.0 M weights), the music-activity
      * gate [com.haithamassoli.naqi.audio.MusicGate] runs so the separator can skip music-free chunks
-     * (A1, `plan-v2` §5.5). Converted from Google's own TF2 SavedModel by `scripts/yamnet_export.py`,
+     * (A1, `plan-v2` §5.5). Converted from Google's own TF2 SavedModel by `models/yamnet_export.py`,
      * opset 15; the upstream embedding and log-mel outputs are trimmed and the input length is pinned.
      *
      * Input `waveform` **[15600] f32 — RANK 1, not [1,15600]** — 0.975 s of mono 16 kHz in [-1,1].
@@ -130,7 +130,7 @@ enum class NaqiModel(
     ),
 
     /**
-     * YOLO11n-seg COCO, FP32 static export (`scripts/export_person.py`): RGB /255 letterboxed to 640;
+     * YOLO11n-seg COCO, FP32 static export (`models/export_person.py`): RGB /255 letterboxed to 640;
      * `output0` [1,116,8400] cx,cy,w,h + 80 class scores + 32 mask coefficients, `output1` [1,32,160,160]
      * prototypes. Not end-to-end: `PersonDetector` runs the class filter and NMS.
      */

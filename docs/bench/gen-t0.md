@@ -1,6 +1,6 @@
 # GEN-0 vs GEN-1 — host T0 (plan §7.1)
 
-Harness: `scripts/bench/score_gen.py`. Crop geometry and the per-track vote copy `FrameSampler.cropToTensor`, `FaceTracker` (`VOTE_CAP=5`, strictly-larger, `EVICT_AFTER_MS=2000`, `shouldCensor` for Women mode) and `FilterWorker` (`p_male = sigmoid(male−female)`, `CONF_FLOOR` on `max(p,1−p)`). Detector is OpenCV YuNet, not ML Kit. Face cadence is **5 fps** (app is 10 fps) on `maxDim=640` frames.
+Harness: `models/bench/score_gen.py`. Crop geometry and the per-track vote copy `FrameSampler.cropToTensor`, `FaceTracker` (`VOTE_CAP=5`, strictly-larger, `EVICT_AFTER_MS=2000`, `shouldCensor` for Women mode) and `FilterWorker` (`p_male = sigmoid(male−female)`, `CONF_FLOOR` on `max(p,1−p)`). Detector is OpenCV YuNet, not ML Kit. Face cadence is **5 fps** (app is 10 fps) on `maxDim=640` frames.
 
 Host ORT **1.27.0**, providers `CoreML / Azure / CPU`. Sessions use **CPU EP**, `intra_op=1`, `session.intra_op.allow_spinning=0`. The app’s `imageSessionOptions` add XNNPACK ×4; host Python ORT has no XNNPACK.
 
@@ -9,10 +9,10 @@ GEN-0 always sees the saved InsightFace **1.5×** square (app crop). GEN-1 is ce
 ## Commands
 
 ```
-.venv-bench/bin/python scripts/bench/score_gen.py extract
-.venv-bench/bin/python scripts/bench/score_gen.py cost --n 100 --warmup 20
-.venv-bench/bin/python scripts/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.0
-.venv-bench/bin/python scripts/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.2
+.venv-bench/bin/python models/bench/score_gen.py extract
+.venv-bench/bin/python models/bench/score_gen.py cost --n 100 --warmup 20
+.venv-bench/bin/python models/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.0
+.venv-bench/bin/python models/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.2
 ```
 
 `extract` writes crops / contact sheets / context thumbs / empty `labels.csv`, converts GEN-1, and parity-tests. Fill `label` with `m` / `f` / `junk` / `skip`, then `score`. Re-run `cost` on an idle machine; numbers below are **contended, provisional**.
@@ -20,7 +20,7 @@ GEN-0 always sees the saved InsightFace **1.5×** square (app crop). GEN-1 is ce
 ## Extract (this run)
 
 ```
-.venv-bench/bin/python scripts/bench/score_gen.py extract
+.venv-bench/bin/python models/bench/score_gen.py extract
 ```
 
 Source `qa-assets/vlog/vlog.webm` 1920×1080 → analyze 640×360, 5 fps, YuNet score 0.5, NMS 0.3, min face 0.1 × shorter side = **36.0 px**. YuNet: `qa-assets/models/face_detection_yunet_2023mar.onnx` (Hugging Face `opencv/face_detection_yunet`, sha256 `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4`). OpenCV 5 prints `setPreferableTarget Targets are not supported by the new graph engine for now`; detect still returned boxes.
@@ -76,7 +76,7 @@ Spot check, track 1 crop `c00_174px.png` (clear woman on the sheet):
 ## Cost (contended, provisional)
 
 ```
-.venv-bench/bin/python scripts/bench/score_gen.py cost --n 100 --warmup 20
+.venv-bench/bin/python models/bench/score_gen.py cost --n 100 --warmup 20
 ```
 
 Warmup 20 + median of 100 `session.run` calls, one arm per subprocess, CPU EP as above. Other agents were running CPU jobs on this Mac. Re-run serially on an idle machine before any cost ranking.
@@ -108,8 +108,8 @@ Both male tracks are **below** `MIN_FACE_PX=80`, so at the app vote floor they n
 App operating point: `CONF_FLOOR=0.60`, `MIN_FACE_PX=80`. Balanced / per-class accuracy is over tracks (or crops) that **vote**; abstain is out of the denom. Women-exposed and men-visible use every labelled f/m track (abstain censors in Women mode). JSON: `qa-assets/bench-out/gen/score_s1.0.json`, `score_s1.2.json`.
 
 ```
-.venv-bench/bin/python scripts/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.0
-.venv-bench/bin/python scripts/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.2
+.venv-bench/bin/python models/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.0
+.venv-bench/bin/python models/bench/score_gen.py score qa-assets/bench-out/gen/labels.csv --gen1-scale 1.2
 ```
 
 ### Per-track, floor 0.60, min_px=80 (app)

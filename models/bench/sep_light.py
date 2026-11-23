@@ -6,13 +6,13 @@ keeping singing is GOOD (owner 2026-09-30).
 
 From repo root, with `.venv-bench`:
 
-  .venv-bench/bin/python scripts/bench/sep_light.py export
-  .venv-bench/bin/python scripts/bench/sep_light.py parity
-  .venv-bench/bin/python scripts/bench/sep_light.py song
-  .venv-bench/bin/python scripts/bench/sep_light.py quality
-  .venv-bench/bin/python scripts/bench/sep_light.py cost          # serial, one arm at a time
-  .venv-bench/bin/python scripts/bench/sep_light.py device
-  .venv-bench/bin/python scripts/bench/sep_light.py all
+  .venv-bench/bin/python models/bench/sep_light.py export
+  .venv-bench/bin/python models/bench/sep_light.py parity
+  .venv-bench/bin/python models/bench/sep_light.py song
+  .venv-bench/bin/python models/bench/sep_light.py quality
+  .venv-bench/bin/python models/bench/sep_light.py cost          # serial, one arm at a time
+  .venv-bench/bin/python models/bench/sep_light.py device
+  .venv-bench/bin/python models/bench/sep_light.py all
 """
 from __future__ import annotations
 

@@ -26,7 +26,7 @@ Device T1 micro + T2 end-to-end on the 4:29 vlog. Fast lane only.
 ## Commands
 
 ```
-scripts/bench/device_run.sh
+models/bench/device_run.sh
 ```
 
 Recorded `am start` lines from this run:
@@ -184,10 +184,10 @@ Component names from logcat this run:
 ## How to rerun
 
 ```
-scripts/bench/device_run.sh                 # full T1+T2+write-up
-scripts/bench/device_run.sh --t1            # micro only
-scripts/bench/device_run.sh --t2            # e2e only
-scripts/bench/device_run.sh --parse         # rebuild this file from qa-assets/bench-out/device/
+models/bench/device_run.sh                 # full T1+T2+write-up
+models/bench/device_run.sh --t1            # micro only
+models/bench/device_run.sh --t2            # e2e only
+models/bench/device_run.sh --parse         # rebuild this file from qa-assets/bench-out/device/
 ```
 
 Raw logs: `qa-assets/bench-out/device/{t1,t2,gate.log,driver.log}`.

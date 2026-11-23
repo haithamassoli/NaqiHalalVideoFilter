@@ -21,7 +21,7 @@ Fields written to apps/android/app/src/test/resources/dsp/stft_small.json:
   cac       = forward(input) flattened [4][bins][le]        channel-major [ch0.re, ch0.im, ch1.re, ch1.im]
   roundtrip = inverse(cac)   = [ch0[T], ch1[T]]             iSTFT of the untouched cac
 
-Run from the repo root:  python3 scripts/stft_golden.py
+Run from the repo root:  python3 models/stft_golden.py
 """
 import json
 import os

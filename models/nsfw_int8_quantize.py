@@ -11,8 +11,8 @@ Then evaluates INT8 vs fp32 on a DISJOINT 360-frame set: argmax agreement, singl
 latency, NsfwGate.fires() flips, and interval recall after NsfwGate.intervals() hysteresis —
 the last one is the metric that matters, because hysteresis absorbs most of the 8-bit drift.
 
-Re-run:  python3 scripts/nsfw_int8_quantize.py            # extract + quantize + evaluate
-         python3 scripts/nsfw_int8_quantize.py --eval-only # re-measure an existing artifact
+Re-run:  python3 models/nsfw_int8_quantize.py            # extract + quantize + evaluate
+         python3 models/nsfw_int8_quantize.py --eval-only # re-measure an existing artifact
 Needs onnx + onnxruntime + numpy importable and ffmpeg/ffprobe on PATH, and the gitignored
 qa-assets/test-video-1.webm. Frames are cached in the system temp dir (extraction is minutes,
 the rest is seconds), keyed by video identity + the sampling constants below.

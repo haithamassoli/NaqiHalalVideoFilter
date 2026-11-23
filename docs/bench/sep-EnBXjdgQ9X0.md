@@ -58,7 +58,7 @@ yt-dlp --no-playlist -f bestaudio --write-info-json -o 'qa-assets/bench-out/EnBX
 ffmpeg -nostdin -y -i qa-assets/bench-out/EnBXjdgQ9X0/source.webm -map 0:a:0 -ar 44100 -ac 2 -c:a pcm_f32le qa-assets/bench-out/EnBXjdgQ9X0/original.wav
 
 for bench_arm in sep0 sep1 sep1 sep0; do
-  .venv-bench/bin/python scripts/bench/score_sep.py cost-worker \
+  .venv-bench/bin/python models/bench/score_sep.py cost-worker \
     --arm "$bench_arm" --wav qa-assets/bench-out/EnBXjdgQ9X0/original.wav \
     --runs 1 --warmup 0 --output "qa-assets/bench-out/EnBXjdgQ9X0/${bench_arm}_vocals.wav"
 done

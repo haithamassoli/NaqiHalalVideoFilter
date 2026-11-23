@@ -1,30 +1,30 @@
 # SEP T0 — host screen (plan §5.1–5.2)
 
 **Date:** 2026-09-30. **Host:** Mac arm64, ORT 1.27.0 CPU EP, 8 cores, intra-op 6 (htdemucs `HtdemucsSession` cap), spinning off, arena off. Host python ORT has no XNNPACK provider (`CPUExecutionProvider` only for these runs; CoreML was available and unused).
-**Harness:** `scripts/bench/score_sep.py`. Raw JSON: `qa-assets/bench-out/sep/{quality,vlog,cost,verdicts}.json`. Sources: `qa-assets/bench-out/sep/SOURCES.md`.
+**Harness:** `models/bench/score_sep.py`. Raw JSON: `qa-assets/bench-out/sep/{quality,vlog,cost,verdicts}.json`. Sources: `qa-assets/bench-out/sep/SOURCES.md`.
 **Cost numbers are contended, provisional** (other CPU-heavy agents on the same Mac). Re-run `score_sep.py cost` on an idle machine before trusting ratios.
 
 ## Commands
 
 ```
-.venv-bench/bin/python scripts/bench/score_sep.py prepare
-.venv-bench/bin/python scripts/bench/score_sep.py quality
-.venv-bench/bin/python scripts/bench/score_sep.py vlog
-.venv-bench/bin/python scripts/bench/score_sep.py cost
+.venv-bench/bin/python models/bench/score_sep.py prepare
+.venv-bench/bin/python models/bench/score_sep.py quality
+.venv-bench/bin/python models/bench/score_sep.py vlog
+.venv-bench/bin/python models/bench/score_sep.py cost
 ```
 
 `prepare` wrote 96 mixes (24 per SNR bin) under `qa-assets/bench-out/sep/mixes/`.
 `cost` spawned one subprocess per arm:
 
 ```
-.venv-bench/bin/python scripts/bench/score_sep.py cost-worker --arm <sep0|sep1|sep2|sep7> \
+.venv-bench/bin/python models/bench/score_sep.py cost-worker --arm <sep0|sep1|sep2|sep7> \
   --wav qa-assets/bench-out/sep/cost_60s.wav --runs 3 --warmup 1
 ```
 
 Unseparated-vlog YAMNet baseline (same judge as `vlog`):
 
 ```
-.venv-bench/bin/python -c "import sys; sys.path.insert(0,'scripts/bench'); import score_sep as s, json
+.venv-bench/bin/python -c "import sys; sys.path.insert(0,'models/bench'); import score_sep as s, json
 print(json.dumps(s.Yamnet().residual_music_seconds(s.load_wav(s.VLOG_44K), s.SR)))"
 ```
 
