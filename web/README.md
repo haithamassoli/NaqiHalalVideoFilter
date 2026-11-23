@@ -1,7 +1,7 @@
 # Naqi website
 
 Landing page for Naqi in English (`/`) and Arabic (`/ar/`), built with Astro.
-The download section links to Google Play, the App Store (iPhone, iPad and Mac) and the newest Android APK on GitHub. The Windows card shows "Coming soon" until a `windows-v…` release with an `.msi` exists, then links to it; both releases are looked up at build time (`src/release.ts`, tested by `node --test src/release.test.ts`). The browser section links to two extensions made by other developers: HaramBlur and Musicless.
+The download section links to Google Play, the App Store (iPhone, iPad and Mac) and the newest Android APK on GitHub. The Windows card shows "Coming soon" until a `windows-v…` release with an `.msi` exists, then links to it; both releases are looked up at build time (`src/release.ts`, tested by `node --test src/release.test.ts`). The browser section shows Naqi Web (`apps/web`) as "Coming soon" until `webAppUrl` in `src/components/Landing.astro` is set to its deployed URL, then two extensions made by other developers: HaramBlur and Musicless.
 
 ```sh
 pnpm install
