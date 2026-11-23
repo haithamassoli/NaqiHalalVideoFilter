@@ -90,7 +90,9 @@
 ## البناء من المصدر
 
 تحتاج إلى جهاز ماك عليه Xcode وحزم تطوير iOS 18 وmacOS 15. يستخدم المشروع Swift 6 ويجلب
-ONNX Runtime والإصدار المصغّر من FFmpegKit عبر Swift Package Manager.
+ONNX Runtime والإصدار المصغّر من FFmpegKit عبر Swift Package Manager. تأتي ONNX Runtime من
+الحزمة المحلية في [`Packages/OnnxRuntime`](Packages/OnnxRuntime/Package.swift)، لأن مستودع حزمة
+Swift من مايكروسوفت لم يعد موجودًا، ويُنزّل Xcode ملفها الثنائي عند أول حلّ للحزم.
 
 النماذج والخطوط مستثناة من Git. نفّذ الأوامر التالية من داخل `apps/apple`. النسخة الجديدة تحتاج
 ثلاثة أشياء أولًا:

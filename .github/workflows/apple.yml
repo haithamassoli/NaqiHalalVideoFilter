@@ -56,12 +56,14 @@ jobs:
           sudo xcode-select -s "$XCODE"
           xcodebuild -version
 
-      # ffmpeg-kit-spm's binary frameworks are large; key on the pins so a repin refetches.
+      # ffmpeg-kit-spm's and ONNX Runtime's binary frameworks are large; key on the pins so a repin
+      # refetches. The local Packages/OnnxRuntime is not in Package.resolved: its binary URL and
+      # checksum live in its Package.swift.
       - name: Cache Swift packages
         uses: actions/cache@v6
         with:
           path: .spm
-          key: spm-${{ runner.os }}-${{ hashFiles('apps/apple/naqi.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: spm-${{ runner.os }}-${{ hashFiles('apps/apple/naqi.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'apps/apple/Packages/OnnxRuntime/Package.swift') }}
 
       - name: xcodebuild ${{ matrix.action }}
         run: |

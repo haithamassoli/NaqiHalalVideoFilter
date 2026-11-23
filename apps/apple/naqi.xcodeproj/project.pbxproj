@@ -327,7 +327,7 @@
 			mainGroup = BE4718E83021E434001C874F;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				AA0000000000000000000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
+				AA0000000000000000000001 /* XCLocalSwiftPackageReference "Packages/OnnxRuntime" */,
 				AB0000000000000000000001 /* XCRemoteSwiftPackageReference "ffmpeg-kit-spm" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -888,15 +888,14 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		AA0000000000000000000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/microsoft/onnxruntime-swift-package-manager";
-			requirement = {
-				kind = exactVersion;
-				version = 1.24.2;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		AA0000000000000000000001 /* XCLocalSwiftPackageReference "Packages/OnnxRuntime" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/OnnxRuntime;
 		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
 		AB0000000000000000000001 /* XCRemoteSwiftPackageReference "ffmpeg-kit-spm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/tylerjonesio/ffmpeg-kit-spm";
@@ -910,7 +909,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		AA0000000000000000000002 /* onnxruntime */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = AA0000000000000000000001 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */;
+			package = AA0000000000000000000001 /* XCLocalSwiftPackageReference "Packages/OnnxRuntime" */;
 			productName = onnxruntime;
 		};
 		AB0000000000000000000002 /* FFmpeg-Kit */ = {
