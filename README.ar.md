@@ -111,6 +111,7 @@
 apps/android/   Android app (Kotlin, Gradle) with its scripts and design docs
 apps/apple/     iPhone, iPad and Mac app (Swift, Xcode), imported with its history
 apps/windows/   Windows app (in development)
+core/           pure-Kotlin logic shared by the Android and Windows apps (EDL, DSP, gates)
 models/         model export, conversion and quantization scripts, and model benchmarks
 server/         optional server for long videos (Modal)
 web/            the website (Astro; Vercel builds from this directory)

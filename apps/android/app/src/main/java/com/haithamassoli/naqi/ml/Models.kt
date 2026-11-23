@@ -183,9 +183,6 @@ enum class NaqiModel(
     ),
 }
 
-/** GantMan class order (alphabetical, index-locked). sfw = drawings+neutral; nsfw = the rest. */
-val NSFW_CLASSES = listOf("drawings", "hentai", "neutral", "porn", "sexy")
-
 data class ModelReport(val model: NaqiModel, val bundled: Boolean, val ok: Boolean, val detail: String)
 
 data class SmokeReport(val providers: List<String>, val models: List<ModelReport>)

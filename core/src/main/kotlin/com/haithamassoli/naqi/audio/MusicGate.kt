@@ -1,13 +1,5 @@
 package com.haithamassoli.naqi.audio
 
-import ai.onnxruntime.OnnxTensor
-import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
-import android.content.Context
-import android.util.Log
-import com.haithamassoli.naqi.ml.ModelSmoke
-import com.haithamassoli.naqi.ml.NaqiModel
-import com.haithamassoli.naqi.ml.imageSessionOptions
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -24,7 +16,7 @@ import kotlin.math.abs
  * **Everything in here is biased toward saying "music".** A missed music chunk is an audible product
  * failure the user cannot fix; a spurious separation costs one chunk of wall clock. That is why
  * [THRESHOLD] sits far below the score any real music gets, why the score is a MAX over frames rather
- * than a mean, and why [open] returns null (gate off, separate everything) on any problem at all rather
+ * than a mean, and why `open` returns null (gate off, separate everything) on any problem at all rather
  * than guessing. The two-tier ±2-chunk dilation that goes with it lives in
  * [DemucsSeparator.separateChunk] — this class is stateless.
  *
@@ -34,7 +26,15 @@ import kotlin.math.abs
  * calls. `OrtSession.run` is itself thread-safe; the reused [input] buffer is what needs the ordering,
  * and coroutine dispatch supplies it.
  */
-class MusicGate private constructor(private val session: OrtSession) : AutoCloseable {
+class MusicGate(
+    /**
+     * Runs YAMNet on one [FRAME]-sample frame (rank 1 — the exported graph's input is [15600], not
+     * [1,15600]) and copies its [CLASSES] scores into the array. The only model call in this class: the
+     * ORT session is the platform's (Android's `MusicGateSession.kt`), the policy here is shared.
+     */
+    private val infer: (frame: FloatBuffer, scores: FloatArray) -> Unit,
+    private val release: () -> Unit = {},
+) : AutoCloseable {
 
     /** 16 kHz mono, reused across calls. Sized for the largest window [DemucsSeparator] can hand over. */
     private val mono16k = FloatArray(out16kLength(DemucsSeparator.SEG) + 1)
@@ -46,7 +46,6 @@ class MusicGate private constructor(private val session: OrtSession) : AutoClose
     private val input: FloatBuffer = ByteBuffer.allocateDirect(FRAME * 4)
         .order(ByteOrder.nativeOrder()).asFloatBuffer()
 
-    private val inputName = session.inputNames.first()
     private val scores = FloatArray(CLASSES)
 
     /**
@@ -117,28 +116,20 @@ class MusicGate private constructor(private val session: OrtSession) : AutoClose
         input.put(mono16k, start, avail)
         while (input.hasRemaining()) input.put(0f)
         input.rewind()
-        // Rank 1 — the exported graph's input is [15600], not [1,15600].
-        OnnxTensor.createTensor(env, input, longArrayOf(FRAME.toLong())).use { tensor ->
-            session.run(mapOf(inputName to tensor)).use { result ->
-                val out = (result[0] as OnnxTensor).floatBuffer
-                out.get(scores)
-            }
-        }
+        infer(input, scores)
         var best = 0f
         for (r in MUSIC_RANGES) for (c in r) if (scores[c] > best) best = scores[c]
         return best
     }
 
     override fun close() {
-        session.close()
+        release()
     }
 
     companion object {
-        private const val TAG = "MusicGate"
-
-        /** [NaqiModel.YAMNET]'s locked input length: 0.975 s at 16 kHz. */
-        private const val FRAME = 15_600
-        private const val CLASSES = 521
+        /** YAMNet's locked input length: 0.975 s at 16 kHz. */
+        const val FRAME = 15_600
+        const val CLASSES = 521
         private const val RATIO = 44_100.0 / 16_000.0
 
         /**
@@ -161,47 +152,19 @@ class MusicGate private constructor(private val session: OrtSession) : AutoClose
          * if a QA clip ever keeps music; the cost of down is wall clock, the cost of up is the product.
          *
          * Not private since C1: [DemucsSeparator] holds SCORES in its dilation ring and so has to apply
-         * this itself. `const`, so the value is inlined at that use site and the separator keeps no
-         * runtime reference to this Android-dependent class — which is what its JVM tests need.
+         * this itself.
          */
         internal const val THRESHOLD = 0.15f
 
         /** -60 dBFS peak. Below this a chunk is silence and needs no model at all. */
         private const val SILENCE_PEAK = 0.001f
 
-        private val env: OrtEnvironment by lazy { OrtEnvironment.getEnvironment() }
-
         /**
-         * Open the gate, or **null when it cannot be opened** — the model is not installed (the asset is
-         * gitignored, so a fresh clone has no `yamnet.onnx` until `scripts/fetch-models.sh` runs) or ORT
-         * refused it. Null means every chunk gets separated, i.e. exactly the pre-A1 behaviour, which is
-         * the only safe failure for a gate whose job is deciding what NOT to process.
+         * Audio this long or longer (in frames at 44.1 kHz) gets the gate; shorter clips
+         * separate every chunk. YAMNet misses some quiet background music under speech (~4 s of a 4:29
+         * vlog), which a short clip doesn't need to risk; on a long one the skips save minutes.
          */
-        fun open(context: Context): MusicGate? {
-            val file = ModelSmoke.modelFile(context, NaqiModel.YAMNET)
-            if (file == null) {
-                Log.w(TAG, "yamnet not installed — separating every chunk (A1 disabled)")
-                return null
-            }
-            return runCatching {
-                // The same options ModelSmoke load-checks it under, so the gate can never infer under
-                // options its smoke test never saw. XNNPACK's thread count is irrelevant here: three
-                // ~1 ms runs against a ~2100 ms chunk.
-                MusicGate(imageSessionOptions().use { env.createSession(file.absolutePath, it) })
-            }.onFailure { Log.w(TAG, "yamnet session failed — separating every chunk (A1 disabled)", it) }
-                .getOrNull()
-        }
-
-        /** Audio this long or longer gets the gate; shorter clips separate every chunk. */
-        private const val LONG_FRAMES = 10L * 60 * 44_100
-
-        /**
-         * [open] only for audio of 10 minutes or more ([estFrames] at 44.1 kHz). YAMNet misses some quiet
-         * background music under speech (~4 s of a 4:29 vlog), which a short clip doesn't need to risk;
-         * on a long one the skips save minutes. Null = separate everything.
-         */
-        fun openIfLong(context: Context, estFrames: Long): MusicGate? =
-            if (estFrames >= LONG_FRAMES) open(context) else null
+        const val LONG_FRAMES = 10L * 60 * 44_100
 
         /** 16 kHz samples a [frames]-sample 44.1 kHz window produces; the last one interpolates in range. */
         private fun out16kLength(frames: Int): Int = ((frames - 1) / RATIO).toInt() + 1

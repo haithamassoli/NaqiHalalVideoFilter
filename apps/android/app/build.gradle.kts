@@ -182,7 +182,13 @@ val verifyModels = tasks.register<VerifyModelsTask>("verifyModels") {
 }
 tasks.named("preBuild") { dependsOn(verifyModels) }
 
+// The shared logic's tests live in core now; the documented gate (`testDebugUnitTest`) still runs them.
+tasks.withType<Test>().configureEach { dependsOn(":core:test") }
+
 dependencies {
+    // org.json is part of the Android framework; bundling core's copy would only trip lint's
+    // DuplicatePlatformClasses and never be loaded.
+    implementation(project(":core")) { exclude(group = "org.json") }
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

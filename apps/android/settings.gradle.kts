@@ -24,3 +24,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Naqi — Halal Video Filter"
 include(":app")
+// Pure-Kotlin code shared with apps/windows, which includes the same directory the same way.
+include(":core")
+project(":core").projectDir = file("../../core")

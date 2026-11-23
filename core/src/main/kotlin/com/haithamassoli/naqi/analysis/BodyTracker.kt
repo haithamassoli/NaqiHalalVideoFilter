@@ -7,7 +7,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /** Person-level votes survive a disappearing face. Uncertain associations start an unknown track. */
-internal class BodyTracker(private val who: String) {
+class BodyTracker(private val who: String) {
     private val live = mutableListOf<FaceTrack>()
     private val emitted = mutableListOf<FaceTrackEdl>()
     private var nextId = 0
@@ -137,7 +137,7 @@ internal class BodyTracker(private val who: String) {
         private fun area(r: NRect) = max(0f, r.width) * max(0f, r.height)
         private fun intersection(a: NRect, b: NRect) = max(0f, min(a.right, b.right) - max(a.left, b.left)) *
             max(0f, min(a.bottom, b.bottom) - max(a.top, b.top))
-        internal fun overlap(a: NRect, b: NRect): Float {
+        fun overlap(a: NRect, b: NRect): Float {
             val common = intersection(a, b)
             return common / (area(a) + area(b) - common).coerceAtLeast(1e-6f)
         }

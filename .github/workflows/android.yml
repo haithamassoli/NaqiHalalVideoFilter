@@ -6,12 +6,14 @@ on:
     branches: [main]
     paths:
       - apps/android/**
+      - core/** # shared Kotlin, included by settings.gradle.kts
       - models/**
       - NOTICE # copied into the APK by :app:copyNotice
       - .github/workflows/android.yml
   pull_request:
     paths:
       - apps/android/**
+      - core/**
       - models/**
       - NOTICE
       - .github/workflows/android.yml
@@ -76,6 +78,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: android-test-reports
-          path: apps/android/app/build/reports/tests/
+          path: |
+            apps/android/app/build/reports/tests/
+            core/build/reports/tests/
           if-no-files-found: ignore
           retention-days: 7

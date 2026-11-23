@@ -165,7 +165,7 @@ data class Edl(val censorIntervalsMs: List<LongRange>, val faceTracks: List<Face
 internal const val BRIDGE_MS = 400L
 
 /** Merge overlapping or near-adjacent ranges. Input need not be sorted; output is, and is disjoint. */
-internal fun mergeRanges(ranges: List<LongRange>, bridgeMs: Long = BRIDGE_MS): List<LongRange> {
+fun mergeRanges(ranges: List<LongRange>, bridgeMs: Long = BRIDGE_MS): List<LongRange> {
     if (ranges.size <= 1) return ranges
     val sorted = ranges.sortedBy { it.first }
     val out = ArrayList<LongRange>(sorted.size)
@@ -211,7 +211,7 @@ internal const val MIN_FULL_MS = 500L
  * survive together rather than being dropped one at a time. It cannot drop a gate interval either:
  * `NsfwGate` hysteresis floors those at 2 s, measured as the shortest span in every run.
  */
-internal fun promoteFacesToFullFrame(intervals: List<LongRange>, tracks: List<FaceTrackEdl>): List<LongRange> =
+fun promoteFacesToFullFrame(intervals: List<LongRange>, tracks: List<FaceTrackEdl>): List<LongRange> =
     mergeRanges(intervals + tracks.map { it.startMs..it.endMs })
         .filter { it.last - it.first >= MIN_FULL_MS }
 
