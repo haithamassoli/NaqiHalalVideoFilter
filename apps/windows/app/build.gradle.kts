@@ -33,12 +33,16 @@ dependencies {
     testImplementation(compose.desktop.uiTestJUnit4)
 }
 
+// Git's bash on Windows, by full path: a bare "bash" there can resolve to System32's WSL launcher, which
+// Windows searches before PATH.
+val bash = File(System.getenv("ProgramFiles") ?: "", "Git/bin/bash.exe").takeIf { it.isFile }?.path ?: "bash"
+
 // The models are not in git. stage-models.sh copies or downloads them into apps/windows/models and checks
 // their hashes; the Sync puts them where Compose expects app resources (<root>/common/...), so they ship
 // inside the distribution and the runtime finds them via `compose.application.resources.dir`.
 val stageModels = tasks.register<Exec>("stageModels") {
     workingDir = rootDir
-    commandLine("bash", "scripts/stage-models.sh")
+    commandLine(bash, "scripts/stage-models.sh")
     inputs.file(rootProject.file("scripts/stage-models.sh"))
     outputs.dir(rootProject.file("models"))
 }
@@ -73,6 +77,9 @@ compose.desktop {
                 perUserInstall = true // no UAC prompt
                 menuGroup = "Naqi"
                 shortcut = true
+                // branding/naqi-icon-512.png at 256 px (jpackage on Windows takes only .ico):
+                // ffmpeg -i branding/naqi-icon-512.png -vf scale=256:256 -c:v png -pix_fmt rgba naqi.ico
+                iconFile.set(project.file("naqi.ico"))
             }
             // jpackage on macOS rejects a 0.x version. Mac builds are local test runs and never ship.
             macOS { packageVersion = "1.0.0" }

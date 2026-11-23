@@ -9,8 +9,10 @@ DEST=models
 mkdir -p "$DEST"
 
 SHARED=(genderage.onnx htdemucs_s26_f16.onnx nsfw_mnv2_140_int8.onnx yamnet.onnx)
+# Fetch on Android's side only for a model neither folder has: fetch-models.sh exports one of its models with
+# torch, which a machine that already has its models staged here should not need.
 for model in "${SHARED[@]}"; do
-  if [ ! -s "$SRC/$model" ]; then ../android/scripts/fetch-models.sh; break; fi
+  if [ ! -s "$DEST/$model" ] && [ ! -s "$SRC/$model" ]; then ../android/scripts/fetch-models.sh; break; fi
 done
 for model in "${SHARED[@]}"; do
   [ -s "$DEST/$model" ] || cp "$SRC/$model" "$DEST/$model"
@@ -24,8 +26,10 @@ if [ ! -s "$DEST/$YUNET" ]; then
   mv "$DEST/$YUNET.part" "$DEST/$YUNET"
 fi
 
-# The first four are the same pins as apps/android/scripts/fetch-models.sh.
-shasum -a 256 -c <<EOF
+# The first four are the same pins as apps/android/scripts/fetch-models.sh. Git Bash on Windows has
+# sha256sum but not always shasum; macOS has both, and its BSD sha256sum cannot read the list from stdin.
+if command -v shasum >/dev/null; then SHA256=(shasum -a 256); else SHA256=(sha256sum); fi
+"${SHA256[@]}" -c <<EOF
 4fde69b1c810857b88c64a335084f1c3fe8f01246c9a191b48c7bb756d6652fb  $DEST/genderage.onnx
 df8a2c2c8dd06ca279f58646dacc007b3e1e07436f31a3189408f0336c56eba5  $DEST/htdemucs_s26_f16.onnx
 6070dd6da875025b4c8df960a3a46dff583fb2bf8a499e214f98a8984674bba9  $DEST/nsfw_mnv2_140_int8.onnx

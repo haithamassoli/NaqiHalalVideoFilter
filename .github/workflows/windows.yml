@@ -1,0 +1,97 @@
+# Tests, the MSI and the portable zip for apps/windows, built on Windows.
+name: Windows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/windows/**
+      - core/** # shared Kotlin, included by settings.gradle.kts
+      - apps/android/gradle/libs.versions.toml # the version catalog apps/windows reads
+      - .github/workflows/windows.yml
+  pull_request:
+    paths:
+      - apps/windows/**
+      - core/**
+      - apps/android/gradle/libs.versions.toml
+      - .github/workflows/windows.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/windows
+    env:
+      # The four models shared with Android come out of this release's APK, as android.yml does it: its
+      # fetch-models.sh needs torch. stage-models.sh then adds YuNet and checks every sha256.
+      MODELS_APK: https://github.com/haithamassoli/NaqiHalalVideoFilter/releases/download/v1.9.0/naqi-1.9.0.apk
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21 # gradle/gradle-daemon-jvm.properties: toolchainVersion=21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Restore ONNX models
+        id: models
+        uses: actions/cache@v6
+        with:
+          path: apps/windows/models
+          key: windows-models-${{ hashFiles('apps/windows/scripts/stage-models.sh') }}
+
+      - name: Download ONNX models
+        if: steps.models.outputs.cache-hit != 'true'
+        run: |
+          curl -fL --retry 3 -o "$RUNNER_TEMP/models.apk" "$MODELS_APK"
+          cd ../android/app/src/main
+          # jar, not unzip: the JDK is the one extractor every runner has.
+          jar xf "$RUNNER_TEMP/models.apk" assets/models/genderage.onnx assets/models/htdemucs_s26_f16.onnx \
+            assets/models/nsfw_mnv2_140_int8.onnx assets/models/yamnet.onnx
+          rm "$RUNNER_TEMP/models.apk"
+
+      # -Pjavacpp.platform below: only Windows' FFmpeg natives, in the tests and in what ships
+      # (gradle.properties also lists the Macs').
+      - name: Stage and verify ONNX models
+        run: ./gradlew -Pjavacpp.platform=windows-x86_64 :app:stageModels
+
+      - name: Tests
+        run: ./gradlew -Pjavacpp.platform=windows-x86_64 :core:test :app:test
+
+      - name: Package MSI and portable zip
+        run: ./gradlew -Pjavacpp.platform=windows-x86_64 :app:packageMsi :app:packagePortableZip
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: naqi-windows-msi
+          path: apps/windows/app/build/compose/binaries/main/msi/*.msi
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: naqi-windows-portable
+          path: apps/windows/app/build/compose/binaries/main/zip/*.zip
+          if-no-files-found: error
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-test-reports
+          path: |
+            apps/windows/app/build/reports/tests/
+            core/build/reports/tests/
+          if-no-files-found: ignore
+          retention-days: 7
