@@ -16,7 +16,7 @@ class CliTest {
 
     @Test
     fun everyOptionMapsOntoFilterOps() {
-        val ops = parseCli(base + listOf("--music", "vocals+other", "--faces", "women", "--style", "fill:navy,whole", "--nsfw", "70")).ops
+        val ops = parseCli(base + listOf("--music", "vocals+other", "--faces", "women", "--style", "fill:navy,whole", "--nsfw", "70")).options.ops
         assertTrue(ops.removeMusic)
         assertEquals("vocals_other", ops.keepStems)
         assertEquals(FilterOps.WOMEN, ops.censorWho)
@@ -25,7 +25,7 @@ class CliTest {
         assertTrue(ops.censorNsfw)
         assertEquals(70, ops.strictness)
 
-        val blur = parseCli(base + listOf("--faces", "everyone", "--style", "blur:30,gray")).ops
+        val blur = parseCli(base + listOf("--faces", "everyone", "--style", "blur:30,gray")).options.ops
         assertEquals(FilterOps.BLUR, blur.solidColor)
         assertEquals(30, blur.blurAmount)
         assertTrue(blur.grayscale)
@@ -46,5 +46,14 @@ class CliTest {
             parseCli(listOf("--input", input.path, "--output", input.path, "--music", "vocals"))
         }
         assertEquals(2, runCli(listOf("--music", "vocals")))
+    }
+
+    @Test
+    fun anExistingOutputNeedsOverwrite() {
+        File(dir, "out.mp4").writeText("an earlier result")
+        assertThrows(IllegalArgumentException::class.java) { parseCli(base + listOf("--music", "vocals")) }
+        assertEquals(2, runCli(base + listOf("--music", "vocals")))
+        assertTrue(parseCli(base + listOf("--music", "vocals", "--overwrite")).overwrite)
+        assertFalse(parseCli(listOf("--input", input.path, "--output", File(dir, "new.mp4").path, "--music", "vocals")).overwrite)
     }
 }

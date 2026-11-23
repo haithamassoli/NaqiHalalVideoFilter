@@ -12,7 +12,9 @@ import org.bytedeco.ffmpeg.global.avcodec.*
 import org.bytedeco.ffmpeg.global.avformat.*
 import org.bytedeco.ffmpeg.global.avutil.*
 import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.IntPointer
 import org.bytedeco.javacpp.Loader
+import org.bytedeco.javacpp.PointerPointer
 import java.io.File
 import java.io.IOException
 
@@ -104,3 +106,23 @@ internal fun startPts(st: AVStream): Long = st.start_time().let { if (it == AV_N
 internal fun toMs(ts: Long, tb: AVRational): Long = av_rescale_q_rnd(ts, tb, MILLIS, AV_ROUND_DOWN)
 
 internal fun toUs(ts: Long, tb: AVRational): Long = av_rescale_q_rnd(ts, tb, MICROS, AV_ROUND_DOWN)
+
+/**
+ * One side of a `sws_scale` call for packed RGB24: FFmpeg copies four plane pointers and four strides from
+ * each side whatever the format, so a one-slot array is read past its end. Four slots, zeroed; only plane 0
+ * is set.
+ */
+internal class SwsPlanes : AutoCloseable {
+    val data = PointerPointer<BytePointer>(4L).apply { zero<PointerPointer<BytePointer>>() }
+    val stride = IntPointer(4L).apply { zero<IntPointer>() }
+
+    fun set(plane0: BytePointer, stride0: Int) {
+        data.put(0L, plane0)
+        stride.put(0L, stride0) // 0L: a bare 0 picks the put(int...) overload
+    }
+
+    override fun close() {
+        data.close()
+        stride.close()
+    }
+}

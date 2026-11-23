@@ -147,6 +147,21 @@ internal fun defaultOutput(input: File, taken: Collection<File> = emptyList()): 
 }
 
 /**
+ * The file a save-dialog pick becomes: `.mp4` appended first (the only container Renderer writes), and only
+ * then numbered past any file that exists or that a queued job will write, so a typed "holiday" never lands
+ * on an existing holiday.mp4. The renderer never replaces a file either; this keeps a job from failing at its
+ * very end over a name that was already taken.
+ */
+internal fun outputFor(picked: File, taken: Collection<File> = emptyList()): File {
+    val f = if (picked.extension.equals("mp4", ignoreCase = true)) picked else File(picked.path + ".mp4")
+    val dir = f.absoluteFile.parentFile
+    val base = f.nameWithoutExtension
+    return generateSequence(1) { it + 1 }
+        .map { n -> if (n == 1) f else File(dir, "$base-$n.${f.extension}") }
+        .first { c -> !c.exists() && taken.none { sameFile(it, c) } }
+}
+
+/**
  * Same file on disk, through symlinks and `..` where the OS can resolve them. Case-blind on Windows: a
  * not-yet-existing output keeps the case it was typed in, while the existing input canonicalizes to its real
  * case, so "CLIP.mp4" and "clip.mp4" would otherwise look like two files.

@@ -2,6 +2,7 @@ package com.haithamassoli.naqi.desktop.media
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import org.bytedeco.ffmpeg.avcodec.AVCodecContext
 import org.bytedeco.ffmpeg.avcodec.AVCodecParameters
@@ -24,10 +25,20 @@ import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
 import java.io.File
 import java.io.IOException
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
+
+/**
+ * In the coroutine context of a [Renderer.render], lets it replace an existing output: the CLI's
+ * `--overwrite`. Without it the renderer never replaces a file.
+ */
+object OverwriteOutput : CoroutineContext.Element, CoroutineContext.Key<OverwriteOutput> {
+    override val key: CoroutineContext.Key<*> get() = this
+}
 
 object Renderer {
     // Android's quality intent (RenderPipeline.resolveBitrate): re-encoding must not visibly soften an
@@ -47,9 +58,12 @@ object Renderer {
      * time together, as the ffmpeg CLI does, so an audio offset survives.
      *
      * [input] is opened read-only. [output] must not be [input] (the same file by canonical path → throws
-     * IllegalArgumentException); it is written to a temp file in its own directory and atomically renamed
-     * over [output] only when complete, so a failure or cancel leaves no partial file and no damaged
-     * original. [onProgress] gets 0..100.
+     * IllegalArgumentException). An existing [output] is never replaced unless the caller's coroutine context
+     * holds [OverwriteOutput]: it fails with FileAlreadyExistsException before any work, or at the end if it
+     * appeared meanwhile. The file is written to a temp file in its own directory and renamed to [output]
+     * only when complete. That rename is the commit point: a failure or cancel before it leaves no partial
+     * file and no damaged original; once it is done, [render] returns normally, even if cancelled since.
+     * [onProgress] gets 0..100, and 100 only once [output] is there.
      */
     suspend fun render(
         input: File,
@@ -57,21 +71,33 @@ object Renderer {
         audio: AudioOut,
         edit: ((RgbFrame) -> Unit)?,
         onProgress: (Int) -> Unit,
-    ): Unit = withContext(Dispatchers.IO) {
+    ) {
         require(input.canonicalFile != output.canonicalFile) { "output $output is the input file" }
+        val overwrite = coroutineContext[OverwriteOutput] != null
+        if (!overwrite && output.exists()) throw FileAlreadyExistsException(output.path, null, "already exists")
         val dir = output.absoluteFile.parentFile ?: throw IOException("no directory for $output")
         val tmp = File.createTempFile(".${output.name}.", ".part", dir)
         var aac: File? = null
         try {
-            var out = audio
-            if (audio is AudioOut.Keep && audioNeedsAac(input)) {
-                // e.g. Vorbis from a WebM: MP4 cannot carry it, so it goes through the same AAC path as music removal.
-                aac = File.createTempFile(".${output.name}.", ".m4a.part", dir)
-                AacWriter(aac).use { w -> AudioDecoder.decode(input) { pcm, n -> w.write(pcm, n) } }
-                out = AudioOut.Replace(aac)
+            withContext(Dispatchers.IO) {
+                var out = audio
+                if (audio is AudioOut.Keep && audioNeedsAac(input)) {
+                    // e.g. Vorbis from a WebM: MP4 cannot carry it, so it goes through the same AAC path as music removal.
+                    val m4a = File.createTempFile(".${output.name}.", ".m4a.part", dir).also { aac = it }
+                    AacWriter(m4a).use { w -> AudioDecoder.decode(input) { pcm, n -> w.write(pcm, n) } }
+                    out = AudioOut.Replace(m4a)
+                }
+                mux(input, tmp, out, edit, onProgress)
             }
-            mux(input, tmp, out, edit, onProgress)
-            Files.move(tmp.toPath(), output.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+            // The commit point. Nothing below suspends, so a cancel either lands here (the finally deletes the
+            // temp file) or after the rename, when the output is complete and the job is done.
+            coroutineContext.ensureActive()
+            if (overwrite) {
+                Files.move(tmp.toPath(), output.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+            } else {
+                Files.move(tmp.toPath(), output.toPath()) // a rename that refuses an existing target
+            }
+            onProgress(100)
         } finally {
             tmp.delete() // already gone after the move
             aac?.delete()
@@ -89,6 +115,9 @@ object Renderer {
     }
 
     private suspend fun mux(input: File, tmp: File, audio: AudioOut, edit: ((RgbFrame) -> Unit)?, onProgress: (Int) -> Unit) {
+        // Checked through the drains and before the trailer too, not only per packet read: the decoder's and
+        // encoder's delayed frames and the .m4a's tail are work after the last read.
+        val job = coroutineContext.job
         val inFmt = openInput(input)
         var m4aFmt: AVFormatContext? = null
         val out = AVFormatContext(null)
@@ -103,8 +132,7 @@ object Renderer {
         val toRgb = ToRgb(SWS_BICUBIC)
         var fromRgb: SwsContext? = null
         var rgbNative = BytePointer(0L)
-        val rgbData = PointerPointer<BytePointer>(1L)
-        val rgbStride = IntPointer(1L)
+        val rgbIn = SwsPlanes()
         try {
             ffCheck(avformat_alloc_output_context2(out, null, "mp4", tmp.absolutePath), "mp4 muxer")
             val vIn = bestStream(inFmt, AVMEDIA_TYPE_VIDEO) ?: throw IOException("no video stream in $input")
@@ -182,6 +210,7 @@ object Renderer {
             fun feedM4a(untilUs: Long) {
                 val m = m4aFmt ?: return
                 while (!m4aDone) {
+                    job.ensureActive()
                     if (!m4aHeld) {
                         val r = av_read_frame(m, m4aPkt)
                         if (r == AVERROR_EOF) { m4aDone = true; return }
@@ -206,6 +235,7 @@ object Renderer {
                 val e = enc!!
                 ffCheck(avcodec_send_frame(e, f), "x264")
                 while (true) {
+                    job.ensureActive()
                     val r = avcodec_receive_packet(e, encPkt)
                     if (r == AVERROR_EAGAIN || r == AVERROR_EOF) return
                     ffCheck(r, "x264")
@@ -215,6 +245,7 @@ object Renderer {
                 }
             }
             fun editAndEncode(f: AVFrame) {
+                job.ensureActive()
                 val ts = f.best_effort_timestamp()
                 // x264 needs strictly increasing pts. A frame with none, or a repeat, is dropped: re-timing
                 // it would be exactly the synthesized timestamp this path exists to avoid.
@@ -229,12 +260,11 @@ object Renderer {
                     fromRgb = sws_getContext(w, h, AV_PIX_FMT_RGB24, yuv.width(), yuv.height(), yuv.format(), SWS_BICUBIC, null, null, null as DoublePointer?)
                     rgbNative.close()
                     rgbNative = BytePointer(rgb.size.toLong())
-                    rgbData.put(0L, rgbNative)
-                    rgbStride.put(0L, w * 3) // 0L: a bare 0 picks the put(int...) overload
+                    rgbIn.set(rgbNative, w * 3)
                 }
                 rgbNative.put(rgb, 0, rgb.size)
                 ffCheck(av_frame_make_writable(yuv), "video frame")
-                ffCheck(sws_scale(fromRgb, rgbData, rgbStride, 0, h, yuv.data(), yuv.linesize()), "to YUV")
+                ffCheck(sws_scale(fromRgb, rgbIn.data, rgbIn.stride, 0, h, yuv.data(), yuv.linesize()), "to YUV")
                 yuv.pts(ts - vShift) // the encoder's time base is the source stream's, so this is the original pts
                 if (f.duration() > 0L) durations[ts - vShift] = f.duration()
                 encode(yuv)
@@ -270,8 +300,8 @@ object Renderer {
                 encode(null)
             }
             feedM4a(Long.MAX_VALUE)
+            job.ensureActive()
             ffCheck(av_write_trailer(out), "mp4 trailer")
-            onProgress(100)
         } finally {
             av_frame_free(frame)
             av_frame_free(yuv)
@@ -283,8 +313,7 @@ object Renderer {
             toRgb.close()
             fromRgb?.let { sws_freeContext(it) }
             rgbNative.close()
-            rgbData.close()
-            rgbStride.close()
+            rgbIn.close()
             pb?.let { avio_closep(it) }
             avformat_free_context(out)
             m4aFmt?.let { avformat_close_input(it) }

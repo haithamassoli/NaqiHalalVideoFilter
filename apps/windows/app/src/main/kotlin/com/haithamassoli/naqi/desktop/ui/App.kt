@@ -84,7 +84,7 @@ fun App(
                         output = output!!,
                         ops = ops,
                         onOpsChange = { ops = it; if (it.censorFaces) lastWho = it.censorWho },
-                        onChangeOutput = { chooseOutput(output!!)?.let { output = it } },
+                        onChangeOutput = { chooseOutput(output!!)?.let { output = outputFor(it, taken()) } },
                         onBack = { step = Step.Pick },
                         onStart = {
                             // The NSFW switch only exists under "Censor faces" (as on Android), so a run without
