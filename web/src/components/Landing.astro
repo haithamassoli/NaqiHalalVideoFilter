@@ -62,8 +62,13 @@ const t = {
     macAppStore: 'Mac App Store',
     msi: 'Installer (MSI)',
     androidNote: 'The APK adds link downloads, sharing into Naqi and updates from GitHub, which Google Play does not allow.',
-    browserTitle: 'Watching in the browser?',
-    browserLead: 'These free extensions filter in real time as you browse. Other developers make them; they are not part of Naqi.',
+    browserTitle: 'In your browser',
+    browserLead: 'Filter a video file without installing anything, or filter live while you browse.',
+    webName: 'Naqi Web',
+    webBody: 'Pick a video file and Naqi filters it inside the browser tab: music, faces, bodies and flagged scenes. Nothing is uploaded. For desktop Chrome and Edge.',
+    webOpen: 'Open Naqi Web',
+    extTitle: 'Live filtering while you browse',
+    extLead: 'These free extensions filter in real time. Other developers make them; they are not part of Naqi.',
     extensions: {
       haramblur: ['HaramBlur', 'Blurs faces and indecent images and videos on most websites while you browse.'],
       musicless: ['Musicless', 'Removes most of the background music from YouTube videos and keeps the voices.'],
@@ -115,8 +120,13 @@ const t = {
     macAppStore: 'Mac App Store',
     msi: 'المثبّت (MSI)',
     androidNote: 'نسخة APK تضيف التنزيل من الروابط، ومشاركة الفيديو إلى نقي، والتحديث من GitHub، وهذه لا يسمح بها Google Play.',
-    browserTitle: 'تشاهد في المتصفح؟',
-    browserLead: 'هذه الإضافات المجانية تفلتر لحظيًا أثناء التصفح. يطوّرها مطوّرون آخرون، وليست جزءًا من نقي.',
+    browserTitle: 'داخل المتصفح',
+    browserLead: 'فلتر ملف فيديو دون تثبيت أي شيء، أو فلتر لحظيًا أثناء التصفح.',
+    webName: 'نقي للويب',
+    webBody: 'اختر ملف فيديو ويفلتره نقي داخل تبويب المتصفح: الموسيقى والوجوه والأجساد والمشاهد المخلّة. لا يُرفع أي شيء. لمتصفحَي Chrome وEdge على الحاسوب.',
+    webOpen: 'افتح نقي للويب',
+    extTitle: 'فلترة لحظية أثناء التصفح',
+    extLead: 'هذه الإضافات المجانية تفلتر لحظيًا. يطوّرها مطوّرون آخرون، وليست جزءًا من نقي.',
     extensions: {
       haramblur: ['HaramBlur', 'يموّه الوجوه والصور والمقاطع المخلّة في معظم المواقع أثناء التصفح.'],
       musicless: ['Musicless', 'يحذف معظم الموسيقى الخلفية من فيديوهات يوتيوب ويُبقي الأصوات.'],
@@ -159,6 +169,8 @@ const platforms: { key: keyof typeof t.platforms; badge?: string; links: Link[];
     ? { key: 'windows', badge: t.beta, links: [{ label: t.msi, href: windows.url, meta: windows.version.replace(/^windows-/, '') }] }
     : { key: 'windows', links: [{ label: t.soon }] },
 ];
+// apps/web is not deployed yet: set its URL here and the card turns into a link.
+const webAppUrl = '';
 const extensions: { key: keyof typeof t.extensions; site: string; source: string; links: Link[] }[] = [
   {
     key: 'haramblur', site: 'https://haramblur.com/', source: 'https://github.com/alganzory/HaramBlur',
@@ -337,6 +349,21 @@ const jsonLd = {
       <section id="browser" class="wrap block" aria-labelledby="browser-title">
         <h2 id="browser-title">{t.browserTitle}</h2>
         <p class="sub">{t.browserLead}</p>
+        <article class:list={['card', 'tile', 'web', { soon: !webAppUrl }]}>
+          <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" set:html={icon.browser} /></span>
+          <div>
+            <h3>{t.webName}</h3>
+            <p>{t.webBody}</p>
+          </div>
+          <div class="links">
+            {webAppUrl
+              ? <a class="btn primary" href={webAppUrl}>{t.webOpen}</a>
+              : <span class="btn off">{t.soon}</span>}
+            <a class="btn" href={`https://github.com/${repo}/tree/main/apps/web`}>GitHub</a>
+          </div>
+        </article>
+        <h3 class="subhead">{t.extTitle}</h3>
+        <p class="sub">{t.extLead}</p>
         <div class="grid two">
           {extensions.map((e) => (
             <article class="card tile">
@@ -361,7 +388,8 @@ const jsonLd = {
         {t.code}:{' '}
         <a href={`https://github.com/${repo}/tree/main/apps/android`}>{t.platforms.android[0]}</a>{sep}
         <a href={`https://github.com/${repo}/tree/main/apps/apple`}>{ar ? 'آبل' : 'Apple'}</a>{sep}
-        <a href={`https://github.com/${repo}/tree/main/apps/windows`}>{t.platforms.windows[0]}</a>
+        <a href={`https://github.com/${repo}/tree/main/apps/windows`}>{t.platforms.windows[0]}</a>{sep}
+        <a href={`https://github.com/${repo}/tree/main/apps/web`}>{ar ? 'الويب' : 'Web'}</a>
       </p>
     </footer>
   </body>
@@ -497,6 +525,11 @@ const jsonLd = {
   .tile .links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem; }
   .tile.soon { background: transparent; border-style: dashed; }
   .tile.soon .ico { background: var(--mist); color: var(--muted); }
+  .web { flex-direction: row; align-items: center; gap: 1.1rem; margin-top: 1.8rem; }
+  .web > div:first-of-type { flex: 1; }
+  .web p { margin-top: 0.25rem; font-size: 0.95rem; color: var(--muted); max-width: 40em; }
+  .web .links { margin-top: 0; padding-top: 0; flex: none; }
+  .subhead { margin-top: 2.5rem; font-size: 1.25rem; }
   .tag { font-size: 0.72rem; font-weight: 500; padding: 0.1rem 0.55rem; border-radius: 999px; background: #f5ddbb; color: #6b4a12; }
 
   footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; padding-block: 2rem 3rem; border-top: 1px solid var(--line); font-size: 0.92rem; color: var(--muted); }
@@ -506,5 +539,6 @@ const jsonLd = {
     .hero, .grid, .grid.two { grid-template-columns: 1fr; }
     nav a:not(.lang) { display: none; }
     .rows { padding-inline: 1.1rem; }
+    .web { flex-direction: column; align-items: flex-start; }
   }
 </style>
