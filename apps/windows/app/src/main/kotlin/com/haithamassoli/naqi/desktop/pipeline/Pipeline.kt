@@ -2,6 +2,7 @@ package com.haithamassoli.naqi.desktop.pipeline
 
 import com.haithamassoli.naqi.analysis.NsfwGate
 import com.haithamassoli.naqi.analysis.VideoMeta
+import com.haithamassoli.naqi.desktop.Models
 import com.haithamassoli.naqi.desktop.audio.MusicRemoval
 import com.haithamassoli.naqi.desktop.media.AudioOut
 import com.haithamassoli.naqi.desktop.media.Probe
@@ -33,39 +34,55 @@ enum class Stage { ANALYZE, MUSIC, RENDER }
 
 object Pipeline {
     /**
-     * Pass 1: `VideoDecoder.sample` at 10 fps, every frame to [FaceAnalyzer] when faces are censored and every
-     * second one (5 fps) to [NsfwClassifier] when the gate is on. Then the gate's hysteresis over the whole
+     * Pass 1: `VideoDecoder.sampleWithSource` at 10 fps, every frame to [FaceAnalyzer] when faces are censored
+     * and every second one's source picture (5 fps) to [NsfwClassifier] when the gate is on. Then the gate's hysteresis over the whole
      * timeline, plus every censored face span promoted to the whole frame under `wholeFrameBlur`.
      */
-    suspend fun analyze(input: File, meta: VideoMeta, ops: FilterOps, onProgress: (Int) -> Unit): Edl {
-        val faces = if (ops.censorFaces) FaceAnalyzer(ops.censorWho) else null
-        val nsfw = if (ops.censorNsfw) NsfwClassifier() else null
-        try {
-            val firings = ArrayList<Long>()
-            var n = 0
-            var lastPct = -1
-            VideoDecoder.sample(input, fps = 10f, maxDim = 640) { frame ->
-                currentCoroutineContext().ensureActive()
-                faces?.onFrame(frame)
-                if (nsfw != null && n % 2 == 0 && NsfwGate.fires(nsfw.classify(frame), ops.strictness)) {
-                    firings += frame.ptsMs
-                }
-                n++
-                if (meta.durationMs > 0) {
-                    val pct = (frame.ptsMs * 100 / meta.durationMs).toInt().coerceIn(0, 99)
-                    if (pct != lastPct) { lastPct = pct; onProgress(pct) }
-                }
+    suspend fun analyze(
+        input: File,
+        meta: VideoMeta,
+        ops: FilterOps,
+        modelsDir: File = Models.dir(),
+        onProgress: (Int) -> Unit,
+    ): Edl =
+        // Each one closed by its own `use` as soon as it is open, so a model failing to load (the NSFW one
+        // after the face ones, say) still closes whatever opened before it.
+        (if (ops.censorFaces) FaceAnalyzer(ops.censorWho, modelsDir) else null).use { faces ->
+            (if (ops.censorNsfw) NsfwClassifier(modelsDir) else null).use { nsfw ->
+                analyze(input, meta, ops, faces, nsfw?.let { c -> { frame, rotation -> c.classify(frame, rotation) } }, onProgress)
             }
-            val tracks = faces?.finish().orEmpty()
-            // Android's correctness item 7.2: an unknown duration must not clamp every interval to [0, 0].
-            val gate = NsfwGate.intervals(firings, if (meta.durationMs > 0) meta.durationMs else Long.MAX_VALUE)
-            val intervals = if (ops.wholeFrameBlur) promoteFacesToFullFrame(gate, tracks) else gate
-            onProgress(100)
-            return Edl(intervals, tracks)
-        } finally {
-            faces?.close()
-            nsfw?.close()
         }
+
+    /** [nsfw] is `NsfwClassifier.classify` (a parameter so a test can see what the gate is given). */
+    internal suspend fun analyze(
+        input: File,
+        meta: VideoMeta,
+        ops: FilterOps,
+        faces: FaceAnalyzer?,
+        nsfw: ((frame: RgbFrame, rotation: Int) -> FloatArray)?,
+        onProgress: (Int) -> Unit,
+    ): Edl {
+        val firings = ArrayList<Long>()
+        var lastPct = -1
+        // The gate reads the source picture of every second frame, never the 640-px analysis one: Android
+        // measured a gate fed from its own downscaled frame as under-censoring (NsfwClassifier.fillInput).
+        VideoDecoder.sampleWithSource(input, fps = 10f, maxDim = 640, sourceEvery = if (nsfw != null) 2 else 0) { frame, source, rotation ->
+            currentCoroutineContext().ensureActive()
+            faces?.onFrame(frame)
+            if (nsfw != null && source != null && NsfwGate.fires(nsfw(source, rotation), ops.strictness)) {
+                firings += frame.ptsMs
+            }
+            if (meta.durationMs > 0) {
+                val pct = (frame.ptsMs * 100 / meta.durationMs).toInt().coerceIn(0, 99)
+                if (pct != lastPct) { lastPct = pct; onProgress(pct) }
+            }
+        }
+        val tracks = faces?.finish().orEmpty()
+        // Android's correctness item 7.2: an unknown duration must not clamp every interval to [0, 0].
+        val gate = NsfwGate.intervals(firings, if (meta.durationMs > 0) meta.durationMs else Long.MAX_VALUE)
+        val intervals = if (ops.wholeFrameBlur) promoteFacesToFullFrame(gate, tracks) else gate
+        onProgress(100)
+        return Edl(intervals, tracks)
     }
 
     /**

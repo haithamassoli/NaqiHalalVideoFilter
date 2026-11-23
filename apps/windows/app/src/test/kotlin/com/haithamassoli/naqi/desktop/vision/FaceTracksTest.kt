@@ -1,8 +1,11 @@
 package com.haithamassoli.naqi.desktop.vision
 
 import com.haithamassoli.naqi.analysis.NRect
+import com.haithamassoli.naqi.desktop.media.RgbFrame
 import com.haithamassoli.naqi.model.FilterOps
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Fixed boxes and a scripted voter in, exact tracks, votes and censor decisions out. No models. */
@@ -106,6 +109,58 @@ class FaceTracksTest {
         val edls = t.finish()
         assertEquals(1, edls.size)
         assertEquals(0L to 50L, edls[0].startMs to edls[0].endMs) // the woman; the man is spared
+    }
+
+    @Test fun aSmallerOverlappingFaceThatVotesTheOtherWayIsNotSparedOnTheFirstTracksVote() {
+        // Codex review, finding 4: a male-voted box, then 100 ms later a slightly smaller overlapping box
+        // that votes female. IoU matched them, her crop was "not bigger" so it never voted, and Women mode
+        // spared the whole track: zero censor tracks. Her own vote disagrees with the spare, so it censors.
+        fun run(who: String, first: Int): Int {
+            val t = FaceTracks(who)
+            t.onFrame(listOf(box(0.40f, 0.20f, 0.25f)), w, h, 0L) { first }
+            t.onFrame(listOf(box(0.41f, 0.21f, 0.24f)), w, h, 100L) { -first }
+            return t.finish().size
+        }
+        assertEquals(1, run(FilterOps.WOMEN, first = 1))
+        assertEquals(1, run(FilterOps.MEN, first = -1))
+    }
+
+    @Test fun aSpareStandsWhileTheMatchedFacesKeepAgreeing() {
+        // The check above must not cost a man in Women mode his spare just for being on screen.
+        val t = FaceTracks(FilterOps.WOMEN)
+        for (i in 0..9) t.onFrame(listOf(box(0.40f + (i % 2) * 0.01f, 0.20f, 0.25f - (i % 2) * 0.01f)), w, h, i * 100L) { 1 }
+        assertEquals(0, t.finish().size)
+    }
+
+    @Test fun aFaceThatChangesSizeTooMuchStartsANewTrack() {
+        val t = FaceTracks(FilterOps.EVERYONE)
+        t.onFrame(listOf(box(0.30f, 0.30f, 0.20f)), w, h, 0L, null)
+        // Concentric and 1.6x the side: IoU 0.39 clears MATCH_IOU, but no face grows that much in 100 ms.
+        t.onFrame(listOf(box(0.24f, 0.24f, 0.32f)), w, h, 100L, null)
+        assertEquals(2, t.finish().size)
+    }
+
+    @Test fun aSceneCutEndsEveryTrackSoTheNextShotIsJudgedOnItsOwn() {
+        // A man voted male, then a cut to a woman framed where he was. Without the cut she would be matched
+        // onto his track; with it she is a track of her own, and the agreeing check vote cannot save her.
+        val t = FaceTracks(FilterOps.WOMEN)
+        t.onFrame(listOf(box(0.40f, 0.20f)), w, h, 0L) { 1 }
+        t.onFrame(listOf(box(0.40f, 0.20f)), w, h, 100L) { 1 }
+        t.cut()
+        t.onFrame(listOf(box(0.40f, 0.20f)), w, h, 200L) { -1 }
+        val edls = t.finish()
+        assertEquals(listOf(150L to 250L), edls.map { it.startMs to it.endMs }) // her span only; he is spared
+    }
+
+    @Test fun sceneCutsFireOnAChangeOfPictureAndNotOnAStillOne() {
+        fun solid(r: Int, g: Int, b: Int) = RgbFrame(64, 36, ByteArray(64 * 36 * 3) { i ->
+            when (i % 3) { 0 -> r; 1 -> g; else -> b }.toByte()
+        }, 0L)
+        val cuts = SceneCuts()
+        assertFalse(cuts.isCut(solid(40, 40, 40)))     // the first frame is never a cut
+        assertFalse(cuts.isCut(solid(50, 45, 40)))     // a small exposure change: mean diff 0.02
+        assertTrue(cuts.isCut(solid(200, 190, 180)))   // a new picture: mean diff ~0.56
+        assertFalse(cuts.isCut(solid(200, 190, 180)))
     }
 
     @Test fun staleTracksAreEmittedAndTheResultIsSortedByStart() {

@@ -19,8 +19,8 @@ import kotlin.math.sqrt
  * never are), so boxes come back in frame pixels with no letterbox offset to undo.
  */
 internal class YuNet(model: File) : AutoCloseable {
+    private val input = directFloats(3 * SIDE * SIDE) // before the session, as in NsfwClassifier
     private val session = createSession(model)
-    private val input = directFloats(3 * SIDE * SIDE)
 
     /** Faces as raw (unpadded) boxes normalized to [frame], best score first. May reach past [0, 1]. */
     fun detect(frame: RgbFrame): List<NRect> {
