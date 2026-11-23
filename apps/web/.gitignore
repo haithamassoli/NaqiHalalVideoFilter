@@ -1,0 +1,8 @@
+node_modules/
+dist/
+# ONNX models: scripts/fetch-models.sh and scripts/build-spleeter.sh stage them; never commit them.
+public/models/
+.venv*/
+# Generated test videos and their outputs (scripts/make-fixture.sh, E2E runs).
+fixtures/out/
+test/fixtures/out/
