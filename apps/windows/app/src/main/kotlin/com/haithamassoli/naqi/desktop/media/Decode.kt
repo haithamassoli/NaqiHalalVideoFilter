@@ -119,16 +119,30 @@ object AudioDecoder {
     private const val SILENCE_CHUNK = 4096 // input samples per batch of inserted silence
 
     /**
+     * The largest timestamp gap filled with silence in a format whose clock may jump ([AVFMT_TS_DISCONT]:
+     * MPEG-TS and the like). A real hole there (lost packets, a dropout) is short; a jump past this is a
+     * splice or a clock reset, where silence would invent time that the content never had. 10 s is the
+     * ffmpeg CLI's own `-dts_delta_threshold` for these formats, so the audio reads as ffmpeg would read it.
+     */
+    private const val MAX_GAP_FILL_SECONDS = 10L
+
+    /**
      * Decode the first audio stream to 44 100 Hz stereo float, interleaved L R L R, nominally in [-1, 1],
      * and hand it over in batches of [frames] sample frames (`interleaved.size >= frames * 2`; the array may
      * be reused after the call returns). Starts at the stream's first sample. Returns false, without calling
      * [onPcm], when the file has no audio stream. Cancellable.
      *
      * The PCM is laid out on the stream's own clock, not concatenated: a frame whose timestamp is later than
-     * where the audio so far ends gets silence before it, and one that starts earlier (an overlap) loses the
-     * samples already covered. Sample k of the output is then `k / RATE` s after the first frame, which is
-     * what [Renderer] assumes when it puts an [AudioOut.Replace] track back. Drifts under [SNAP_SECONDS] are
-     * timestamp rounding and left alone.
+     * where the audio so far ends gets silence before it, and one that starts earlier but still ends past it
+     * (an overlap) loses the samples already covered. Sample k of the output is then `k / RATE` s after the
+     * first frame, which is what [Renderer] assumes when it puts an [AudioOut.Replace] track back. Drifts under
+     * [SNAP_SECONDS] are timestamp rounding and left alone.
+     *
+     * A clock discontinuity is not a gap: a backward jump past the end of the frame (it would lose the whole
+     * frame), or, in an [AVFMT_TS_DISCONT] format, a forward one over [MAX_GAP_FILL_SECONDS]. There the clock
+     * is rebased onto where the audio so far ends and the frame is appended whole, so no decoded sample is
+     * ever dropped except a genuine overlap. Other formats' timestamps are trusted (MP4, MKV: their gaps are
+     * real, and the video sits on the same clock), so a forward gap of any size is filled there.
      *
      * Mono is duplicated at full level into both channels, as Android's decoder does (swresample's own
      * mono upmix would put it 3 dB down). More than two channels go through swresample's downmix, which,
@@ -173,9 +187,11 @@ object AudioDecoder {
 
             var inRate = 0
             var fed = 0L // input samples handed to the resampler since the first frame
-            var origin = AV_NOPTS_VALUE // the first frame's timestamp, in input samples
+            var origin = AV_NOPTS_VALUE // the first frame's timestamp, in input samples (rebased at a discontinuity)
+            var discont = false
             try {
-                readStream(input, AVMEDIA_TYPE_AUDIO) { st, frame ->
+                val opened = { fmt: AVFormatContext -> discont = fmt.iformat().flags() and AVFMT_TS_DISCONT != 0 }
+                readStream(input, AVMEDIA_TYPE_AUDIO, opened) { st, frame ->
                     if (swr == null) {
                         inRate = frame.sample_rate()
                         val inLayout = AVChannelLayout()
@@ -201,7 +217,10 @@ object AudioDecoder {
                         val at = av_rescale(ts, st.time_base().num().toLong() * inRate, st.time_base().den().toLong())
                         if (origin == AV_NOPTS_VALUE) origin = at
                         val drift = at - origin - fed // > 0: a gap before this frame; < 0: it overlaps what was fed
-                        if (drift > inRate * SNAP_SECONDS) {
+                        val maxGap = if (discont) inRate * MAX_GAP_FILL_SECONDS else Long.MAX_VALUE
+                        if (drift > maxGap || drift <= -frame.nb_samples()) {
+                            origin += drift // a discontinuity: the clock goes on from where the audio ends
+                        } else if (drift > inRate * SNAP_SECONDS) {
                             // Silence in the input's own format, through the resampler like any audio, so the
                             // resampler's tail of the audio before the gap stays before it.
                             val sil = silence ?: av_frame_alloc().also { f ->
@@ -222,7 +241,7 @@ object AudioDecoder {
                             }
                             fed += drift
                         } else if (drift < -inRate * SNAP_SECONDS) {
-                            skip = minOf(-drift, frame.nb_samples().toLong()).toInt()
+                            skip = (-drift).toInt() // under nb_samples: the rest of the frame is new
                         }
                     }
                     val n = frame.nb_samples() - skip
@@ -342,12 +361,13 @@ internal class ToRgb(private val flags: Int) : AutoCloseable {
 
 /**
  * Decodes every frame of [input]'s best stream of [type] in presentation order and hands it to
- * [onFrame] (valid only inside the call). Returns null, having decoded nothing, when there is no such
- * stream. Checks for cancellation once per packet.
+ * [onFrame] (valid only inside the call), after [onOpen] has seen the opened file. Returns null, having
+ * decoded nothing, when there is no such stream. Checks for cancellation once per packet.
  */
 internal suspend inline fun readStream(
     input: File,
     type: Int,
+    onOpen: (AVFormatContext) -> Unit = {},
     onFrame: (AVStream, AVFrame) -> Unit,
 ): Unit? {
     val fmt: AVFormatContext = openInput(input)
@@ -356,6 +376,7 @@ internal suspend inline fun readStream(
     val frame = av_frame_alloc()
     try {
         val st = bestStream(fmt, type) ?: return null
+        onOpen(fmt)
         val d = openDecoder(st).also { dec = it }
         while (true) {
             kotlin.coroutines.coroutineContext.ensureActive()

@@ -300,6 +300,52 @@ class MediaTest {
     }
 
     @Test
+    fun anOutputThatAppearsDuringTheRenderIsNotReplaced() = runBlocking {
+        val input = clip()
+        val out = tmp.root.resolve("out.mp4")
+        // Created after render's up-front check and before it publishes.
+        try {
+            Renderer.render(input, out, AudioOut.Keep, null) { if (it < 100 && !out.exists()) out.writeText("someone else's") }
+            fail("replaced a file that appeared during the render")
+        } catch (_: FileAlreadyExistsException) {
+        }
+        assertEquals("someone else's", out.readText())
+        assertArrayEquals(arrayOf("in.mp4", "out.mp4"), tmp.root.list()!!.sortedArray())
+    }
+
+    @Test
+    fun publishingNeverClobbersAFileCreatedAtTheSameMoment() {
+        // Codex re-review, finding 1: Java's move without REPLACE_EXISTING is check-then-rename on macOS and
+        // Linux, so a file created between the two is silently replaced. Race a CREATE_NEW against publish
+        // many times: at most one of them may succeed, and the file holds the winner's bytes.
+        val out = tmp.root.resolve("raced.mp4").toPath()
+        val barrier = java.util.concurrent.CyclicBarrier(2)
+        var theirs = false
+        var clobbered = 0
+        val rounds = 500 // the check-then-rename lost about 98% of them
+        val rival = Thread {
+            repeat(rounds) {
+                barrier.await()
+                theirs = runCatching { java.nio.file.Files.write(out, byteArrayOf(2), java.nio.file.StandardOpenOption.CREATE_NEW) }.isSuccess
+                barrier.await()
+            }
+        }.apply { start() }
+        repeat(rounds) {
+            val part = File.createTempFile(".raced.", ".part", tmp.root).apply { writeBytes(byteArrayOf(1)) }
+            barrier.await()
+            val ours = try { Renderer.publish(part, out.toFile(), overwrite = false); true } catch (_: FileAlreadyExistsException) { false }
+            barrier.await()
+            val bytes = out.toFile().readBytes()
+            if ((ours && theirs) || bytes.single() != (if (ours) 1 else 2).toByte()) clobbered++
+            if (!ours) assertTrue("the temp file is left behind", part.delete())
+            assertFalse(part.exists())
+            out.toFile().delete()
+        }
+        rival.join()
+        assertEquals("rounds where both wrote, or the file is not the winner's", 0, clobbered)
+    }
+
+    @Test
     fun aCancelBeforeTheRenameLeavesNothingAndOneAfterItIsDone() = runBlocking {
         val input = clip()
         val frames = framePtsMs(input).size
@@ -364,5 +410,42 @@ class MediaTest {
         val aacFrameS = 1024 / 44_100.0
         assertEquals(resumeS, startS + resumeAt / 44_100.0, aacFrameS)
         assertEquals(endS, startS + samples.size / 44_100.0, aacFrameS)
+    }
+
+    @Test
+    fun aTimestampDiscontinuityInAnMpegTsNeitherInsertsSilenceNorDropsAudio() = runBlocking {
+        // Codex re-review, finding 6: three MPEG-TS segments back to back, the second's clock 60 s ahead and
+        // the third's reset to where the first began, as a broadcast splice or a concatenated recording has.
+        // It used to come out as 60 s of silence with the third segment dropped.
+        val tones = listOf(440 to 1.0, 880 to 1.5, 1320 to 2.0)
+        val parts = tones.mapIndexed { i, (hz, s) ->
+            tmp.root.resolve("p$i.ts").also {
+                ff("-f", "lavfi", "-i", "sine=frequency=$hz:sample_rate=44100:duration=$s", "-c:a", "aac",
+                    *(if (i == 1) arrayOf("-output_ts_offset", "60") else emptyArray()), "-f", "mpegts", it.path)
+            }
+        }
+        val ts = tmp.root.resolve("splice.ts")
+        ts.writeBytes(parts.fold(ByteArray(0)) { acc, f -> acc + f.readBytes() })
+
+        val left = ArrayList<Float>()
+        assertTrue(AudioDecoder.decode(ts) { pcm, n -> for (i in 0 until n) left += pcm[2 * i] })
+        // Every segment, once: their sum, plus at most two AAC frames each (priming and end padding, which
+        // MPEG-TS has no way to trim).
+        val sum = tones.sumOf { it.second * 44_100 }.toInt()
+        assertTrue("decoded ${left.size} of $sum", left.size in sum..sum + 3 * 2048)
+        // No inserted hole: never 100 ms of silence in a row.
+        var run = 0
+        var longest = 0
+        for (x in left) { run = if (abs(x) < 1e-3f) run + 1 else 0; longest = maxOf(longest, run) }
+        assertTrue("silent for $longest samples", longest < 4_410)
+        // And in order: the tone over the middle of each segment is that segment's.
+        var at = 0.0
+        for ((hz, s) in tones) {
+            val from = ((at + s / 4) * 44_100).toInt()
+            val to = ((at + s * 3 / 4) * 44_100).toInt()
+            val crossings = (from + 1 until to).count { (left[it - 1] < 0f) != (left[it] < 0f) }
+            assertEquals("tone at ${at + s / 2} s", hz.toDouble(), crossings / 2.0 / ((to - from) / 44_100.0), hz * 0.05)
+            at += s
+        }
     }
 }

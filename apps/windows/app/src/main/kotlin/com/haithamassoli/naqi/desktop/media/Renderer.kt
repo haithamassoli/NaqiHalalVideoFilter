@@ -92,16 +92,40 @@ object Renderer {
             // The commit point. Nothing below suspends, so a cancel either lands here (the finally deletes the
             // temp file) or after the rename, when the output is complete and the job is done.
             coroutineContext.ensureActive()
-            if (overwrite) {
-                Files.move(tmp.toPath(), output.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
-            } else {
-                Files.move(tmp.toPath(), output.toPath()) // a rename that refuses an existing target
-            }
+            publish(tmp, output, overwrite)
             onProgress(100)
         } finally {
             tmp.delete() // already gone after the move
             aac?.delete()
         }
+    }
+
+    /**
+     * Puts the finished [tmp] at [output]. With [overwrite] it is an atomic rename over whatever is there.
+     * Without it, it throws FileAlreadyExistsException if [output] exists, and a file that appears at any
+     * moment is never replaced: Java's move without REPLACE_EXISTING is check-then-rename on macOS and Linux,
+     * so instead [output] is made a hard link to [tmp] (link(2) / CreateHardLink fail atomically when the name
+     * is taken) and [tmp] is then removed. Only where the volume has no hard links (FAT32, exFAT, some network
+     * shares) does it fall back to that move, which is still atomic on Windows (MoveFileEx without
+     * MOVEFILE_REPLACE_EXISTING) but has the check-then-rename window elsewhere. [tmp] is left on failure.
+     */
+    internal fun publish(tmp: File, output: File, overwrite: Boolean) {
+        if (overwrite) {
+            Files.move(tmp.toPath(), output.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+            return
+        }
+        val linked = try {
+            Files.createLink(output.toPath(), tmp.toPath())
+            true
+        } catch (e: FileAlreadyExistsException) {
+            throw e
+        } catch (_: UnsupportedOperationException) {
+            false
+        } catch (_: IOException) {
+            false // no hard links on this volume: the move below, whose own check still refuses an existing file
+        }
+        // Once linked, [output] is published: a temp name that will not delete is the caller's cleanup, not a failure.
+        if (linked) tmp.delete() else Files.move(tmp.toPath(), output.toPath())
     }
 
     private fun audioNeedsAac(input: File): Boolean {

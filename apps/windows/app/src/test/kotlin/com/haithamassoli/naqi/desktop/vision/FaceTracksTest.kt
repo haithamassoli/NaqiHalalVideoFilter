@@ -132,6 +132,54 @@ class FaceTracksTest {
         assertEquals(0, t.finish().size)
     }
 
+    @Test fun aSpareIsNotInheritedByAMatchedFaceThatAbstainsOrIsTooSmallToRead() {
+        // Codex re-review, finding 4a: a male-voted box, then a matched box whose own vote abstains (or that
+        // is under MIN_FACE_PX, so it never votes). Neither carries evidence for the spare, so the track is
+        // covered, as an unreadable face is everywhere else.
+        fun run(who: String, first: Int, second: NRect, secondVote: Int): Int {
+            val t = FaceTracks(who)
+            t.onFrame(listOf(box(0.40f, 0.20f, 0.25f)), w, h, 0L) { first }
+            t.onFrame(listOf(second), w, h, 100L) { secondVote }
+            return t.finish().size
+        }
+        val readable = box(0.41f, 0.21f, 0.24f)
+        // 0.25 of 640 is 160 px; a matched box can shrink at most 1.5x (to ~107 px), so the frame is what
+        // makes it small: the same normalized box in a 256x144 frame is 61 px, under the 80 px floor.
+        assertEquals(1, run(FilterOps.WOMEN, first = 1, second = readable, secondVote = 0))
+        assertEquals(1, run(FilterOps.MEN, first = -1, second = readable, secondVote = 0))
+        fun runSmall(who: String, first: Int): Int {
+            val t = FaceTracks(who)
+            t.onFrame(listOf(box(0.40f, 0.20f, 0.25f)), w, h, 0L) { first }
+            t.onFrame(listOf(readable), 256, 144, 100L) { first } // never asked: too small to read
+            return t.finish().size
+        }
+        assertEquals(1, runSmall(FilterOps.WOMEN, first = 1))
+        assertEquals(1, runSmall(FilterOps.MEN, first = -1))
+    }
+
+    @Test fun aCutBetweenTwoDetectionsLeavesNoFrameUncovered() {
+        // Codex re-review, finding 4b: faces at 0 and 200 ms, the detector misses the one at 100 ms, which
+        // is where the cut fires. The old shot's face is covered up to the cut, the new shot's from the cut
+        // (with the usual 50 ms lead-in), so every frame from 0 to 250 ms is under one span or the other.
+        val t = FaceTracks(FilterOps.EVERYONE)
+        t.onFrame(listOf(box(0.40f, 0.20f)), w, h, 0L, null)
+        t.cut(100L)
+        t.onFrame(emptyList(), w, h, 100L, null)
+        t.onFrame(listOf(box(0.40f, 0.20f)), w, h, 200L, null)
+        val spans = t.finish().map { it.startMs to it.endMs }
+        assertEquals(listOf(0L to 100L, 50L to 250L), spans)
+        for (ms in 0L..250L) assertTrue("uncovered at $ms ms: $spans", spans.any { (s, e) -> ms in s..e })
+    }
+
+    @Test fun aCutDoesNotStretchAFaceLongGoneOrPullInOneThatComesMuchLater() {
+        // The bridge is only for a face that would have matched across the cut (within MATCH_GAP_MS).
+        val t = FaceTracks(FilterOps.EVERYONE)
+        t.onFrame(listOf(box(0.40f, 0.20f)), w, h, 0L, null)
+        t.cut(1_000L)
+        t.onFrame(listOf(box(0.40f, 0.20f)), w, h, 2_000L, null)
+        assertEquals(listOf(0L to 50L, 1_950L to 2_050L), t.finish().map { it.startMs to it.endMs })
+    }
+
     @Test fun aFaceThatChangesSizeTooMuchStartsANewTrack() {
         val t = FaceTracks(FilterOps.EVERYONE)
         t.onFrame(listOf(box(0.30f, 0.30f, 0.20f)), w, h, 0L, null)
@@ -146,7 +194,7 @@ class FaceTracksTest {
         val t = FaceTracks(FilterOps.WOMEN)
         t.onFrame(listOf(box(0.40f, 0.20f)), w, h, 0L) { 1 }
         t.onFrame(listOf(box(0.40f, 0.20f)), w, h, 100L) { 1 }
-        t.cut()
+        t.cut(200L)
         t.onFrame(listOf(box(0.40f, 0.20f)), w, h, 200L) { -1 }
         val edls = t.finish()
         assertEquals(listOf(150L to 250L), edls.map { it.startMs to it.endMs }) // her span only; he is spared

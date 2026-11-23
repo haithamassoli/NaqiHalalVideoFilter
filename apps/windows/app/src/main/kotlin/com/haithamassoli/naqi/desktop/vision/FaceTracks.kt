@@ -21,8 +21,9 @@ import kotlin.math.abs
  * once, at eviction, through core's [edlFor] (pad, ±50 ms, censor on tie or abstention).
  *
  * Two rules are Windows-only, because IoU is weaker evidence of identity than ML Kit's tracking id and a
- * wrong merge fails OPEN (one person's spare covers another): a shot cut ([cut]) ends every live track,
- * and a track that would be spared re-checks each readable face matched to it ([CHECK] below).
+ * wrong merge fails OPEN (one person's spare covers another): a shot cut ([cut]) ends every live track
+ * (bridging the cut so no frame goes bare), and a track that would be spared needs each face matched to
+ * it while spared to read and agree, or the whole track is covered ([CHECK] below).
  *
  * Pure (no ORT, no frames), so `FaceTracksTest` can drive it with fixed boxes and a fake voter.
  */
@@ -31,8 +32,12 @@ internal class FaceTracks(private val who: String) {
     private val emitted = ArrayList<FaceTrackEdl>()
     private var nextId = 0
 
-    /** Tracks a matched face voted against while they were spared: censored whatever the majority says. */
+    /** Spared tracks a matched face did not vote for (against, abstained, too small): censored whatever the majority says. */
     private val contested = HashSet<FaceTrack>()
+
+    /** The last [cut], and the tracks the shot after it started within [MATCH_GAP_MS], keyed to it. */
+    private var lastCutMs = Long.MIN_VALUE / 2
+    private val afterCut = HashMap<FaceTrack, Long>()
 
     /**
      * [faces] are raw boxes normalized to the [uprightW] × [uprightH] analysis frame. [vote] classifies
@@ -42,18 +47,25 @@ internal class FaceTracks(private val who: String) {
     fun onFrame(faces: List<NRect>, uprightW: Int, uprightH: Int, ptsMs: Long, vote: ((NRect) -> Int)?) {
         val assigned = associate(faces, ptsMs)
         for ((i, rect) in faces.withIndex()) {
-            val track = assigned[i] ?: FaceTrack(nextId++).also { live += it }
+            val track = assigned[i] ?: FaceTrack(nextId++).also {
+                live += it
+                if (ptsMs - lastCutMs <= MATCH_GAP_MS) afterCut[it] = lastCutMs
+            }
             track.samples += FaceSample(ptsMs, rect)
             if (vote == null || track in contested) continue  // contested is already censored: nothing to learn
+            // CHECK: a spared track keeps its spare only for faces whose own readable vote agrees with it,
+            // because IoU cannot tell a different face in the same place from the same face. A matched face
+            // that votes against it, abstains, or is too small to read censors the whole track (a wrong
+            // merge and a wrong vote look the same, and either way covering is the safe side). Costs one
+            // crop per readable frame of a spared face.
+            val spared = spared(track)
             val px = maxOf(rect.width * uprightW, rect.height * uprightH).toInt()  // unpadded, upright px
-            if (px < MIN_FACE_PX) continue      // too small to read: no vote, which already means censor
+            if (px < MIN_FACE_PX) {             // too small to read: no vote, which already means censor
+                if (spared) contested += track
+                continue
+            }
             // Android's guards: at most VOTE_CAP votes, spent on the biggest crops.
             val counted = track.votesTried < VOTE_CAP && px > track.classifiedPx
-            // CHECK: a spared track never carries its spare onto a readable face without that face's own
-            // vote, because IoU cannot tell a smaller face in the same place from the same face. If the face
-            // votes against the spare, the track is censored (a wrong merge and a wrong vote look the same,
-            // and either way covering is the safe side). Costs one crop per readable frame of a spared face.
-            val spared = spared(track)
             if (!counted && !spared) continue
             val v = vote(rect)
             if (counted) {
@@ -64,7 +76,7 @@ internal class FaceTracks(private val who: String) {
                     -1 -> track.femaleVotes++
                 }
             }
-            if (spared && v == against) contested += track
+            if (spared && v != -against) contested += track
         }
         val iter = live.iterator()
         while (iter.hasNext()) {
@@ -77,23 +89,35 @@ internal class FaceTracks(private val who: String) {
     }
 
     /**
-     * A shot cut between the previous frame and the next: end every live track now, so nobody in the new
+     * A shot cut at [atMs] (the first frame of the new shot): end every live track now, so nobody in the new
      * shot is matched onto (and spared by) a track from the old one. Same as BodyTracker's `sceneCut`.
+     *
+     * Splitting at a cut must not open a hole where one track would have bridged a missed detection: a track
+     * last seen within [MATCH_GAP_MS] before the cut is covered up to it (the face was presumably on screen
+     * until then), and one the new shot starts within [MATCH_GAP_MS] after it is covered from the cut, with
+     * the usual [CUT_LEAD_IN_MS] lead-in, so no frame between the two is left bare.
      */
-    fun cut() {
-        live.forEach(::emit)
+    fun cut(atMs: Long) {
+        for (track in live) emit(track, endAtMs = atMs.takeIf { it - track.samples.last().ptsMs <= MATCH_GAP_MS })
         live.clear()
+        lastCutMs = atMs
     }
 
     /** Emit whatever is still live, then every censored span of the pass, by start. */
     fun finish(): List<FaceTrackEdl> {
-        cut()
+        live.forEach { emit(it) }
+        live.clear()
         return emitted.sortedBy { it.startMs }
     }
 
-    private fun emit(track: FaceTrack) {
-        edlFor(track, if (track in contested) FilterOps.EVERYONE else who)?.let { emitted += it }
+    private fun emit(track: FaceTrack, endAtMs: Long? = null) {
+        val from = afterCut.remove(track)
+        var edl = edlFor(track, if (track in contested) FilterOps.EVERYONE else who)
         contested -= track
+        if (edl == null) return
+        if (from != null) edl = edl.copy(startMs = minOf(edl.startMs, (from - CUT_LEAD_IN_MS).coerceAtLeast(0L)))
+        if (endAtMs != null) edl = edl.copy(endMs = maxOf(edl.endMs, endAtMs))
+        emitted += edl
     }
 
     /** What core's `shouldCensor` (internal there) would leave uncovered right now. */
@@ -103,7 +127,7 @@ internal class FaceTracks(private val who: String) {
         else -> false
     }
 
-    /** The vote that contradicts a spare: female in Women mode, male in Men mode. */
+    /** The vote that contradicts a spare: female in Women mode, male in Men mode (its negation agrees). */
     private val against = when (who) {
         FilterOps.WOMEN -> -1
         FilterOps.MEN -> 1
@@ -154,6 +178,9 @@ internal class FaceTracks(private val who: String) {
          * person nearer or further from the camera does.
          */
         const val MAX_SIDE_RATIO = 1.5f
+
+        /** Core's `SPAN_PAD_MS` (private there): half the 10 fps sample gap, the lead-in every span gets. */
+        const val CUT_LEAD_IN_MS = 50L
 
         private fun similarSize(a: NRect, b: NRect): Boolean =
             ratio(a.width, b.width) <= MAX_SIDE_RATIO && ratio(a.height, b.height) <= MAX_SIDE_RATIO
