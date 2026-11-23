@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Stage the ONNX models into naqi/Resources/Models (gitignored, as on Android).
-# Source of truth is the Android repo's assets; regeneration pipelines live in
-# the Android docs/m0-spikes.md "Regen pipelines" section.
+# Source of truth is the Android app's assets (apps/android in this monorepo);
+# regeneration pipelines live in apps/android/docs/m0-spikes.md "Regen pipelines".
 set -euo pipefail
 
-ANDROID="${NAQI_ANDROID_REPO:-$HOME/AndroidStudioProjects/NaqiHalalVideoFilter}"
-SRC="$ANDROID/app/src/main/assets/models"
+# Checkout root: this monorepo by default, or a standalone Android checkout.
+ANDROID="${NAQI_ANDROID_REPO:-$(cd "$(dirname "$0")/../../.." && pwd)}"
+SRC="$ANDROID/apps/android/app/src/main/assets/models"
+[ -d "$SRC" ] || SRC="$ANDROID/app/src/main/assets/models"
 DST="$(cd "$(dirname "$0")/.." && pwd)/naqi/Resources/Models"
 
 # Source artifacts. The Apple build step converts/fixes them below, then keeps
