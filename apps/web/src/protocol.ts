@@ -8,10 +8,12 @@ export type ToWorker =
   | { type: 'start'; file: File; ops: FilterOps; target: SaveTarget }
   | { type: 'cancel' };
 
-export type Phase = 'open' | 'remux' | 'finalize';
+export type Phase = 'open' | 'remux' | 'model' | 'music' | 'finalize';
 
 export type FromWorker =
   | { type: 'progress'; phase: Phase; pct: number }
-  /** `buffer` is set only for a `buffer` target. */
-  | { type: 'done'; buffer?: ArrayBuffer }
+  /** Something the user should know about the output, e.g. a codec fallback. */
+  | { type: 'notice'; message: string }
+  /** `buffer` is set only for a `buffer` target; `mimeType` is the output container's. */
+  | { type: 'done'; buffer?: ArrayBuffer; mimeType: string }
   | { type: 'error'; message: string; canceled?: boolean };

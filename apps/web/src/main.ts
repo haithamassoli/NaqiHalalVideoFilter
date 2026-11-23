@@ -57,6 +57,8 @@ function readOps(): FilterOps {
 const PHASES: Record<Phase, string> = {
   open: 'Opening the video…',
   remux: 'Writing the MP4…',
+  model: 'Loading the music model…',
+  music: 'Removing music…',
   finalize: 'Finishing…',
 };
 
@@ -72,8 +74,8 @@ function setBusy(busy: boolean) {
   if (!busy) syncOutputs();
 }
 
-function outputName(file: File) {
-  return `${file.name.replace(/\.[^.]+$/, '')}-naqi.mp4`;
+function outputName(file: File, mimeType = 'video/mp4') {
+  return `${file.name.replace(/\.[^.]+$/, '')}-naqi.${mimeType === 'video/webm' ? 'webm' : 'mp4'}`;
 }
 
 form.addEventListener('submit', async (e) => {
@@ -110,8 +112,13 @@ form.addEventListener('submit', async (e) => {
 
   const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
   worker = w;
+  let notice = '';
   w.onmessage = (ev: MessageEvent<FromWorker>) => {
     const msg = ev.data;
+    if (msg.type === 'notice') {
+      notice = ` ${msg.message}`;
+      return;
+    }
     if (msg.type === 'progress') {
       bar.value = msg.pct;
       show(`${PHASES[msg.phase]} ${Math.round(msg.pct * 100)}%`);
@@ -122,13 +129,13 @@ form.addEventListener('submit', async (e) => {
       show(msg.canceled ? 'Canceled. Nothing was saved.' : `Failed: ${msg.message} Nothing was saved.`);
     } else if (msg.buffer) {
       bar.value = 1;
-      saveLink.href = URL.createObjectURL(new Blob([msg.buffer], { type: 'video/mp4' }));
-      saveLink.download = outputName(file);
+      saveLink.href = URL.createObjectURL(new Blob([msg.buffer], { type: msg.mimeType }));
+      saveLink.download = outputName(file, msg.mimeType);
       saveLink.hidden = false;
-      show('Done. Save the video:');
+      show(`Done.${notice} Save the video:`);
     } else {
       bar.value = 1;
-      show(`Done. Saved as ${target.kind === 'file' ? target.handle.name : outputName(file)}.`);
+      show(`Done. Saved as ${target.kind === 'file' ? target.handle.name : outputName(file)}.${notice}`);
     }
   };
   w.onerror = (ev) => {
