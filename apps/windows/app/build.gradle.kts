@@ -29,6 +29,8 @@ dependencies {
         runtimeOnly("org.bytedeco:ffmpeg:$ffmpeg:$platform-gpl")
     }
     testImplementation(libs.junit)
+    // runComposeUiTest for the UI test (headless, offscreen); same Compose version as the app.
+    testImplementation(compose.desktop.uiTestJUnit4)
 }
 
 // The models are not in git. stage-models.sh copies or downloads them into apps/windows/models and checks
