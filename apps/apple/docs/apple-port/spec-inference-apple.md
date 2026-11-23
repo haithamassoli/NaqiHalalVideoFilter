@@ -460,7 +460,7 @@ Actually ran this:
 So: **uv solves the Python problem completely** (`uv venv --python 3.12`; no pyenv needed), but it does
 not solve the conversion problem. coremltools 9 converts from **PyTorch and TensorFlow only** — the ONNX
 converter was removed years ago. Getting a `.mlpackage` therefore means re-exporting from the
-`demucs.onnx` PyTorch fork that `scripts/htdemucs_export.py` already drives (`m0-spikes.md:52`), then
+`demucs.onnx` PyTorch fork that `models/htdemucs_export.py` already drives (`m0-spikes.md:52`), then
 re-validating parity, `SEG` geometry, and the bit-identical-resume contract. That is a real project, and
 the CoreML EP already delivers most of the win. **Hence F1: deferred, not rejected.**
 

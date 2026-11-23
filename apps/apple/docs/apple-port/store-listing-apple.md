@@ -1,6 +1,6 @@
 # App Store listing — EN / AR
 
-Ported from the Android `docs/store-listing.md`, but **not** a translation of it. Four claims in the Play
+Ported from the Android `apps/android/docs/store-listing.md`, but **not** a translation of it. Four claims in the Play
 listing are false on Apple and are gone rather than softened:
 
 | Play listing says | Apple reality |

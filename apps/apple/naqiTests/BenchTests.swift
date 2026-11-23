@@ -417,7 +417,7 @@ struct BenchTests {
         let renderMs = t.duration(to: .now).milliseconds
         MemoryFootprint.note("render")
 
-        // Android, censor-only on this clip, cooled S23 (docs/perf-plan-v3.md §0).
+        // Android, censor-only on this clip, cooled S23 (apps/android/docs/perf-plan-v3.md §0).
         let s23 = (analyze: 114_648.0, render: 89_411.0, total: 204_752.0)
         let appleTotal = analyzed.wallMs + renderMs
 

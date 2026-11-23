@@ -1,6 +1,6 @@
 # Naqi — Render Pass & Video Encode: exact porting spec (Android → Apple)
 
-Extracted from the shipped Android app at `/Users/goldentik/AndroidStudioProjects/NaqiHalalVideoFilter`,
+Extracted from the shipped Android app at `apps/android/`,
 commit-state 2026-08-04. Every number below is quoted from source with a `file:line` citation.
 media3 version is **1.10.1** (`gradle/libs.versions.toml:10`); media3 internals are cited from the
 sources jars in `~/.gradle/caches`, because several shipped behaviours are *media3 defaults the app

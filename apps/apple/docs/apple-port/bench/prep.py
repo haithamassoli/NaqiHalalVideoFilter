@@ -2,8 +2,9 @@ import onnx, sys, os
 from onnx import numpy_helper, TensorProto
 import numpy as np
 
-M = "/Users/goldentik/AndroidStudioProjects/NaqiHalalVideoFilter/app/src/main/assets/models"
 OUT = os.path.dirname(os.path.abspath(__file__))
+# Android models, staged by apps/android/scripts/fetch-models.sh (monorepo root is five levels up).
+M = os.path.join(OUT, *[".."] * 5, "apps", "android", "app", "src", "main", "assets", "models")
 
 # 1) htdemucs fp16 -> fp32 (initializers + value_info), for a gold fp32 reference.
 try:

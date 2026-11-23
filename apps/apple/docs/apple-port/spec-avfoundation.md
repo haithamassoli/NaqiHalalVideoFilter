@@ -1,7 +1,7 @@
 # Naqi — AVFoundation + Vision layer: exact porting spec (Android → Apple)
 
 Target: **iOS 26 / macOS 26, Swift 6, Xcode 26.6 (17F113), iPhoneOS SDK 26.5**.
-Extracted from the shipped Android app at `/Users/goldentik/AndroidStudioProjects/NaqiHalalVideoFilter`
+Extracted from the shipped Android app at `apps/android/`
 (commit-state 2026-08-04) and verified against the installed SDK headers and against code actually
 compiled and run on this machine on 2026-08-04.
 

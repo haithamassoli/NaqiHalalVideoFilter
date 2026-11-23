@@ -1,7 +1,7 @@
 # Naqi — Apple port spec: the ANALYZE pass (pass 1)
 
 Source of truth: the shipped Android build at
-`/Users/goldentik/AndroidStudioProjects/NaqiHalalVideoFilter`, commit state of 2026-08-04.
+`apps/android/`, commit state of 2026-08-04.
 Every number below is quoted from Kotlin with a `file:line` citation. Nothing here is inferred
 unless it is explicitly marked **[INFERRED]** or **[UNKNOWN]**.
 

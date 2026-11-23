@@ -38,3 +38,7 @@ The website (`web/src/release.ts`) builds its "Download the APK" link from the n
 Only the first page of releases is read. That page holds 30 releases in builds after the monorepo move, and **10** in older builds. If more than 9 desktop releases are published after the newest Android one, older builds can't see it and stop offering updates until the next Android release. Keep desktop releases below that limit, or publish an Android release in between.
 
 Each published release, desktop ones included, also triggers a website rebuild (`.github/workflows/web.yml`). That is harmless.
+
+## Remote config
+
+Apple builds refresh their YouTube client list weekly from `apps/apple/config/youtube-clients.json` on `main` of this repo. Builds released before the monorepo move read `config/youtube-clients.json` from the old standalone repo (`haithamassoli/naqi`) instead, so when you change the file, update that copy too for as long as those builds are in use. A missing or invalid file is harmless: the app keeps its cached list or its built-in defaults.

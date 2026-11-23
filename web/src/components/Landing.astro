@@ -161,7 +161,7 @@ const jsonLd = {
   operatingSystem: 'Android 10+, iOS 18+, iPadOS 18+, macOS 15+',
   installUrl: [playUrl, appStoreUrl],
   downloadUrl: [playUrl, appStoreUrl, android.url],
-  sameAs: [playUrl, appStoreUrl, 'https://github.com/haithamassoli/NaqiHalalVideoFilter', 'https://github.com/haithamassoli/naqi'],
+  sameAs: [playUrl, appStoreUrl, 'https://github.com/haithamassoli/NaqiHalalVideoFilter'],
   ...(android.version && { softwareVersion: android.version.replace(/^v/, '') }),
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   author: { '@type': 'Person', name: 'Haitham Assoli' },
@@ -324,8 +324,8 @@ const jsonLd = {
       <p>{t.footer}</p>
       <p>
         {t.code}:{' '}
-        <a href="https://github.com/haithamassoli/NaqiHalalVideoFilter">{t.androidName}</a>{ar ? '، ' : ', '}
-        <a href="https://github.com/haithamassoli/naqi">{t.appleName}</a>
+        <a href="https://github.com/haithamassoli/NaqiHalalVideoFilter/tree/main/apps/android">{t.androidName}</a>{ar ? '، ' : ', '}
+        <a href="https://github.com/haithamassoli/NaqiHalalVideoFilter/tree/main/apps/apple">{t.appleName}</a>
       </p>
     </footer>
   </body>

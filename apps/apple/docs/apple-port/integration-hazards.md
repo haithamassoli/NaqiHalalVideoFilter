@@ -118,7 +118,7 @@ against the CPU EP's, not just against NaN.
 ## 11. Segment concat: place segments at intended starts, not at a running cursor
 
 Android measured this one rather than reasoning about it
-(`docs/long-film-plan.md:123`). Offsetting each segment by the **accumulated
+(`apps/android/docs/long-film-plan.md:123`). Offsetting each segment by the **accumulated
 measured duration** of the ones before it folds a sub-frame rounding error into
 every following segment — up to **~1 s of A/V drift across 31 joins**, 20× past
 the PRD's 50 ms budget. Their fix: offset by the *intended* segment start.

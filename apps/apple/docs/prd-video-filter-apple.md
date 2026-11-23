@@ -3,7 +3,7 @@
 ## Summary
 Native Apple port of Naqi (shipped Android app). Filters a locally selected video entirely on-device and saves a filtered copy; the original file is never modified. Two independent operations, run alone or together: (1) **remove music** — stem separation keeps `vocals` or `vocals + other`; drums/bass never kept; (2) **censor** — faces of the chosen gender (Who = women | men) blurred for their whole on-screen span, plus whole-frame censoring while an NSFW classifier gate fires, with pre-roll so nothing slips through. Censor style: blur amount + grayscale, region or whole-frame mode. No cloud, no accounts, no telemetry; network only for optional model download. v1 = feature parity with Android 1.3 as a full Swift rewrite — the Android pipeline is MediaCodec/GLES/ORT-Android-bound; none of it ports.
 
-**Reference implementation:** `github.com/haithamassoli/NaqiHalalVideoFilter`. Where this doc under-specifies behavior (thresholds, hysteresis, EDL rules), the Android code + `docs/prd-video-filter-android.md` are the spec. Its `qa-assets` clips + Android outputs are the parity suite.
+**Reference implementation:** `apps/android/` in this repo. Where this doc under-specifies behavior (thresholds, hysteresis, EDL rules), the Android code + `apps/android/docs/prd-video-filter-android.md` are the spec. Its `qa-assets` clips + Android outputs are the parity suite.
 
 ## Scope
 - Input: one local video via Photos picker, Files, share sheet, or drag-drop (Mac). MP4/MOV, H.264/H.265, AAC/MP3 audio. MKV/Opus: AVFoundation cannot demux it — M0 spike decides drop-in-v1 vs embedded demuxer. Feature-length input supported.

@@ -1,8 +1,8 @@
 # spec-audio.md — Naqi music-removal pipeline, exact porting spec (Android → Apple)
 
 Source of truth: the shipped Kotlin at
-`/Users/goldentik/AndroidStudioProjects/NaqiHalalVideoFilter/app/src/main/java/com/haithamassoli/naqi/audio/`
-plus `ml/Models.kt`, `scripts/htdemucs_export.py`, `scripts/htdemucs_post.py`, `scripts/stft_golden.py`,
+`apps/android/app/src/main/java/com/haithamassoli/naqi/audio/`
+plus `ml/Models.kt`, `models/htdemucs_export.py`, `models/htdemucs_post.py`, `models/stft_golden.py`,
 and the measured findings in `docs/`. Every constant below is quoted with `file:line`. Paths are
 repo-relative to the Android root unless absolute.
 
@@ -47,9 +47,9 @@ Two driver entry points, same separator:
 ## 1. htdemucs graph IO
 
 Artifact: `htdemucs_s26_f16.onnx`, 87.9 MB, sha256 `df8a2c2c8dd06ca279f58646dacc007b3e1e07436f31a3189408f0336c56eba5`
-(`ml/Models.kt:104-109`). fp16 **weights**, f32 **IO** (`keep_io_types=True`, `scripts/htdemucs_post.py:32`).
+(`ml/Models.kt:104-109`). fp16 **weights**, f32 **IO** (`keep_io_types=True`, `models/htdemucs_post.py:32`).
 Exported torch 2.13 dynamo exporter, opset 18, from sevagh/demucs.onnx's fork with STFT/iSTFT outside the
-graph (`docs/m0-spikes.md:37`, `scripts/htdemucs_export.py:38-47`).
+graph (`docs/m0-spikes.md:37`, `models/htdemucs_export.py:38-47`).
 
 ### 1.1 Tensors
 
@@ -63,7 +63,7 @@ graph (`docs/m0-spikes.md:37`, `scripts/htdemucs_export.py:38-47`).
 **Do not bind by name.** The shipped Kotlin matches inputs and outputs **by tensor rank**
 (`DemucsSeparator.kt:671-678` for inputs — rank 3 = wav, rank 4 = spec; `:688-698` for outputs — rank 5 =
 spec, rank 4 = time). Reproduce the rank dispatch; the names above are what the export script sets
-(`scripts/htdemucs_export.py:45-46`) and are correct for this artifact, but the driver never reads them.
+(`models/htdemucs_export.py:45-46`) and are correct for this artifact, but the driver never reads them.
 
 ### 1.2 Geometry constants (all in `DemucsSeparator.kt` companion)
 
@@ -102,7 +102,7 @@ Measured on an S23, 30 s clip (`docs/m0-spikes.md:41-47`, corroborated `docs/per
 
 2.6 s is the **compute optimum**, not a RAM compromise: the cross-domain transformer's attention is
 O(T²) (10 `Softmax` at seq len 896 / 448, `docs/perf-plan-v4.md:216-218`). More RAM does not reopen this
-dial. Changing `SEG` requires a matching re-export (`scripts/htdemucs_export.py`).
+dial. Changing `SEG` requires a matching re-export (`models/htdemucs_export.py`).
 
 ### 1.4 Per-chunk data volumes (sizing the Swift buffers)
 
@@ -125,7 +125,7 @@ The graph **always computes all four stems**; only the kept ones are copied out 
 
 ## 2. STFT / iSTFT contract (outside the graph)
 
-Implemented in `Dsp.kt`; independently reproduced in numpy by `scripts/stft_golden.py`. Both must agree
+Implemented in `Dsp.kt`; independently reproduced in numpy by `models/stft_golden.py`. Both must agree
 with your Swift port to **atol 1e-4** (`DspTest.kt:20`, `:84`, `:93`).
 
 ### 2.1 Forward — `Stft.forward(ch0, ch1, T) -> FloatArray[4*bins*le]`
@@ -225,11 +225,11 @@ Contract points that bite:
 1. **Bin 2048 (Nyquist) stays zero** — never reconstructed (`Dsp.kt:209`, `:216-219` skips it).
 2. **DC bin keeps a non-zero imaginary part** in `im[0]`. A full complex inverse FFT is run and only
    `re[]` is used, which is numerically identical to discarding `Im(DC)` — numpy's `irfft` in the golden
-   does the same (`scripts/stft_golden.py:90-92`). If you use vDSP's real-inverse FFT, drop `Im(DC)`
+   does the same (`models/stft_golden.py:90-92`). If you use vDSP's real-inverse FFT, drop `Im(DC)`
    deliberately.
 3. **Boundary frames 0, 1, and `2+le .. nframes-1` contribute nothing** to `ola` but **DO contribute to
    `env`** — the window sum-of-squares runs over ALL `nframes = le+4` frames (`Dsp.kt:256-261`,
-   `scripts/stft_golden.py:81-82`). Computing `env` only over the transformed frames is wrong.
+   `models/stft_golden.py:81-82`). Computing `env` only over the transformed frames is wrong.
 4. **The `1/N` lives in the inverse FFT and nowhere else** (`Dsp.kt:33-34`, `:80-86`). Adding a second
    `1/N` is dsp-spec §8c gotcha 1.
 5. Division is by `env + 1e-8` (`Dsp.kt:229`) — the epsilon is inside the parenthesis.
@@ -253,7 +253,7 @@ floor this file explicitly rejected. Either (a) use `vDSP_DFT_zop_CreateSetupD` 
 Accelerate entry points, or (b) use single precision and re-derive the golden tolerances with a measured
 diff — never by loosening the tolerance. Validate against `app/src/test/resources/dsp/stft_small.json`
 (nfft 64, hop 16, T 4123 — chosen because `T % hop != 0` exercises the odd-tail branch that the production
-config never hits; `scripts/stft_golden.py:10-13`).
+config never hits; `models/stft_golden.py:10-13`).
 
 ---
 
@@ -859,7 +859,7 @@ Losing any one of these has cost this codebase a job, a stage, or a stem. None a
 
 | Android test | what it locks | port target |
 |---|---|---|
-| `app/src/test/resources/dsp/stft_small.json` (nfft 64, hop 16, T 4123) | forward CaC + iSTFT round trip vs a numpy f64 reference, atol 1e-4 | Swift STFT unit test. Regenerate with `scripts/stft_golden.py` if needed. |
+| `app/src/test/resources/dsp/stft_small.json` (nfft 64, hop 16, T 4123) | forward CaC + iSTFT round trip vs a numpy f64 reference, atol 1e-4 | Swift STFT unit test. Regenerate with `models/stft_golden.py` if needed. |
 | `DspTest.fullSizeInteriorRoundTripHighSnr` | `Stft(4096,1024)` on T = 343 980, interior (guard 8192) SNR > 80 dB on a band-limited probe | Swift STFT unit test |
 | `DspTest.frameArithmetic` | `bins == 2048`; `le(343980) == 336`; `le(335*1024) == 335`; `le(335*1024+1) == 336`; `le(336*1024+1) == 337`; `Stft(64,16).le(4123) == 258`, `.bins == 32` | trivial, port verbatim |
 | `DemucsSeparatorTest` (13 tests, fake infer lambdas, no runtime) | every driver seam: identity round trip, normalization round trip, keepOther summing, single-chunk short input, time-branch passthrough, short/long stream length, full-skip passthrough, ±2 dilation width, C1 two-tier, bit-exact resume ×2, skipped-chunk progress, progress monotonicity | **Highest-value thing in this spec.** Port it first, before any AVFoundation code exists. |

@@ -164,7 +164,9 @@ enum NativeExtract {
 
     private struct ClientConfig: Decodable { var clients: [YouTubeClient] }
 
-    private static let configURL = URL(string: "https://raw.githubusercontent.com/haithamassoli/naqi/main/config/youtube-clients.json")!
+    /// Lives in the monorepo now. Builds released before the move still read
+    /// `haithamassoli/naqi/main/config/`, so keep that copy in sync too.
+    private static let configURL = URL(string: "https://raw.githubusercontent.com/haithamassoli/NaqiHalalVideoFilter/main/apps/apple/config/youtube-clients.json")!
     private static let configKey = "naqi.yt.clients"
     private static let configCheckedKey = "naqi.yt.clientsCheckedAt"
     private static let visitorKey = "naqi.yt.visitorData"

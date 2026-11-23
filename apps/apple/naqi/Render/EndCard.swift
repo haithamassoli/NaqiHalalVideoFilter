@@ -10,7 +10,7 @@ import Foundation
 /// the bowl draws itself, the drop lands in it, the line rises underneath.
 ///
 /// A pure function of `t`, ported from `drawFrame` in
-/// `docs/endcard/endcard-mockup.html` — every number below is that file's, so a
+/// `apps/android/docs/endcard/endcard-mockup.html` — every number below is that file's, so a
 /// change to the look starts there. The card is drawn **upright** with
 /// CoreGraphics and CoreText (both platforms, and CoreText is what shapes the
 /// Arabic line), then turned into stored orientation in Core Image: the output

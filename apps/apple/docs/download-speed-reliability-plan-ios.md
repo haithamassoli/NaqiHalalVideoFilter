@@ -1,7 +1,7 @@
 # Download Speed & Reliability Plan — iOS / macOS
 
 **Date:** 2026-09-27 · **Scope:** `naqi/Download/*`, `NaqiShared/DownloadQuality.swift`, `NaqiShare/ShareViewController.swift`, `naqi/Jobs/JobRunner.swift`, `naqi/Jobs/Job.swift`, `naqi/Jobs/JobQueue.swift`, `naqi/Jobs/LiveActivity.swift`, `naqi/UI/Screens/JobsScreen.swift`
-**Companion:** the Android plan (`NaqiHalalVideoFilter/docs/download-speed-reliability-plan.md`, Phases 0–6 shipped). This document maps each Android item onto what iOS can actually do, with measurements taken on 2026-09-27.
+**Companion:** the Android plan (`apps/android/docs/download-speed-reliability-plan.md`, Phases 0–6 shipped). This document maps each Android item onto what iOS can actually do, with measurements taken on 2026-09-27.
 **Overlaps:** `docs/apple-port/apple-silicon-performance-plan-2026-09.md` §6 (D1–D3, J1). This plan replaces D3's progress and concurrency parts and builds on J1's download record; D1/D2 are unchanged and still worth doing.
 
 **Status:** Phases 0–8 (7.1 only) implemented on `feat/download-speed-reliability-ios`. 7.2, 9, 10 and X stay gated on measurement or a decision, as §7 says. Review notes are in §R.

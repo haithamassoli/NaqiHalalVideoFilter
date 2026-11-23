@@ -947,7 +947,7 @@ struct RenderTests {
 
     // MARK: - End card
 
-    /// The mockup's timeline (`docs/endcard/endcard-mockup.html`): blank at 0,
+    /// The mockup's timeline (`apps/android/docs/endcard/endcard-mockup.html`): blank at 0,
     /// settled well before 2 s, and the drop overshooting its resting place on
     /// the way in.
     @Test("end card timing follows the mockup")

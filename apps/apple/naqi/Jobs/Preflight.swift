@@ -49,7 +49,7 @@ enum Preflight {
     /// Full-size temporary copies that coexist with the published output.
     /// Measured: the mux temp is a full-size copy of the source, so a 2 h movie
     /// exceeds any fixed "2 GB temp" budget by construction. The preflight
-    /// sizes for that rather than asserting it (`docs/tasks.md:50` on Android).
+    /// sizes for that rather than asserting it (`apps/android/docs/tasks.md:50`).
     static func tempCopies(for ops: FilterOps, segmented: Bool) -> Int64 {
         // Segmented never holds three: the segments are deleted the moment the
         // concat lands, so the pairs that coexist are (segments, concat) and

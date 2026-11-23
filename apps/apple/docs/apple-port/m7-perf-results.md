@@ -39,7 +39,7 @@ the simulator could not — is that the port's architecture is sound and competi
 ## 0. What was run
 
 `qa-assets/tv1-h264.mp4` — the **same clip** Android published its numbers against
-(`docs/perf-plan-v3.md` §0): 643.0 s, 1920×1080, **29.97 fps**, H.264 + AAC. Transcoded from the
+(`apps/android/docs/perf-plan-v3.md` §0): 643.0 s, 1920×1080, **29.97 fps**, H.264 + AAC. Transcoded from the
 repo's `test-video-1.webm` (AV1 + Opus) because AVFoundation cannot demux WebM.
 
 Censor-only, default options, via `BenchTests.tv1EndToEnd`, **Release configuration**.

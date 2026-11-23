@@ -1,6 +1,6 @@
 # Naqi — Apple port spec: jobs / orchestration, options model, design language
 
-Extracted from the shipped Android app at `/Users/goldentik/AndroidStudioProjects/NaqiHalalVideoFilter`.
+Extracted from the shipped Android app at `apps/android/`.
 Every number below is quoted from Kotlin with `file:line`. Paths are relative to
 `app/src/main/java/com/haithamassoli/naqi/` unless prefixed with `docs/` or `app/src/main/res/`.
 
@@ -977,7 +977,7 @@ gradient, needed for an App Icon that matches: `#24805F` (0 %) → `#123A2F` (55
 centred at (54, 36) with r = 80 in a 108×108 viewport; cup in `#F5F7F3`, droplet in `#55C3A1`.
 
 **⚠ Naming conflict to resolve before writing Swift.** The Apple task list says "ink = interaction / jade =
-video-truth" (`/Users/goldentik/Documents/naqi/docs/tasks.md:80`). The shipped Android code assigns the
+video-truth" (`apps/apple/docs/tasks.md:80`). The shipped Android code assigns the
 **opposite** roles: **jade is the interaction colour** (`primary`, every button, switch, selected state,
 progress bar, trust seal) and **ink is the text colour** on paper (`onBackground`/`onSurface`). Nothing in
 the Android source or `docs/` uses "video-truth". Recommendation: keep the shipped semantics (jade =

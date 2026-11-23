@@ -3,8 +3,8 @@
 What the Android build has that this one does not, what to take, what to refuse, and where the
 performance actually is.
 
-Scope: `/Users/goldentik/Documents/naqi` (Swift, 9 808 lines) against
-`/Users/goldentik/AndroidStudioProjects/NaqiHalalVideoFilter` (Kotlin, 12 934 lines). Every claim
+Scope: `apps/apple/` (Swift, 9 808 lines) against
+`apps/android/` (Kotlin, 12 934 lines). Every claim
 below cites a `file:line` in one of the two trees or a measurement already checked in under
 `docs/apple-port/`.
 

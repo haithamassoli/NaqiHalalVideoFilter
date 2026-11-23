@@ -1,7 +1,7 @@
 # spec-models.md — ML model contracts & ORT runtime configuration
 
 Exact porting spec extracted from the shipped Android app
-`/Users/goldentik/AndroidStudioProjects/NaqiHalalVideoFilter`.
+`apps/android/`.
 Every constant below is quoted from real Kotlin/Python/ONNX with a `file:line` citation, or from a
 `python3 -c onnx` dump of the actual asset bytes (§0). Nothing here is inferred.
 
@@ -179,7 +179,7 @@ between the two columns (`NsfwGate.kt:20-26`):
 | out | `out_wave` | `[1,4,2,114660]` | float32 | time-branch waveform, 4 stems × 2 ch × SEG |
 
 Weights are FLOAT16 (552 initializers), **IO is float32** — `keep_io_types=True`
-(`scripts/htdemucs_post.py:33`).
+(`models/htdemucs_post.py:33`).
 
 Stem index order (`DemucsSeparator.kt:570-571`): **0 = drums, 1 = bass, 2 = other, 3 = vocals.**
 
@@ -215,7 +215,7 @@ Geometry constants (`DemucsSeparator.kt:529-569`):
 The class map CSV is **deliberately not shipped** (`Models.kt:118-119`). Only two index ranges are
 used, **inclusive at both ends** (`MusicGate.kt:150`):
 
-| range | meaning | verified anchors (`scripts/yamnet_export.py:69`) |
+| range | meaning | verified anchors (`models/yamnet_export.py:69`) |
 |---|---|---|
 | `132..276` | the AudioSet music block, `Music` … `Scary music` | 132=`Music`, 276=`Scary music`, 277=`Wind` (excluded) |
 | `24..32` | vocal music: Singing, Choir, Yodeling, Chant, Mantra, Child singing, Synthetic singing, Rapping, Humming | 24=`Singing`, 32=`Humming` |
@@ -507,7 +507,7 @@ smoke path for warm-up must not let XNNPACK execute this graph.
 | model | live at runtime? | evidence |
 |---|---|---|
 | `nsfw_mnv2_140_int8.onnx` | **LIVE.** `NaqiModel.NSFW_GATE` (`Models.kt:82`), called by `Infer.nsfw` (`Infer.kt:83-91`) | — |
-| `nsfw_mnv2_140_f32.onnx` | **VESTIGIAL at runtime, load-bearing in the build.** No enum entry, never opened by any Kotlin. Kept as (a) the input to `scripts/nsfw_int8_quantize.py`, (b) the A/B baseline a recall regression is diffed against; the whole A/B is swapping `assetName` + `sha256` back | `Models.kt:72-75`, `scripts/fetch-models.sh:17-21` |
+| `nsfw_mnv2_140_f32.onnx` | **VESTIGIAL at runtime, load-bearing in the build.** No enum entry, never opened by any Kotlin. Kept as (a) the input to `models/nsfw_int8_quantize.py`, (b) the A/B baseline a recall regression is diffed against; the whole A/B is swapping `assetName` + `sha256` back | `Models.kt:72-75`, `scripts/fetch-models.sh:17-21` |
 | `htdemucs_s26_f16.onnx` | **LIVE.** `HtdemucsSession` (`DemucsSeparator.kt:633-659`) | — |
 | `yamnet.onnx` | **LIVE.** `MusicGate.open` (`MusicGate.kt:177-190`), 3 inferences/chunk. Fails **open**: null ⇒ separate every chunk, i.e. exact pre-A1 behaviour | `MusicGate.kt:171-176` |
 | `genderage.onnx` | **LIVE, CONDITIONAL.** Session created only when `censorWho ∈ {WOMEN, MEN}` AND the file is installed; Everyone/Off allocate nothing | `FilterWorker.kt:955-961` |
@@ -668,7 +668,7 @@ retry it."* Lowering the gate input resolution is the same trap measured separat
 agreement @192 vs 91.1 % for INT8@224** (`Models.kt:75-76`).
 
 ### 6.8 INT8 gate accuracy — the numbers that authorised the swap
-(`Models.kt:39-71`.) Built by `scripts/nsfw_int8_quantize.py`:
+(`Models.kt:39-71`.) Built by `models/nsfw_int8_quantize.py`:
 AveragePool[7,7] → GlobalAveragePool (bit-exact, max|Δ| 0) → `quant_pre_process` →
 `quantize_static(QDQ, QInt8/QInt8, per_channel=True)` calibrated on **100 real frames**.
 ORT fuses to **75 nodes / 52 `QLinearConv`**.
@@ -785,8 +785,8 @@ APK assets (`downloadUrl = null` for HTDEMUCS)"*.
 |---|---|---|
 | `fetch-models.sh` | orchestrator | `cd "$(dirname $0)/.."`, `DEST=app/src/main/assets/models` (`:11-13`) |
 | ” | `nsfw_mnv2_140_f32.onnx`, `htdemucs_s26_f16.onnx` | **not fetchable** — prints `MISSING … regenerate per docs/m0-spikes.md` (`:19-21`) |
-| ” | `nsfw_mnv2_140_int8.onnx` | runs `python3 scripts/nsfw_int8_quantize.py`, no-op if the fp32 input is missing (`:25-26`) |
-| ” | `yamnet.onnx` | runs `python3 scripts/yamnet_export.py` (`:28`) |
+| ” | `nsfw_mnv2_140_int8.onnx` | runs `python3 models/nsfw_int8_quantize.py`, no-op if the fp32 input is missing (`:25-26`) |
+| ” | `yamnet.onnx` | runs `python3 models/yamnet_export.py` (`:28`) |
 | ” | `genderage.onnx` | `curl -fL` **buffalo_l.zip (289 MB)** from `github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip`, `unzip -o -j "$ZIP" buffalo_l/genderage.onnx -d "$DEST"`, `rm` the zip (`:33-40`) |
 | ” | integrity | `shasum -a 256 -c` against the hardcoded `GENDERAGE_SHA`, **run even when the file was already present**; mismatch ⇒ `exit 1`, *"a silently different graph is worse than a missing one"* (`:41-46`) |
 | `gantman_tf_convert.py` | `nsfw_f32.onnx` | **two-pass** `tf2onnx.convert --saved-model … --opset 17`: pass 1 discovers the graph input name, pass 2 re-runs with `--inputs-as-nchw` (`m0-spikes.md:33`, `:26-40`) |
