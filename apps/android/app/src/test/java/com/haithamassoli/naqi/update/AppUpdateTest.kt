@@ -118,7 +118,42 @@ class AppUpdateTest {
         // ...and it does not hide a good release published alongside it.
         assertEquals("1.3", pickRelease(merge(sourceOnly, stable("v1.3")), v("1.1"))?.version?.toString())
     }
+
+    /**
+     * The monorepo publishes Windows and Apple releases into this same repo, as `windows-vX.Y.Z` and
+     * `apple-vX.Y.Z` (docs/RELEASING.md). Installed builds that already shipped run this exact
+     * filter, so it has to hold without an app update: a desktop tag doesn't parse as a version,
+     * and a desktop release carries no APK, so either check alone keeps it out.
+     */
+    @Test
+    fun desktopReleasesAreIgnoredAndDoNotHideTheAndroidOne() {
+        // Even a desktop release that somehow carried an APK is ignored on its tag alone.
+        val desktop = merge(
+            desktop("windows-v9.0.0", "Naqi-9.0.0-x64.msix"),
+            desktop("apple-v9.0.0", "Naqi-9.0.0.dmg"),
+            desktop("windows-v9.0.1", "naqi-9.0.1.apk"),
+            desktop("apple-v9.0.1", "naqi-9.0.1.apk"),
+        )
+        assertNull(pickRelease(desktop, v("1.1")))
+        assertNull(pickRelease(desktop, v("1.0-beta1")))
+        // A v-tagged release without an APK is skipped too, so a desktop build mis-tagged as vX.Y.Z
+        // can't be offered either.
+        assertNull(pickRelease(desktop("v9.0.0", "Naqi-9.0.0-x64.msix"), v("1.1")))
+
+        // Newest first, the way GitHub lists them: desktop releases on top of the Android ones.
+        val mixed = merge(desktop, stable("v1.3"), desktop("apple-v8.0.0", "Naqi-8.0.0.dmg"), REAL)
+        assertEquals("1.3", pickRelease(mixed, v("1.1"))?.version?.toString())
+        assertEquals("1.3", pickRelease(mixed, v("1.2-beta2"))?.version?.toString())
+        assertTrue(pickRelease(mixed, v("1.1"))?.apkUrl.orEmpty().endsWith("/naqi-1.3.apk"))
+        // Already on the newest Android build: the bigger desktop numbers don't read as an update.
+        assertNull(pickRelease(mixed, v("1.3")))
+    }
 }
+
+/** A non-Android release: its own tag scheme and, normally, no APK. Published as a stable. */
+private fun desktop(tag: String, asset: String) =
+    """[{"tag_name":"$tag","draft":false,"prerelease":false,
+        "assets":[{"name":"$asset","size":150000000,"browser_download_url":"https://x/$asset"}]}]"""
 
 private fun stable(tag: String) = release(tag, pre = false)
 private fun pre(tag: String) = release(tag, pre = true)

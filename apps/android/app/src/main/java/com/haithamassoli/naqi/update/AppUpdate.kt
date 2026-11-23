@@ -42,9 +42,14 @@ import java.net.URL
 object AppUpdate {
     private const val TAG = "AppUpdate"
 
-    /** Ten is well past the horizon anyone updates across, and one page is one request. */
+    /**
+     * One page is one request. The repo also publishes Windows (`windows-v…`) and Apple
+     * (`apple-v…`) releases, which [pickRelease] skips, so the page has to be deep enough that a run
+     * of desktop releases can't push the newest Android one off it. 30 leaves that headroom; see
+     * docs/RELEASING.md at the repo root.
+     */
     private const val RELEASES_URL =
-        "https://api.github.com/repos/haithamassoli/NaqiHalalVideoFilter/releases?per_page=10"
+        "https://api.github.com/repos/haithamassoli/NaqiHalalVideoFilter/releases?per_page=30"
 
     private const val FILE_NAME = "naqi-update.apk"
 
