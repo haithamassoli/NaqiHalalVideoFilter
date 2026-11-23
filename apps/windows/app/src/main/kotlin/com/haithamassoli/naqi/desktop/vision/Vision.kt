@@ -28,9 +28,15 @@ class FaceAnalyzer(who: String, modelsDir: File = Models.dir()) : AutoCloseable 
 
     // Android's rule (FilterWorker.genderVoter): only Women/Men pay for the vote, and a missing genderage
     // degrades to "no vote cast", which edlFor already censors, i.e. to Everyone, the safe direction.
-    private val voter = File(modelsDir, Models.GENDERAGE)
-        .takeIf { (who == FilterOps.WOMEN || who == FilterOps.MEN) && it.isFile }
-        ?.let { GenderVoter(it) }
+    // A genderage that is there but will not load throws, and must not strand the detector opened above.
+    private val voter = try {
+        File(modelsDir, Models.GENDERAGE)
+            .takeIf { (who == FilterOps.WOMEN || who == FilterOps.MEN) && it.isFile }
+            ?.let { GenderVoter(it) }
+    } catch (t: Throwable) {
+        detector.close()
+        throw t
+    }
 
     private val tracker = FaceTracks(who)
     private val cuts = SceneCuts()
@@ -46,15 +52,15 @@ class FaceAnalyzer(who: String, modelsDir: File = Models.dir()) : AutoCloseable 
     fun finish(): List<FaceTrackEdl> = tracker.finish()
 
     override fun close() {
-        detector.close()
-        voter?.close()
+        detector.use { voter?.close() } // both, even if one close throws
     }
 }
 
 /** The GantMan NSFW model ([Models.NSFW], input [1,3,224,224]). Not thread-safe. */
 class NsfwClassifier(modelsDir: File = Models.dir()) : AutoCloseable {
-    private val session = createSession(File(modelsDir, Models.NSFW))
+    // The buffer first: once the session is open nothing else in the constructor may throw.
     private val input = directFloats(3 * SIDE * SIDE)
+    private val session = createSession(File(modelsDir, Models.NSFW))
 
     /** Softmax probabilities in core's `NSFW_CLASSES` order, ready for `NsfwGate.fires`. */
     fun classify(frame: RgbFrame): FloatArray {
@@ -92,8 +98,8 @@ class NsfwClassifier(modelsDir: File = Models.dir()) : AutoCloseable {
  * contract with FilterWorker's body (crop, sigmoid of the logit gap, [CONF_FLOOR]).
  */
 internal class GenderVoter(model: File) : AutoCloseable {
+    private val input = directFloats(3 * SIDE * SIDE) // before the session, as in NsfwClassifier
     private val session = createSession(model)
-    private val input = directFloats(3 * SIDE * SIDE)
 
     fun vote(frame: RgbFrame, rect: NRect): Int = try {
         cropToTensor(frame, rect, input)
@@ -149,7 +155,11 @@ internal val ortEnv: OrtEnvironment by lazy { OrtEnvironment.getEnvironment() }
 internal fun createSession(model: File): OrtSession {
     require(model.isFile) { "Model missing: ${model.absolutePath}" }
     return OrtSession.SessionOptions().use { ortEnv.createSession(model.absolutePath, it) }
+        .also { s -> openedSessions?.let { synchronized(it) { it += s } } }
 }
+
+/** Test seam: when set, every session [createSession] opens is added here, so a test can see it closed. */
+@Volatile internal var openedSessions: MutableList<OrtSession>? = null
 
 /** Direct and native-order, so ORT wraps it without a copy (a heap buffer is copied on every run). */
 internal fun directFloats(n: Int): FloatBuffer =
